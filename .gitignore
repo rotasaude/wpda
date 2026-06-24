@@ -25,6 +25,7 @@ yarn-error.log*
 
 # Cache
 .cache/
+tsconfig.tsbuildinfo
 
 # tsc emit safety net (noEmit deve prevenir, mas garante)
 src/**/*.js
