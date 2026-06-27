@@ -1,30 +1,21 @@
-import { useEffect, useState } from "react";
-
-type Health =
-  | { kind: "loading" }
-  | { kind: "ok"; status: number }
-  | { kind: "error"; detail: string };
+import { tokenFromUrl } from "./lib/report";
+import { Report } from "./modules/Report";
 
 export function App() {
-  const [health, setHealth] = useState<Health>({ kind: "loading" });
-
-  useEffect(() => {
-    fetch("/up")
-      .then((res) => setHealth({ kind: "ok", status: res.status }))
-      .catch((err) => setHealth({ kind: "error", detail: String(err) }));
-  }, []);
-
-  return (
-    <main style={{ fontFamily: "var(--font-mono, monospace)", padding: 24 }}>
-      <h1>Rota Saúde · WPDA</h1>
-      <p>Autoria de protocolo da cidade. Fundação — sem editor ainda.</p>
-      <HealthLine health={health} />
-    </main>
-  );
-}
-
-function HealthLine({ health }: { health: Health }) {
-  if (health.kind === "loading") return <p>API: verificando…</p>;
-  if (health.kind === "ok") return <p>API /up: {health.status} ✓ (proxy dev→Rails ok)</p>;
-  return <p>API /up: falhou — {health.detail}</p>;
+  const token = tokenFromUrl();
+  if (!token) {
+    return (
+      <main style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24, fontFamily: "system-ui, sans-serif" }}>
+        <div style={{ textAlign: "center", maxWidth: 360 }}>
+          <strong style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 13 }}>Rota Saúde</strong>
+          <h1 style={{ fontSize: 18, margin: "8px 0" }}>Link inválido</h1>
+          <p style={{ color: "var(--ink3, #888)", fontSize: 14 }}>
+            Use o link enviado por WhatsApp para ver seu resultado.
+          </p>
+        </div>
+      </main>
+    );
+  }
+  return <Report token={token} />;
 }
