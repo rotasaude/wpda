@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { tokenFromUrl, fetchReport } from "./report";
+import { reportNote, GENERIC_NOTE } from "./report";
 
 describe("tokenFromUrl", () => {
   it("extrai ?token", () => { expect(tokenFromUrl("?token=abc")).toBe("abc"); });
@@ -29,4 +30,14 @@ describe("fetchReport", () => {
   });
   it("null em 404", async () => { mockFetch(404); expect(await fetchReport("x")).toBe(null); });
   it("lança em 500", async () => { mockFetch(500); await expect(fetchReport("x")).rejects.toThrow(); });
+});
+
+describe("reportNote", () => {
+  it("uses the recommendation when present", () => {
+    expect(reportNote({ title: "Procure atendimento", body: "Va a UPA." }))
+      .toEqual({ title: "Procure atendimento", body: "Va a UPA." });
+  });
+  it("falls back to the generic note when null", () => {
+    expect(reportNote(null)).toEqual({ title: null, body: GENERIC_NOTE });
+  });
 });
