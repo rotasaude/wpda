@@ -31,3 +31,5 @@ tsconfig.tsbuildinfo
 src/**/*.js
 vite.config.js
 *.tsbuildinfo
+!.env.example
+/.claude/
