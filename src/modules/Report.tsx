@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { fetchReport, type Report as ReportData } from "../lib/report";
+import { fetchReport, reportNote, type Report as ReportData } from "../lib/report";
 import { fmtDateTime } from "../lib/format";
 
 type State =
@@ -30,6 +30,7 @@ export function Report({ token }: { token: string }) {
   }
 
   const r = state.data;
+  const note = reportNote(r.recommendation);
   return (
     <Centered>
       <article style={{ maxWidth: 520, width: "100%" }}>
@@ -46,9 +47,13 @@ export function Report({ token }: { token: string }) {
           )}
           {r.priority && <span style={{ fontSize: 12, color: "var(--ink2, #555)" }}>prioridade: {r.priority}</span>}
         </div>
+        {note.title && (
+          <p style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.4, margin: "0 0 8px" }}>
+            {note.title}
+          </p>
+        )}
         <p style={{ fontSize: 15, lineHeight: 1.5, margin: "0 0 24px" }}>
-          Este é o resultado da sua triagem. Siga as orientações da sua unidade de saúde.
-          Se os sintomas piorarem, procure atendimento.
+          {note.body}
         </p>
         <footer style={{ fontSize: 12, color: "var(--ink3, #888)", borderTop: "1px solid var(--line, #eee)", paddingTop: 12 }}>
           {r.completed_at && <div>Realizado em {fmtDateTime(r.completed_at)}.</div>}
