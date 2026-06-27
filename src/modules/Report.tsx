@@ -46,7 +46,10 @@ export function Report({ token }: { token: string }) {
           )}
           {r.priority && <span style={{ fontSize: 12, color: "var(--ink2, #555)" }}>prioridade: {r.priority}</span>}
         </div>
-        {r.summary && <p style={{ fontSize: 15, lineHeight: 1.5, margin: "0 0 24px" }}>{r.summary}</p>}
+        <p style={{ fontSize: 15, lineHeight: 1.5, margin: "0 0 24px" }}>
+          Este é o resultado da sua triagem. Siga as orientações da sua unidade de saúde.
+          Se os sintomas piorarem, procure atendimento.
+        </p>
         <footer style={{ fontSize: 12, color: "var(--ink3, #888)", borderTop: "1px solid var(--line, #eee)", paddingTop: 12 }}>
           {r.completed_at && <div>Realizado em {fmtDateTime(r.completed_at)}.</div>}
           {r.expires_at && <div>Válido até {fmtDateTime(r.expires_at)}.</div>}
