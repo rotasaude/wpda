@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 // Em dev, Vite proxa rotas de backend para o Rails (apps/api, :3030).
 //   /up         → healthcheck do Rails.
 //   /r          → ReportsController (relatório público por token).
-const proxy = (target: string) => ({ target, changeOrigin: true });
+const proxy = (target: string) => ({ target, changeOrigin: false });
 const TARGET = process.env.VITE_API_PROXY_TARGET || "http://localhost:3030";
 
 export default defineConfig({
@@ -14,11 +14,10 @@ export default defineConfig({
   server: {
     port: 5173,
     host: "0.0.0.0",
+    allowedHosts: [ ".localhost" ],
     proxy: {
-      "/up":        proxy(TARGET),
-      "/r":         proxy(TARGET),
-      "/admin/api": proxy(TARGET),
-      "/session":   proxy(TARGET)
+      "/up": proxy(TARGET),
+      "/r":  proxy(TARGET)
     }
   }
 });

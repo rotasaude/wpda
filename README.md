@@ -15,5 +15,6 @@ npm install
 npm run dev
 ```
 
-Acesso: http://localhost:5176/wpda/. O Vite proxa as chamadas de API para
-`VITE_API_PROXY_TARGET` (default `http://localhost:3030`).
+Acesso: http://curitiba.localhost:5176/wpda/?token=<token>. O Vite proxa as chamadas de API para
+`VITE_API_PROXY_TARGET` (default `http://localhost:3030`) **sem reescrever o Host** — é o subdomínio que diz ao
+Rails qual cidade servir.
