@@ -96,7 +96,7 @@ export function Flow() {
       break;
     case "declined":
       view = <Screen title="Tudo bem" footer={<BigButton onClick={() => setState({ at: "consent" })}>Ler o termo de novo</BigButton>}>
-        <p>Sem o seu consentimento não fazemos a triagem, e nenhum dado seu foi guardado.</p>
+        <p>Sem o seu consentimento não fazemos a triagem, e nenhum CPF ou resposta sua foi guardado.</p>
       </Screen>;
       break;
   }
