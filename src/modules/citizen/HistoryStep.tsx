@@ -34,13 +34,15 @@ export function HistoryStep({ citizenId, onBack }: { citizenId: string; onBack: 
               <li key={t.id} style={{ border: "1px solid var(--rule2, #ccc)", borderRadius: 12, padding: 12 }}>
                 <strong>{t.tier ? `Prioridade ${t.tier}` : "Em andamento"}</strong>
                 <div style={{ fontSize: 18 }}>{fmtDateTime(t.completed_at ?? t.created_at)}</div>
-                {t.report_url && <a href={t.report_url} style={{ display: "inline-block", minHeight: 48, lineHeight: "48px", fontSize: 18 }}>Ver relatório</a>}
-                {t.consent_active && (
-                  <button type="button" onClick={() => revoke(t.id)}
-                    style={{ minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 18 }}>
-                    Revogar consentimento
-                  </button>
-                )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 8 }}>
+                  {t.report_url && <a href={t.report_url} style={{ display: "inline-block", minHeight: 48, lineHeight: "48px", fontSize: 18 }}>Ver relatório</a>}
+                  {t.consent_active && (
+                    <button type="button" onClick={() => revoke(t.id)}
+                      style={{ minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 18 }}>
+                      Revogar consentimento
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
