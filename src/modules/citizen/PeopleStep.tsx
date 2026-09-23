@@ -30,7 +30,7 @@ export function PeopleStep({ onChoose, onHistory }:
               CPF {p.cpf_masked}
             </BigButton>
             <button type="button" onClick={() => onHistory(p.id)}
-              style={{ minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 16 }}>
+              style={{ minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 18 }}>
               Ver triagens de {p.cpf_masked}
             </button>
           </div>
