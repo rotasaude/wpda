@@ -1,7 +1,7 @@
 // Máquina de telas do canal web do cidadão (spec §4). Sem biblioteca de rotas:
 // o estado mora aqui, e um F5 volta ao começo com a sessão (cookie) preservada.
 import { useEffect, useState } from "react";
-import { citizenApi, type Step } from "../../lib/citizenApi";
+import { citizenApi, ApiError, type Step } from "../../lib/citizenApi";
 import { PhoneStep } from "./PhoneStep";
 import { CodeStep } from "./CodeStep";
 import { ConsentStep } from "./ConsentStep";
@@ -46,7 +46,23 @@ export function Flow() {
       const r = await citizenApi.start({ ...choice, consentVersion });
       setState({ at: "question", consentVersion, conversationId: r.conversation_id, citizenId: r.citizen_id, step: r.step });
     } catch (e) {
+      if (e instanceof ApiError && (e.code === "consent_outdated" || e.code === "no_consent")) {
+        setState({ at: "consent" });
+        return;
+      }
       setError(messageFor(e));
+    }
+  }
+
+  // Conflitos que retentar não resolve (§ spec de erros): o termo mudou no
+  // meio da triagem, o consentimento foi revogado em outra aba, ou a
+  // conversa parou de existir (aba aberta >24h). Manda o cidadão para a
+  // tela que resolve cada caso, em vez do erro genérico.
+  function onConflict(code: string, consentVersion: string) {
+    if (code === "not_in_progress") {
+      setState({ at: "people", consentVersion });
+    } else {
+      setState({ at: "consent" });
     }
   }
 
@@ -83,7 +99,8 @@ export function Flow() {
     case "question":
       view = <QuestionStep conversationId={state.conversationId} step={state.step}
         onStep={step => setState({ ...state, step })}
-        onCompleted={triageId => setState({ at: "result", consentVersion: state.consentVersion, triageId, citizenId: state.citizenId })} />;
+        onCompleted={triageId => setState({ at: "result", consentVersion: state.consentVersion, triageId, citizenId: state.citizenId })}
+        onConflict={code => onConflict(code, state.consentVersion)} />;
       break;
     case "result":
       view = <ResultStep triageId={state.triageId}

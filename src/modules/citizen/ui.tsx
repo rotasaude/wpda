@@ -63,6 +63,8 @@ const MESSAGES: Record<string, string> = {
   invalid_cpf: "CPF inválido. Confira os números.",
   too_many_people: "Este celular já tem 10 pessoas cadastradas.",
   consent_outdated: "O termo foi atualizado. Leia de novo para continuar.",
+  no_consent: "É preciso aceitar o termo para continuar.",
+  not_in_progress: "Essa triagem não está mais em andamento. Escolha para quem é a nova triagem.",
   no_protocol: "A triagem não está disponível agora nesta cidade.",
   no_consent_term: "A triagem não está disponível agora nesta cidade.",
   invalid_answer: "Não entendemos a resposta. Tente de novo.",

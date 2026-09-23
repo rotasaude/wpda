@@ -1,12 +1,18 @@
 // Uma pergunta por tela (spec §2.7). A chave de idempotência é uma por
 // pergunta mostrada: um toque duplo manda a mesma chave e não avança duas vezes.
 import { useMemo, useState } from "react";
-import { citizenApi, type AnswerState, type Step } from "../../lib/citizenApi";
+import { citizenApi, ApiError, type AnswerState, type Step } from "../../lib/citizenApi";
 import { onlyDigits } from "../../lib/masks";
 import { BigButton, ErrorText, Field, Screen, messageFor } from "./ui";
 
-export function QuestionStep({ conversationId, step, onStep, onCompleted }: {
+// Códigos de conflito que retentar não resolve: a triagem parou de existir
+// (aba aberta >24h, consentimento revogado em outra aba) ou o termo mudou no
+// meio do caminho. Quem decide para onde mandar o cidadão é o Flow.
+const STALE_TRIAGE_CODES = new Set(["no_consent", "not_in_progress", "consent_outdated"]);
+
+export function QuestionStep({ conversationId, step, onStep, onCompleted, onConflict }: {
   conversationId: string; step: Step; onStep: (s: Step) => void; onCompleted: (triageId: string) => void;
+  onConflict?: (code: string) => void;
 }) {
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -19,13 +25,21 @@ export function QuestionStep({ conversationId, step, onStep, onCompleted }: {
     else if ("triage_id" in state) onCompleted(state.triage_id);
   }
 
+  function handleError(e: unknown) {
+    if (onConflict && e instanceof ApiError && STALE_TRIAGE_CODES.has(e.code)) {
+      onConflict(e.code);
+      return;
+    }
+    setError(messageFor(e));
+  }
+
   async function send(answer: string) {
     setBusy(true);
     setError(null);
     try {
       handle(await citizenApi.answer(conversationId, answer, key));
     } catch (e) {
-      setError(messageFor(e));
+      handleError(e);
     } finally {
       setBusy(false);
     }
@@ -37,7 +51,7 @@ export function QuestionStep({ conversationId, step, onStep, onCompleted }: {
     try {
       handle(await citizenApi.undo(conversationId));
     } catch (e) {
-      setError(messageFor(e));
+      handleError(e);
     } finally {
       setBusy(false);
     }
