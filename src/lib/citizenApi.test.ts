@@ -39,4 +39,11 @@ describe("citizenApi", () => {
     const init = (fn.mock.calls[0] as unknown as [string, RequestInit])[1];
     expect(JSON.parse(init.body as string)).toEqual({ cpf: "529.982.247-25", consent_version: "1" });
   });
+
+  it("401 dispara citizen:unauthenticated e ainda rejeita com ApiError", async () => {
+    mockFetch(401, { error: "unauthenticated" });
+    const spy = vi.spyOn(window, "dispatchEvent");
+    await expect(citizenApi.currentSession()).rejects.toEqual(new ApiError(401, "unauthenticated"));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ type: "citizen:unauthenticated" }));
+  });
 });

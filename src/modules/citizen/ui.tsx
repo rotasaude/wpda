@@ -66,7 +66,8 @@ const MESSAGES: Record<string, string> = {
   no_protocol: "A triagem não está disponível agora nesta cidade.",
   no_consent_term: "A triagem não está disponível agora nesta cidade.",
   invalid_answer: "Não entendemos a resposta. Tente de novo.",
-  city_schema_behind: "Serviço em manutenção. Tente em instantes."
+  city_schema_behind: "Serviço em manutenção. Tente em instantes.",
+  unauthenticated: "Sua sessão expirou. Entre de novo com seu celular."
 };
 
 export function messageFor(error: unknown): string {

@@ -49,7 +49,10 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   });
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, (data as { error?: string }).error ?? `http_${res.status}`);
+  if (!res.ok) {
+    if (res.status === 401) window.dispatchEvent(new Event("citizen:unauthenticated"));
+    throw new ApiError(res.status, (data as { error?: string }).error ?? `http_${res.status}`);
+  }
   return data as T;
 }
 

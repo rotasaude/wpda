@@ -32,6 +32,14 @@ export function Flow() {
       .catch(() => setState({ at: "phone" }));
   }, []);
 
+  useEffect(() => {
+    function onUnauthenticated() {
+      setState({ at: "phone" });
+    }
+    window.addEventListener("citizen:unauthenticated", onUnauthenticated);
+    return () => window.removeEventListener("citizen:unauthenticated", onUnauthenticated);
+  }, []);
+
   async function choose(consentVersion: string, choice: PersonChoice) {
     setError(null);
     try {
