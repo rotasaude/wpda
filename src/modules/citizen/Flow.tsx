@@ -9,6 +9,7 @@ import { PeopleStep, type PersonChoice } from "./PeopleStep";
 import { QuestionStep } from "./QuestionStep";
 import { ResultStep } from "./ResultStep";
 import { HistoryStep } from "./HistoryStep";
+import { VerificationCodeStep } from "./VerificationCodeStep";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
 type State =
@@ -20,6 +21,7 @@ type State =
   | { at: "question"; consentVersion: string; conversationId: string; citizenId: string; step: Step }
   | { at: "result"; consentVersion: string; triageId: string; citizenId: string }
   | { at: "history"; consentVersion: string | null; citizenId: string }
+  | { at: "verify-code"; citizenId: string; consentVersion: string | null }
   | { at: "declined" };
 
 export function Flow() {
@@ -109,7 +111,12 @@ export function Flow() {
       break;
     case "history":
       view = <HistoryStep citizenId={state.citizenId}
-        onBack={() => setState(state.consentVersion ? { at: "people", consentVersion: state.consentVersion } : { at: "consent" })} />;
+        onBack={() => setState(state.consentVersion ? { at: "people", consentVersion: state.consentVersion } : { at: "consent" })}
+        onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })} />;
+      break;
+    case "verify-code":
+      view = <VerificationCodeStep citizenId={state.citizenId}
+        onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
       break;
     case "declined":
       view = <Screen title="Tudo bem" footer={<BigButton onClick={() => setState({ at: "consent" })}>Ler o termo de novo</BigButton>}>

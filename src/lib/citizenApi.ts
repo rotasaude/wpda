@@ -24,7 +24,12 @@ export type AnswerState =
   | { status: "in_progress"; step: Step }
   | { status: string; triage_id: string };
 
-export interface Person { id: string; cpf_masked: string; verification_level: "declared" | "verified" }
+export interface Person {
+  id: string;
+  cpf_masked: string;
+  verification_level: "declared" | "verified";
+  verified_at?: string | null;
+}
 
 export interface TriageSummary {
   id: string;
@@ -35,6 +40,7 @@ export interface TriageSummary {
   completed_at: string | null;
   report_url: string | null;
   consent_active: boolean;
+  origin_phone_masked: string | null;
 }
 
 export interface StartResult { conversation_id: string; citizen_id: string; resumed: boolean; step: Step }
@@ -76,5 +82,7 @@ export const citizenApi = {
   triages: (citizenId: string) =>
     call<{ citizen: Person; triages: TriageSummary[] }>("GET", `/triages?citizen_id=${encodeURIComponent(citizenId)}`),
   triage: (id: string) => call<TriageSummary>("GET", `/triages/${id}`),
-  revokeConsent: (id: string) => call<TriageSummary>("POST", `/triages/${id}/revoke_consent`)
+  revokeConsent: (id: string) => call<TriageSummary>("POST", `/triages/${id}/revoke_consent`),
+  issueVerificationCode: (citizenId: string) =>
+    call<{ code: string; expires_at: string }>("POST", "/verification_codes", { citizen_id: citizenId })
 };
