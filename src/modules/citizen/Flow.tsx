@@ -10,6 +10,7 @@ import { QuestionStep } from "./QuestionStep";
 import { ResultStep } from "./ResultStep";
 import { HistoryStep } from "./HistoryStep";
 import { VerificationCodeStep } from "./VerificationCodeStep";
+import { CounterCodeStep } from "./CounterCodeStep";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
 type State =
@@ -22,6 +23,7 @@ type State =
   | { at: "result"; consentVersion: string; triageId: string; citizenId: string }
   | { at: "history"; consentVersion: string | null; citizenId: string }
   | { at: "verify-code"; citizenId: string; consentVersion: string | null }
+  | { at: "check-in-code"; triageId: string; citizenId: string; consentVersion: string | null }
   | { at: "declined" };
 
 export function Flow() {
@@ -112,10 +114,17 @@ export function Flow() {
     case "history":
       view = <HistoryStep citizenId={state.citizenId}
         onBack={() => setState(state.consentVersion ? { at: "people", consentVersion: state.consentVersion } : { at: "consent" })}
-        onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })} />;
+        onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })}
+        onCheckIn={triageId => setState({ at: "check-in-code", triageId, citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
       break;
     case "verify-code":
       view = <VerificationCodeStep citizenId={state.citizenId}
+        onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
+      break;
+    case "check-in-code":
+      view = <CounterCodeStep title="Cheguei na unidade"
+        instruction="Mostre este código e um documento com foto na recepção da unidade."
+        issue={() => citizenApi.issueCheckInCode(state.triageId)}
         onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
       break;
     case "declined":

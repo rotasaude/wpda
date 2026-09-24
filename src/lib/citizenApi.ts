@@ -31,6 +31,16 @@ export interface Person {
   verified_at?: string | null;
 }
 
+export interface AttendanceSummary {
+  status: "open" | "closed";
+  unit_name: string;
+  checked_in_at: string;
+  outcome: "discharged" | "referred" | "left" | null;
+  referral_unit_name: string | null;
+  referral_note: string | null;
+  closed_at: string | null;
+}
+
 export interface TriageSummary {
   id: string;
   status: string;
@@ -41,6 +51,11 @@ export interface TriageSummary {
   report_url: string | null;
   consent_active: boolean;
   origin_phone_masked: string | null;
+  // Ausentes numa api anterior a este deploy: normalizados na borda (ver
+  // normalizeTriage) para que as telas nunca comparem `=== null` um valor
+  // que pode chegar `undefined`.
+  attendance?: AttendanceSummary | null;
+  check_in_available?: boolean;
 }
 
 export interface StartResult { conversation_id: string; citizen_id: string; resumed: boolean; step: Step }
@@ -62,6 +77,10 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return data as T;
 }
 
+function normalizeTriage(t: TriageSummary): TriageSummary {
+  return { ...t, attendance: t.attendance ?? null, check_in_available: t.check_in_available ?? false };
+}
+
 export const citizenApi = {
   requestCode: (phone: string) =>
     call<{ status: string; resend_after: number }>("POST", "/otp", { phone }),
@@ -79,10 +98,15 @@ export const citizenApi = {
   answer: (conversationId: string, answer: string, idempotencyKey: string) =>
     call<AnswerState>("POST", `/conversations/${conversationId}/answers`, { answer, idempotency_key: idempotencyKey }),
   undo: (conversationId: string) => call<AnswerState>("POST", `/conversations/${conversationId}/undo`),
-  triages: (citizenId: string) =>
-    call<{ citizen: Person; triages: TriageSummary[] }>("GET", `/triages?citizen_id=${encodeURIComponent(citizenId)}`),
-  triage: (id: string) => call<TriageSummary>("GET", `/triages/${id}`),
+  triages: async (citizenId: string) => {
+    const data = await call<{ citizen: Person; triages: TriageSummary[] }>(
+      "GET", `/triages?citizen_id=${encodeURIComponent(citizenId)}`);
+    return { ...data, triages: data.triages.map(normalizeTriage) };
+  },
+  triage: async (id: string) => normalizeTriage(await call<TriageSummary>("GET", `/triages/${id}`)),
   revokeConsent: (id: string) => call<TriageSummary>("POST", `/triages/${id}/revoke_consent`),
   issueVerificationCode: (citizenId: string) =>
-    call<{ code: string; expires_at: string }>("POST", "/verification_codes", { citizen_id: citizenId })
+    call<{ code: string; expires_at: string }>("POST", "/verification_codes", { citizen_id: citizenId }),
+  issueCheckInCode: (triageId: string) =>
+    call<{ code: string; expires_at: string }>("POST", `/triages/${triageId}/check_in_code`)
 };

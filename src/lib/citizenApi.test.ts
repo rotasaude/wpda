@@ -46,4 +46,52 @@ describe("citizenApi", () => {
     await expect(citizenApi.currentSession()).rejects.toEqual(new ApiError(401, "unauthenticated"));
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ type: "citizen:unauthenticated" }));
   });
+
+  it("triages de uma api antiga sem attendance/check_in_available normaliza para null/false", async () => {
+    const rawTriage: Record<string, unknown> = {
+      id: "t1", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-22T12:00:00Z",
+      completed_at: "2026-09-22T12:05:00Z", report_url: null, consent_active: true, origin_phone_masked: null,
+      attendance: { status: "open", unit_name: "UBS Centro", checked_in_at: "2026-09-24T12:00:00Z",
+        outcome: null, referral_unit_name: null, referral_note: null, closed_at: null },
+      check_in_available: true
+    };
+    // Guarda: confirma que as chaves realmente existiam antes de serem apagadas
+    // (senão o teste não provaria nada sobre a normalização de ausência).
+    expect("attendance" in rawTriage).toBe(true);
+    expect("check_in_available" in rawTriage).toBe(true);
+    delete rawTriage.attendance;
+    delete rawTriage.check_in_available;
+    expect("attendance" in rawTriage).toBe(false);
+    expect("check_in_available" in rawTriage).toBe(false);
+
+    mockFetch(200, {
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", verified_at: null },
+      triages: [rawTriage]
+    });
+    const result = await citizenApi.triages("p1");
+    expect(result.triages[0].attendance).toBeNull();
+    expect(result.triages[0].check_in_available).toBe(false);
+  });
+
+  it("triage() de uma api antiga sem attendance/check_in_available normaliza para null/false", async () => {
+    const rawTriage: Record<string, unknown> = {
+      id: "t1", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-22T12:00:00Z",
+      completed_at: "2026-09-22T12:05:00Z", report_url: null, consent_active: true, origin_phone_masked: null
+    };
+    expect("attendance" in rawTriage).toBe(false);
+    expect("check_in_available" in rawTriage).toBe(false);
+    mockFetch(200, rawTriage);
+    const result = await citizenApi.triage("t1");
+    expect(result.attendance).toBeNull();
+    expect(result.check_in_available).toBe(false);
+  });
+
+  it("issueCheckInCode manda POST para check_in_code da triagem", async () => {
+    const fn = mockFetch(201, { code: "123456", expires_at: "2026-09-24T12:10:00Z" });
+    const result = await citizenApi.issueCheckInCode("t1");
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/triages/t1/check_in_code");
+    expect(init.method).toBe("POST");
+    expect(result).toEqual({ code: "123456", expires_at: "2026-09-24T12:10:00Z" });
+  });
 });

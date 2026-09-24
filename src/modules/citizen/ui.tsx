@@ -70,7 +70,10 @@ const MESSAGES: Record<string, string> = {
   invalid_answer: "Não entendemos a resposta. Tente de novo.",
   city_schema_behind: "Serviço em manutenção. Tente em instantes.",
   unauthenticated: "Sua sessão expirou. Entre de novo com seu celular.",
-  already_verified: "Seu cadastro já está verificado."
+  already_verified: "Seu cadastro já está verificado.",
+  triage_too_old: "Esta triagem tem mais de 3 dias. Faça uma triagem nova.",
+  triage_not_eligible: "Esta triagem não está disponível para check-in.",
+  already_checked_in: "Você já fez o check-in desta triagem."
 };
 
 export function messageFor(error: unknown): string {
