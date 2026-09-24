@@ -61,12 +61,38 @@ describe("QuestionStep", () => {
 describe("HistoryStep", () => {
   it("lista triagens e avisa que o cadastro não é verificado", async () => {
     vi.spyOn(citizenApi, "triages").mockResolvedValue({
-      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" },
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", verified_at: null },
       triages: [{ id: "t1", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-22T12:00:00Z",
-                  completed_at: "2026-09-22T12:05:00Z", report_url: "http://x/wpda/?token=abc", consent_active: true }]
+                  completed_at: "2026-09-22T12:05:00Z", report_url: "http://x/wpda/?token=abc", consent_active: true,
+                  origin_phone_masked: null }]
     });
-    render(<HistoryStep citizenId="p1" onBack={vi.fn()} />);
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} />);
     expect(await screen.findByText(/Cadastro não verificado/)).toBeInTheDocument();
     expect(screen.getByText(/Prioridade alta/)).toBeInTheDocument();
+  });
+
+  it("cadastro declarado oferece 'Validar no posto'", async () => {
+    vi.spyOn(citizenApi, "triages").mockResolvedValue({
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", verified_at: null },
+      triages: []
+    });
+    const onValidate = vi.fn();
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={onValidate} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Validar no posto" }));
+    expect(onValidate).toHaveBeenCalledWith("p1");
+  });
+
+  it("cadastro verificado mostra o selo e a origem das triagens de outro celular, sem revogar", async () => {
+    vi.spyOn(citizenApi, "triages").mockResolvedValue({
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "verified", verified_at: "2026-09-24T12:00:00Z" },
+      triages: [{ id: "t2", status: "completed", tier: "baixa", priority: 9, created_at: "2026-09-20T12:00:00Z",
+                  completed_at: "2026-09-20T12:05:00Z", report_url: null, consent_active: false,
+                  origin_phone_masked: "(**) *****-2222" }]
+    });
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} />);
+    expect(await screen.findByText(/Cadastro verificado em/)).toBeInTheDocument();
+    expect(screen.getByText("Feita no celular (**) *****-2222")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Validar no posto" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Revogar consentimento" })).not.toBeInTheDocument();
   });
 });

@@ -3,7 +3,8 @@ import { citizenApi, type Person, type TriageSummary } from "../../lib/citizenAp
 import { fmtDateTime } from "../../lib/format";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
-export function HistoryStep({ citizenId, onBack }: { citizenId: string; onBack: () => void }) {
+export function HistoryStep({ citizenId, onBack, onValidate }:
+  { citizenId: string; onBack: () => void; onValidate: (citizenId: string) => void }) {
   const [data, setData] = useState<{ citizen: Person; triages: TriageSummary[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,10 +24,15 @@ export function HistoryStep({ citizenId, onBack }: { citizenId: string; onBack: 
       {data && (
         <>
           <p>CPF {data.citizen.cpf_masked}</p>
-          {data.citizen.verification_level === "declared" && (
-            <p style={{ background: "var(--warnBg, #fff4e0)", padding: 12, borderRadius: 12 }}>
-              Cadastro não verificado. Leve um documento com foto ao posto de saúde para ver seu histórico completo.
-            </p>
+          {data.citizen.verification_level === "declared" ? (
+            <>
+              <p style={{ background: "var(--warnBg, #fff4e0)", padding: 12, borderRadius: 12 }}>
+                Cadastro não verificado. Leve um documento com foto ao posto de saúde para ver seu histórico completo.
+              </p>
+              <BigButton onClick={() => onValidate(citizenId)}>Validar no posto</BigButton>
+            </>
+          ) : (
+            <p>Cadastro verificado{data.citizen.verified_at ? ` em ${fmtDateTime(data.citizen.verified_at)}` : ""}</p>
           )}
           {data.triages.length === 0 && <p>Nenhuma triagem ainda.</p>}
           <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 12 }}>
@@ -34,9 +40,10 @@ export function HistoryStep({ citizenId, onBack }: { citizenId: string; onBack: 
               <li key={t.id} style={{ border: "1px solid var(--rule2, #ccc)", borderRadius: 12, padding: 12 }}>
                 <strong>{t.tier ? `Prioridade ${t.tier}` : "Em andamento"}</strong>
                 <div style={{ fontSize: 18 }}>{fmtDateTime(t.completed_at ?? t.created_at)}</div>
+                {t.origin_phone_masked && <div>Feita no celular {t.origin_phone_masked}</div>}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 8 }}>
                   {t.report_url && <a href={t.report_url} style={{ display: "inline-block", minHeight: 48, lineHeight: "48px", fontSize: 18 }}>Ver relatório</a>}
-                  {t.consent_active && (
+                  {t.consent_active && !t.origin_phone_masked && (
                     <button type="button" onClick={() => revoke(t.id)}
                       style={{ minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 18 }}>
                       Revogar consentimento
