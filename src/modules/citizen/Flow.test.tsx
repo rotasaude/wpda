@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { useState } from "react";
 import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Flow } from "./Flow";
@@ -76,5 +77,48 @@ describe("Flow", () => {
     await userEvent.click(screen.getByRole("button", { name: "Sim" }));
 
     expect(await screen.findByText("Para quem é esta triagem?")).toBeInTheDocument();
+  });
+
+  // Harness que força Flow a re-renderizar sem mudar seu estado interno —
+  // simula o re-render que, sem useCallback, geraria um `issue` novo e
+  // reemitiria o código de check-in (mesmo cuidado que VerificationCodeStep).
+  function ForcedRerenderHarness() {
+    const [tick, setTick] = useState(0);
+    return (
+      <>
+        <button type="button" onClick={() => setTick(t => t + 1)}>rerender {tick}</button>
+        <Flow />
+      </>
+    );
+  }
+
+  it("issue do check-in é memoizado: re-render de Flow não reemite o código", async () => {
+    vi.spyOn(citizenApi, "currentSession").mockResolvedValue({ phone_masked: "(**) *****-5432" });
+    vi.spyOn(citizenApi, "consentTerm").mockResolvedValue({ version: "1", body: "Termo" });
+    vi.spyOn(citizenApi, "people").mockResolvedValue({
+      people: [{ id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" }]
+    });
+    vi.spyOn(citizenApi, "triages").mockResolvedValue({
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" },
+      triages: [{
+        id: "t1", status: "completed", priority: 3, created_at: "2026-09-24T12:00:00Z",
+        completed_at: "2026-09-24T12:05:00Z", report_url: null, consent_active: true,
+        origin_phone_masked: null, tier: "azul", check_in_available: true
+      }]
+    });
+    const issueCheckInCode = vi.spyOn(citizenApi, "issueCheckInCode")
+      .mockResolvedValue({ code: "123456", expires_at: new Date(Date.now() + 600000).toISOString() });
+
+    render(<ForcedRerenderHarness />);
+    await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
+    await userEvent.click(await screen.findByText("Ver triagens de ***.982.247-**"));
+    await userEvent.click(await screen.findByRole("button", { name: "Cheguei na unidade" }));
+
+    expect(await screen.findByText("123456")).toBeInTheDocument();
+    expect(issueCheckInCode).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByRole("button", { name: /rerender/ }));
+
+    expect(issueCheckInCode).toHaveBeenCalledTimes(1);
   });
 });

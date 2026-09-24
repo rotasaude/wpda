@@ -1,6 +1,6 @@
 // Máquina de telas do canal web do cidadão (spec §4). Sem biblioteca de rotas:
 // o estado mora aqui, e um F5 volta ao começo com a sessão (cookie) preservada.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { citizenApi, ApiError, type Step } from "../../lib/citizenApi";
 import { PhoneStep } from "./PhoneStep";
 import { CodeStep } from "./CodeStep";
@@ -74,6 +74,15 @@ export function Flow() {
     try { await citizenApi.signOut(); } finally { setState({ at: "phone" }); }
   }
 
+  // Mesmo cuidado que VerificationCodeStep: sem memoizar por triageId, cada
+  // re-render de Flow (ex.: o próprio contador do CounterCodeStep) passaria
+  // um `issue` novo e reemitiria o código.
+  const checkInTriageId = state.at === "check-in-code" ? state.triageId : null;
+  const issueCheckIn = useCallback(
+    () => citizenApi.issueCheckInCode(checkInTriageId as string),
+    [checkInTriageId]
+  );
+
   const exit = state.at !== "boot" && state.at !== "phone" && state.at !== "code" && (
     <button type="button" onClick={signOut}
       style={{ position: "fixed", top: 8, right: 8, minHeight: 48, background: "none", border: "none", fontSize: 18 }}>
@@ -124,7 +133,7 @@ export function Flow() {
     case "check-in-code":
       view = <CounterCodeStep title="Cheguei na unidade"
         instruction="Mostre este código e um documento com foto na recepção da unidade."
-        issue={() => citizenApi.issueCheckInCode(state.triageId)}
+        issue={issueCheckIn}
         onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
       break;
     case "declined":
