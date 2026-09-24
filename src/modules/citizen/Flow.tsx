@@ -1,6 +1,6 @@
 // Máquina de telas do canal web do cidadão (spec §4). Sem biblioteca de rotas:
 // o estado mora aqui, e um F5 volta ao começo com a sessão (cookie) preservada.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { citizenApi, ApiError, type Step } from "../../lib/citizenApi";
 import { PhoneStep } from "./PhoneStep";
 import { CodeStep } from "./CodeStep";
@@ -10,6 +10,7 @@ import { QuestionStep } from "./QuestionStep";
 import { ResultStep } from "./ResultStep";
 import { HistoryStep } from "./HistoryStep";
 import { VerificationCodeStep } from "./VerificationCodeStep";
+import { CounterCodeStep } from "./CounterCodeStep";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
 type State =
@@ -22,6 +23,7 @@ type State =
   | { at: "result"; consentVersion: string; triageId: string; citizenId: string }
   | { at: "history"; consentVersion: string | null; citizenId: string }
   | { at: "verify-code"; citizenId: string; consentVersion: string | null }
+  | { at: "check-in-code"; triageId: string; citizenId: string; consentVersion: string | null }
   | { at: "declined" };
 
 export function Flow() {
@@ -72,6 +74,15 @@ export function Flow() {
     try { await citizenApi.signOut(); } finally { setState({ at: "phone" }); }
   }
 
+  // Mesmo cuidado que VerificationCodeStep: sem memoizar por triageId, cada
+  // re-render de Flow (ex.: o próprio contador do CounterCodeStep) passaria
+  // um `issue` novo e reemitiria o código.
+  const checkInTriageId = state.at === "check-in-code" ? state.triageId : null;
+  const issueCheckIn = useCallback(
+    () => citizenApi.issueCheckInCode(checkInTriageId as string),
+    [checkInTriageId]
+  );
+
   const exit = state.at !== "boot" && state.at !== "phone" && state.at !== "code" && (
     <button type="button" onClick={signOut}
       style={{ position: "fixed", top: 8, right: 8, minHeight: 48, background: "none", border: "none", fontSize: 18 }}>
@@ -112,10 +123,17 @@ export function Flow() {
     case "history":
       view = <HistoryStep citizenId={state.citizenId}
         onBack={() => setState(state.consentVersion ? { at: "people", consentVersion: state.consentVersion } : { at: "consent" })}
-        onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })} />;
+        onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })}
+        onCheckIn={triageId => setState({ at: "check-in-code", triageId, citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
       break;
     case "verify-code":
       view = <VerificationCodeStep citizenId={state.citizenId}
+        onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
+      break;
+    case "check-in-code":
+      view = <CounterCodeStep title="Cheguei na unidade"
+        instruction="Mostre este código e um documento com foto na recepção da unidade."
+        issue={issueCheckIn}
         onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
       break;
     case "declined":

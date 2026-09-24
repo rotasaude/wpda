@@ -66,7 +66,7 @@ describe("HistoryStep", () => {
                   completed_at: "2026-09-22T12:05:00Z", report_url: "http://x/wpda/?token=abc", consent_active: true,
                   origin_phone_masked: null }]
     });
-    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} />);
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} onCheckIn={vi.fn()} />);
     expect(await screen.findByText(/Cadastro não verificado/)).toBeInTheDocument();
     expect(screen.getByText(/Prioridade alta/)).toBeInTheDocument();
   });
@@ -77,7 +77,7 @@ describe("HistoryStep", () => {
       triages: []
     });
     const onValidate = vi.fn();
-    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={onValidate} />);
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={onValidate} onCheckIn={vi.fn()} />);
     await userEvent.click(await screen.findByRole("button", { name: "Validar no posto" }));
     expect(onValidate).toHaveBeenCalledWith("p1");
   });
@@ -89,10 +89,101 @@ describe("HistoryStep", () => {
                   completed_at: "2026-09-20T12:05:00Z", report_url: null, consent_active: false,
                   origin_phone_masked: "(**) *****-2222" }]
     });
-    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} />);
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} onCheckIn={vi.fn()} />);
     expect(await screen.findByText(/Cadastro verificado em/)).toBeInTheDocument();
     expect(screen.getByText("Feita no celular (**) *****-2222")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Validar no posto" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Revogar consentimento" })).not.toBeInTheDocument();
+  });
+
+  it("triagem elegível para check-in mostra 'Cheguei na unidade' e chama onCheckIn(id)", async () => {
+    vi.spyOn(citizenApi, "triages").mockResolvedValue({
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", verified_at: null },
+      triages: [{ id: "t3", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-23T12:00:00Z",
+                  completed_at: "2026-09-23T12:05:00Z", report_url: null, consent_active: true,
+                  origin_phone_masked: null, attendance: null, check_in_available: true }]
+    });
+    const onCheckIn = vi.fn();
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} onCheckIn={onCheckIn} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Cheguei na unidade" }));
+    expect(onCheckIn).toHaveBeenCalledWith("t3");
+  });
+
+  it("atendimento aberto mostra 'Em atendimento na UBS Centro desde hh:mm'", async () => {
+    vi.spyOn(citizenApi, "triages").mockResolvedValue({
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", verified_at: null },
+      triages: [{ id: "t4", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-24T12:00:00Z",
+                  completed_at: "2026-09-24T12:05:00Z", report_url: null, consent_active: true,
+                  origin_phone_masked: null, check_in_available: false,
+                  attendance: { status: "open", unit_name: "UBS Centro", checked_in_at: "2026-09-24T15:30:00Z",
+                    outcome: null, referral_unit_name: null, referral_note: null, closed_at: null } }]
+    });
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} onCheckIn={vi.fn()} />);
+    expect(await screen.findByText(/Em atendimento na UBS Centro desde \d\d:\d\d/)).toBeInTheDocument();
+  });
+
+  it("atendimento encerrado com alta mostra 'Atendido e liberado'", async () => {
+    vi.spyOn(citizenApi, "triages").mockResolvedValue({
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", verified_at: null },
+      triages: [{ id: "t5", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-24T12:00:00Z",
+                  completed_at: "2026-09-24T12:05:00Z", report_url: null, consent_active: true,
+                  origin_phone_masked: null, check_in_available: false,
+                  attendance: { status: "closed", unit_name: "UBS Centro", checked_in_at: "2026-09-24T15:30:00Z",
+                    outcome: "discharged", referral_unit_name: null, referral_note: null, closed_at: "2026-09-24T16:00:00Z" } }]
+    });
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} onCheckIn={vi.fn()} />);
+    expect(await screen.findByText("Atendido e liberado")).toBeInTheDocument();
+  });
+
+  it("atendimento encerrado com encaminhamento (unidade e descrição) mostra 'Encaminhado para UPA Norte — cardiologia'", async () => {
+    vi.spyOn(citizenApi, "triages").mockResolvedValue({
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", verified_at: null },
+      triages: [{ id: "t6", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-24T12:00:00Z",
+                  completed_at: "2026-09-24T12:05:00Z", report_url: null, consent_active: true,
+                  origin_phone_masked: null, check_in_available: false,
+                  attendance: { status: "closed", unit_name: "UBS Centro", checked_in_at: "2026-09-24T15:30:00Z",
+                    outcome: "referred", referral_unit_name: "UPA Norte", referral_note: "cardiologia", closed_at: "2026-09-24T16:00:00Z" } }]
+    });
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} onCheckIn={vi.fn()} />);
+    expect(await screen.findByText("Encaminhado para UPA Norte — cardiologia")).toBeInTheDocument();
+  });
+
+  it("atendimento encerrado com encaminhamento só com descrição mostra 'Encaminhado — só a nota'", async () => {
+    vi.spyOn(citizenApi, "triages").mockResolvedValue({
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", verified_at: null },
+      triages: [{ id: "t7", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-24T12:00:00Z",
+                  completed_at: "2026-09-24T12:05:00Z", report_url: null, consent_active: true,
+                  origin_phone_masked: null, check_in_available: false,
+                  attendance: { status: "closed", unit_name: "UBS Centro", checked_in_at: "2026-09-24T15:30:00Z",
+                    outcome: "referred", referral_unit_name: null, referral_note: "só a nota", closed_at: "2026-09-24T16:00:00Z" } }]
+    });
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} onCheckIn={vi.fn()} />);
+    expect(await screen.findByText("Encaminhado — só a nota")).toBeInTheDocument();
+  });
+
+  it("atendimento encerrado com saída sem atendimento mostra 'Saiu sem atendimento'", async () => {
+    vi.spyOn(citizenApi, "triages").mockResolvedValue({
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", verified_at: null },
+      triages: [{ id: "t8", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-24T12:00:00Z",
+                  completed_at: "2026-09-24T12:05:00Z", report_url: null, consent_active: true,
+                  origin_phone_masked: null, check_in_available: false,
+                  attendance: { status: "closed", unit_name: "UBS Centro", checked_in_at: "2026-09-24T15:30:00Z",
+                    outcome: "left", referral_unit_name: null, referral_note: null, closed_at: "2026-09-24T16:00:00Z" } }]
+    });
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} onCheckIn={vi.fn()} />);
+    expect(await screen.findByText("Saiu sem atendimento")).toBeInTheDocument();
+  });
+
+  it("sem check_in_available nem atendimento, não mostra botão de check-in nem status de atendimento", async () => {
+    vi.spyOn(citizenApi, "triages").mockResolvedValue({
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", verified_at: null },
+      triages: [{ id: "t9", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-10T12:00:00Z",
+                  completed_at: "2026-09-10T12:05:00Z", report_url: null, consent_active: true,
+                  origin_phone_masked: null, check_in_available: false, attendance: null }]
+    });
+    render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} onCheckIn={vi.fn()} />);
+    await screen.findByText(/Prioridade alta/);
+    expect(screen.queryByRole("button", { name: "Cheguei na unidade" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Em atendimento/)).not.toBeInTheDocument();
   });
 });

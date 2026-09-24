@@ -1,10 +1,29 @@
 import { useEffect, useState } from "react";
-import { citizenApi, type Person, type TriageSummary } from "../../lib/citizenApi";
+import { citizenApi, type AttendanceSummary, type Person, type TriageSummary } from "../../lib/citizenApi";
 import { fmtDateTime } from "../../lib/format";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
-export function HistoryStep({ citizenId, onBack, onValidate }:
-  { citizenId: string; onBack: () => void; onValidate: (citizenId: string) => void }) {
+function fmtTime(iso: string): string {
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+}
+
+function attendanceStatusText(a: AttendanceSummary): string {
+  if (a.status === "open") return `Em atendimento na ${a.unit_name} desde ${fmtTime(a.checked_in_at)}`;
+  switch (a.outcome) {
+    case "discharged": return "Atendido e liberado";
+    case "referred": {
+      if (a.referral_unit_name && a.referral_note) return `Encaminhado para ${a.referral_unit_name} — ${a.referral_note}`;
+      if (a.referral_unit_name) return `Encaminhado para ${a.referral_unit_name}`;
+      if (a.referral_note) return `Encaminhado — ${a.referral_note}`;
+      return "Encaminhado";
+    }
+    case "left": return "Saiu sem atendimento";
+    default: return "Atendimento encerrado";
+  }
+}
+
+export function HistoryStep({ citizenId, onBack, onValidate, onCheckIn }:
+  { citizenId: string; onBack: () => void; onValidate: (citizenId: string) => void; onCheckIn: (triageId: string) => void }) {
   const [data, setData] = useState<{ citizen: Person; triages: TriageSummary[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +60,10 @@ export function HistoryStep({ citizenId, onBack, onValidate }:
                 <strong>{t.tier ? `Prioridade ${t.tier}` : "Em andamento"}</strong>
                 <div style={{ fontSize: 18 }}>{fmtDateTime(t.completed_at ?? t.created_at)}</div>
                 {t.origin_phone_masked && <div>Feita no celular {t.origin_phone_masked}</div>}
+                {t.attendance && <div style={{ fontSize: 18 }}>{attendanceStatusText(t.attendance)}</div>}
+                {!t.attendance && t.check_in_available && (
+                  <BigButton onClick={() => onCheckIn(t.id)} style={{ marginTop: 8 }}>Cheguei na unidade</BigButton>
+                )}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 8 }}>
                   {t.report_url && <a href={t.report_url} style={{ display: "inline-block", minHeight: 48, lineHeight: "48px", fontSize: 18 }}>Ver relatório</a>}
                   {t.consent_active && !t.origin_phone_masked && (
