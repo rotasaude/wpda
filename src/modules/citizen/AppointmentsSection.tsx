@@ -56,6 +56,8 @@ function AppointmentRow({ item, onReload, onCheckIn }:
     setError(null);
     try {
       await citizenApi.cancelAppointment(appointment.id, reason);
+      setCancelling(false);
+      setReason("");
       onReload();
     } catch (e) {
       setError(messageFor(e));
@@ -109,7 +111,7 @@ function AppointmentRow({ item, onReload, onCheckIn }:
         </>
       )}
 
-      {cancelling && appointment && (
+      {cancelling && appointment && (appointment.status === "scheduled" || appointment.status === "confirmed") && (
         <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
           <Field label="Motivo do cancelamento" value={reason} onChange={e => setReason(e.target.value)} />
           <BigButton variant="danger" onClick={cancel} disabled={busy || reason.trim().length < 10}>

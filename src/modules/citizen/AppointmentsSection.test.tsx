@@ -135,6 +135,34 @@ describe("AppointmentsSection", () => {
     expect(appointments).toHaveBeenCalledTimes(2);
   });
 
+  it("5b. depois de cancelar com sucesso, o formulário fecha e não convive com o estado final", async () => {
+    const scheduledItem: AppointmentItem = {
+      request: { id: "r7b", kind: "return", target_unit_name: "UBS Centro", status: "scheduled", closed_reason: null, reopened_reason: null },
+      appointment: {
+        id: "a4b", scheduled_at: "2026-10-02T14:30:00-03:00", status: "scheduled",
+        confirmation_deadline_at: "2026-10-01T14:30:00-03:00", check_in_available: false
+      }
+    };
+    const cancelledItem: AppointmentItem = {
+      request: { id: "r7b", kind: "return", target_unit_name: "UBS Centro", status: "closed", closed_reason: "citizen_cancelled", reopened_reason: null },
+      appointment: { id: "a4b", scheduled_at: "2026-10-02T14:30:00-03:00", status: "cancelled_by_citizen", confirmation_deadline_at: null, check_in_available: false }
+    };
+    vi.spyOn(citizenApi, "appointments")
+      .mockResolvedValueOnce({ appointments: [scheduledItem] })
+      .mockResolvedValueOnce({ appointments: [cancelledItem] });
+    vi.spyOn(citizenApi, "cancelAppointment").mockResolvedValue({
+      appointment: { id: "a4b", scheduled_at: "x", status: "cancelled_by_citizen" }
+    });
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Cancelar" }));
+    await userEvent.type(await screen.findByLabelText("Motivo do cancelamento"), "não posso ir");
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar agendamento" }));
+
+    expect(await screen.findByText("Cancelado por você")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Motivo do cancelamento")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancelar agendamento" })).not.toBeInTheDocument();
+  });
+
   it("6. Confirmar recarrega a lista", async () => {
     const appointments = mockAppointments([{
       request: { id: "r8", kind: "return", target_unit_name: "UBS Centro", status: "scheduled", closed_reason: null, reopened_reason: null },
