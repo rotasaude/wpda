@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { citizenApi, type AttendanceSummary, type Person, type TriageSummary } from "../../lib/citizenApi";
 import { fmtDateTime } from "../../lib/format";
+import { AppointmentsSection } from "./AppointmentsSection";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
 function fmtTime(iso: string): string {
@@ -8,7 +9,8 @@ function fmtTime(iso: string): string {
 }
 
 function attendanceStatusText(a: AttendanceSummary): string {
-  if (a.status === "open") return `Em atendimento na ${a.unit_name} desde ${fmtTime(a.checked_in_at)}`;
+  if (a.status === "waiting") return `Aguardando atendimento na ${a.unit_name}`;
+  if (a.status === "in_care") return `Em atendimento na ${a.unit_name} desde ${fmtTime(a.called_at ?? a.checked_in_at)}`;
   switch (a.outcome) {
     case "discharged": return "Atendido e liberado";
     case "referred": {
@@ -17,13 +19,15 @@ function attendanceStatusText(a: AttendanceSummary): string {
       if (a.referral_note) return `Encaminhado — ${a.referral_note}`;
       return "Encaminhado";
     }
+    case "return": return "Retorno — veja em Seus agendamentos";
     case "left": return "Saiu sem atendimento";
     default: return "Atendimento encerrado";
   }
 }
 
-export function HistoryStep({ citizenId, onBack, onValidate, onCheckIn }:
-  { citizenId: string; onBack: () => void; onValidate: (citizenId: string) => void; onCheckIn: (triageId: string) => void }) {
+export function HistoryStep({ citizenId, onBack, onValidate, onCheckIn, onAppointmentCheckIn }:
+  { citizenId: string; onBack: () => void; onValidate: (citizenId: string) => void; onCheckIn: (triageId: string) => void;
+    onAppointmentCheckIn: (appointmentId: string) => void }) {
   const [data, setData] = useState<{ citizen: Person; triages: TriageSummary[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +46,7 @@ export function HistoryStep({ citizenId, onBack, onValidate, onCheckIn }:
       {error && <ErrorText>{error}</ErrorText>}
       {data && (
         <>
+          <AppointmentsSection citizenId={citizenId} onCheckIn={onAppointmentCheckIn} />
           <p>CPF {data.citizen.cpf_masked}</p>
           {data.citizen.verification_level === "declared" ? (
             <>

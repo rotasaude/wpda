@@ -94,4 +94,90 @@ describe("citizenApi", () => {
     expect(init.method).toBe("POST");
     expect(result).toEqual({ code: "123456", expires_at: "2026-09-24T12:10:00Z" });
   });
+
+  it("triages: attendance.status legado 'open' normaliza para 'waiting', called_at/request_kind ausentes viram null", async () => {
+    mockFetch(200, {
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", verified_at: null },
+      triages: [{
+        id: "t1", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-22T12:00:00Z",
+        completed_at: "2026-09-22T12:05:00Z", report_url: null, consent_active: true, origin_phone_masked: null,
+        attendance: { status: "open", unit_name: "UBS Centro", checked_in_at: "2026-09-24T12:00:00Z",
+          outcome: null, referral_unit_name: null, referral_note: null, closed_at: null }
+      }]
+    });
+    const result = await citizenApi.triages("p1");
+    expect(result.triages[0].attendance?.status).toBe("waiting");
+    expect(result.triages[0].attendance?.called_at).toBeNull();
+    expect(result.triages[0].attendance?.request_kind).toBeNull();
+  });
+
+  it("triages: attendance.status 'in_care' já no formato novo não é alterado", async () => {
+    mockFetch(200, {
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", verified_at: null },
+      triages: [{
+        id: "t1", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-22T12:00:00Z",
+        completed_at: "2026-09-22T12:05:00Z", report_url: null, consent_active: true, origin_phone_masked: null,
+        attendance: { status: "in_care", unit_name: "UBS Centro", checked_in_at: "2026-09-24T12:00:00Z",
+          called_at: "2026-09-24T12:05:00Z", request_kind: "return",
+          outcome: null, referral_unit_name: null, referral_note: null, closed_at: null }
+      }]
+    });
+    const result = await citizenApi.triages("p1");
+    expect(result.triages[0].attendance?.status).toBe("in_care");
+    expect(result.triages[0].attendance?.called_at).toBe("2026-09-24T12:05:00Z");
+    expect(result.triages[0].attendance?.request_kind).toBe("return");
+  });
+
+  it("appointments manda GET com citizen_id e normaliza campos ausentes", async () => {
+    const rawItem: Record<string, unknown> = {
+      request: { id: "r1", kind: "return", target_unit_name: "UBS Centro", status: "open" },
+      appointment: { id: "a1", scheduled_at: "2026-10-02T14:30:00Z", status: "scheduled" }
+    };
+    const fn = mockFetch(200, { appointments: [rawItem] });
+    const result = await citizenApi.appointments("p1");
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/appointments?citizen_id=p1");
+    expect(init.method).toBe("GET");
+    expect(result.appointments[0].request.closed_reason).toBeNull();
+    expect(result.appointments[0].request.reopened_reason).toBeNull();
+    expect(result.appointments[0].appointment?.confirmation_deadline_at).toBeNull();
+    expect(result.appointments[0].appointment?.check_in_available).toBe(false);
+  });
+
+  it("appointments: appointment nulo permanece nulo depois da normalização", async () => {
+    mockFetch(200, {
+      appointments: [{
+        request: { id: "r1", kind: "referral", target_unit_name: "UPA Norte", status: "open", closed_reason: null, reopened_reason: null },
+        appointment: null
+      }]
+    });
+    const result = await citizenApi.appointments("p1");
+    expect(result.appointments[0].appointment).toBeNull();
+  });
+
+  it("confirmAppointment manda POST para confirm do agendamento", async () => {
+    const fn = mockFetch(200, { appointment: { id: "a1", scheduled_at: "x", status: "confirmed" } });
+    await citizenApi.confirmAppointment("a1");
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/appointments/a1/confirm");
+    expect(init.method).toBe("POST");
+  });
+
+  it("cancelAppointment manda POST com o motivo para cancel do agendamento", async () => {
+    const fn = mockFetch(200, { appointment: { id: "a1", scheduled_at: "x", status: "cancelled_by_citizen" } });
+    await citizenApi.cancelAppointment("a1", "não posso mais ir");
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/appointments/a1/cancel");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ reason: "não posso mais ir" });
+  });
+
+  it("issueAppointmentCheckInCode manda POST para check_in_code do agendamento", async () => {
+    const fn = mockFetch(201, { code: "123456", expires_at: "2026-09-24T12:10:00Z" });
+    const result = await citizenApi.issueAppointmentCheckInCode("a1");
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/appointments/a1/check_in_code");
+    expect(init.method).toBe("POST");
+    expect(result).toEqual({ code: "123456", expires_at: "2026-09-24T12:10:00Z" });
+  });
 });
