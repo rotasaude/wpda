@@ -24,6 +24,7 @@ type State =
   | { at: "history"; consentVersion: string | null; citizenId: string }
   | { at: "verify-code"; citizenId: string; consentVersion: string | null }
   | { at: "check-in-code"; triageId: string; citizenId: string; consentVersion: string | null }
+  | { at: "appointment-check-in-code"; appointmentId: string; citizenId: string; consentVersion: string | null }
   | { at: "declined" };
 
 export function Flow() {
@@ -83,6 +84,13 @@ export function Flow() {
     [checkInTriageId]
   );
 
+  // Mesmo cuidado, para o check-in de um horário agendado.
+  const checkInAppointmentId = state.at === "appointment-check-in-code" ? state.appointmentId : null;
+  const issueAppointmentCheckIn = useCallback(
+    () => citizenApi.issueAppointmentCheckInCode(checkInAppointmentId as string),
+    [checkInAppointmentId]
+  );
+
   const exit = state.at !== "boot" && state.at !== "phone" && state.at !== "code" && (
     <button type="button" onClick={signOut}
       style={{ position: "fixed", top: 8, right: 8, minHeight: 48, background: "none", border: "none", fontSize: 18 }}>
@@ -124,7 +132,8 @@ export function Flow() {
       view = <HistoryStep citizenId={state.citizenId}
         onBack={() => setState(state.consentVersion ? { at: "people", consentVersion: state.consentVersion } : { at: "consent" })}
         onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })}
-        onCheckIn={triageId => setState({ at: "check-in-code", triageId, citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
+        onCheckIn={triageId => setState({ at: "check-in-code", triageId, citizenId: state.citizenId, consentVersion: state.consentVersion })}
+        onAppointmentCheckIn={appointmentId => setState({ at: "appointment-check-in-code", appointmentId, citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
       break;
     case "verify-code":
       view = <VerificationCodeStep citizenId={state.citizenId}
@@ -134,6 +143,12 @@ export function Flow() {
       view = <CounterCodeStep title="Cheguei na unidade"
         instruction="Mostre este código e um documento com foto na recepção da unidade."
         issue={issueCheckIn}
+        onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
+      break;
+    case "appointment-check-in-code":
+      view = <CounterCodeStep title="Cheguei na unidade"
+        instruction="Mostre este código e um documento com foto na recepção da unidade."
+        issue={issueAppointmentCheckIn}
         onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
       break;
     case "declined":

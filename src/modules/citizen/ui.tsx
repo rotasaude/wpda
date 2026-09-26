@@ -73,7 +73,12 @@ const MESSAGES: Record<string, string> = {
   already_verified: "Seu cadastro já está verificado.",
   triage_too_old: "Esta triagem tem mais de 3 dias. Faça uma triagem nova.",
   triage_not_eligible: "Esta triagem não está disponível para check-in.",
-  already_checked_in: "Você já fez o check-in desta triagem."
+  already_checked_in: "Você já fez o check-in desta triagem.",
+  confirmation_closed: "O prazo para confirmar terminou",
+  appointment_ended: "Este agendamento já foi encerrado.",
+  reason_too_short: "Escreva um motivo com pelo menos 10 caracteres.",
+  not_today: "Isso só pode ser feito no dia do horário marcado.",
+  appointment_not_eligible: "Este agendamento não está disponível para check-in."
 };
 
 export function messageFor(error: unknown): string {
