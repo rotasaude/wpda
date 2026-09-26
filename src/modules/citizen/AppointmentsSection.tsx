@@ -68,16 +68,23 @@ function AppointmentRow({ item, onReload, onCheckIn }:
 
   const final = appointment ? finalStatusText(appointment, request.target_unit_name) : null;
 
+  // A unidade só dispensa pedido aberto — e um pedido reaberto sempre traz o
+  // último horário (expired/no_show). Dispensado vale mais que esse horário:
+  // "pode marcar outro horário" deixou de ser verdade.
+  if (request.status === "closed" && request.closed_reason === "dismissed") {
+    return (
+      <li style={{ border: "1px solid var(--rule2, #ccc)", borderRadius: 12, padding: 12 }}>
+        <p style={{ fontSize: 18 }}>Pedido encerrado pela unidade</p>
+      </li>
+    );
+  }
+
   return (
     <li style={{ border: "1px solid var(--rule2, #ccc)", borderRadius: 12, padding: 12 }}>
       {error && <ErrorText>{error}</ErrorText>}
 
       {!appointment && request.status === "open" && (
         <p style={{ fontSize: 18 }}>{openRequestText(request)}</p>
-      )}
-
-      {!appointment && request.status === "closed" && request.closed_reason === "dismissed" && (
-        <p style={{ fontSize: 18 }}>Pedido encerrado pela unidade</p>
       )}
 
       {appointment && appointment.status === "scheduled" && (

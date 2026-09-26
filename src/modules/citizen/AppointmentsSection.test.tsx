@@ -229,6 +229,17 @@ describe("AppointmentsSection", () => {
     expect(await screen.findByText("Pedido encerrado pela unidade")).toBeInTheDocument();
   });
 
+  it("pedido reaberto e depois dispensado pela unidade: vale o encerramento, não o último horário expirado", async () => {
+    mockAppointments([{
+      request: { id: "r15", kind: "return", target_unit_name: "UBS Centro", status: "closed", closed_reason: "dismissed", reopened_reason: "expired" },
+      appointment: { id: "a12", scheduled_at: "2026-10-02T14:30:00-03:00", status: "expired", confirmation_deadline_at: null, check_in_available: false }
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText("Pedido encerrado pela unidade")).toBeInTheDocument();
+    expect(screen.queryByText(/pode marcar outro horário/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
   it("10. botões atendem os alvos de toque (>= 48px) e o texto (>= 18px)", async () => {
     mockAppointments([{
       request: { id: "r15", kind: "return", target_unit_name: "UBS Centro", status: "scheduled", closed_reason: null, reopened_reason: null },
