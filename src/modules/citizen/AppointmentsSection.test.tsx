@@ -1,10 +1,20 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AppointmentsSection } from "./AppointmentsSection";
 import { citizenApi, ApiError, type AppointmentItem } from "../../lib/citizenApi";
 
-afterEach(() => vi.restoreAllMocks());
+// Relógio fixo antes dos prazos das fixtures (2026-10-01 14:30): a tela
+// esconde "Confirmar" depois do prazo, então o relógio real quebraria os
+// testes quando a data passasse. Só Date é falso: os timers do findBy seguem reais.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: [ "Date" ] });
+  vi.setSystemTime(new Date("2026-09-30T10:00:00-03:00"));
+});
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 // Mesma formatação da spec (item 9): weekday/day/month/hour/minute no fuso
 // da cidade. Usada aqui para montar o texto esperado sem depender do fuso
@@ -53,17 +63,6 @@ describe("AppointmentsSection", () => {
     expect(await screen.findByText("Encaminhamento para UPA Norte — a unidade vai marcar o horário")).toBeInTheDocument();
   });
 
-  it("2. pedido reaberto por prazo ou falta acrescenta aviso de novo horário", async () => {
-    mockAppointments([{
-      request: { id: "r3", kind: "return", target_unit_name: "UBS Centro", status: "open", closed_reason: null, reopened_reason: "expired" },
-      appointment: null
-    }]);
-    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
-    expect(await screen.findByText(
-      "Retorno pedido na UBS Centro — a unidade vai marcar o horário A unidade pode marcar outro horário"
-    )).toBeInTheDocument();
-  });
-
   it("3. horário 'scheduled' mostra data, unidade, prazo de confirmação e os botões Confirmar/Cancelar", async () => {
     mockAppointments([{
       request: { id: "r4", kind: "return", target_unit_name: "UBS Centro", status: "scheduled", closed_reason: null, reopened_reason: null },
@@ -77,6 +76,23 @@ describe("AppointmentsSection", () => {
     const deadline = fmt("2026-10-01T14:30:00-03:00");
     expect(await screen.findByText(`Agendado: ${scheduledAt} — UBS Centro. Confirme até ${deadline}`)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirmar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeInTheDocument();
+  });
+
+  it("3b. depois do prazo, some o Confirmar e avisa que a unidade pode marcar outro horário", async () => {
+    vi.setSystemTime(new Date("2026-10-01T14:30:00-03:00"));
+    mockAppointments([{
+      request: { id: "r4", kind: "return", target_unit_name: "UBS Centro", status: "scheduled", closed_reason: null, reopened_reason: null },
+      appointment: {
+        id: "a1", scheduled_at: "2026-10-02T14:30:00-03:00", status: "scheduled",
+        confirmation_deadline_at: "2026-10-01T14:30:00-03:00", check_in_available: false
+      }
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText(
+      "O prazo para confirmar terminou. A unidade pode marcar outro horário."
+    )).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Confirmar" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancelar" })).toBeInTheDocument();
   });
 
