@@ -11,11 +11,18 @@ function fmt(iso: string): string {
   }).format(new Date(iso));
 }
 
+// Só pedido sem horário nenhum chega aqui: um pedido reaberto sempre traz o
+// último horário (expired/no_show), que já diz "pode marcar outro horário".
 function openRequestText(request: AppointmentRequest): string {
-  const base = request.kind === "return"
+  return request.kind === "return"
     ? `Retorno pedido na ${request.target_unit_name} — a unidade vai marcar o horário`
     : `Encaminhamento para ${request.target_unit_name} — a unidade vai marcar o horário`;
-  return request.reopened_reason ? `${base} A unidade pode marcar outro horário` : base;
+}
+
+// O job de expiração roda a cada 15 min; até lá o horário ainda vem
+// "scheduled", mas confirmar já seria recusado (confirmation_closed).
+function confirmationClosed(appointment: Appointment): boolean {
+  return !!appointment.confirmation_deadline_at && Date.now() >= new Date(appointment.confirmation_deadline_at).getTime();
 }
 
 function finalStatusText(appointment: Appointment, unitName: string): string | null {
@@ -93,9 +100,12 @@ function AppointmentRow({ item, onReload, onCheckIn }:
             Agendado: {fmt(appointment.scheduled_at)} — {request.target_unit_name}.
             {appointment.confirmation_deadline_at && ` Confirme até ${fmt(appointment.confirmation_deadline_at)}`}
           </p>
+          {confirmationClosed(appointment) && (
+            <p style={{ fontSize: 18 }}>O prazo para confirmar terminou. A unidade pode marcar outro horário.</p>
+          )}
           {!cancelling && (
             <div style={{ display: "grid", gap: 8 }}>
-              <BigButton onClick={confirm} disabled={busy}>Confirmar</BigButton>
+              {!confirmationClosed(appointment) && <BigButton onClick={confirm} disabled={busy}>Confirmar</BigButton>}
               <BigButton variant="secondary" onClick={() => setCancelling(true)} disabled={busy}>Cancelar</BigButton>
             </div>
           )}
