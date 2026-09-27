@@ -1,14 +1,12 @@
 // Relatório público do cidadão. Lê o token da URL e busca o JSON congelado
-// de GET /r/:token (sem login). 404 = token inválido/expirado.
-export interface TrailEntry { step: string; answer: string }
-
+// de GET /r/:token (sem login). 404 = token inválido/expirado. O link é
+// público: a API nunca devolve as respostas do cidadão (F-03.17).
 export interface Recommendation { title: string; body: string }
 
 export interface Report {
   tier: string | null;
   priority: string | null;
   recommendation: Recommendation | null;
-  summary: TrailEntry[] | null;
   completed_at: string | null;
   expires_at: string | null;
 }

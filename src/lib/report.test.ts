@@ -18,15 +18,14 @@ function mockFetch(status: number, body?: unknown) {
 }
 
 describe("fetchReport", () => {
-  it("devolve Report em 200 (summary é o trail)", async () => {
+  it("devolve Report em 200", async () => {
     mockFetch(200, {
-      tier: "alta", priority: "1",
-      summary: [{ step: "s1", answer: "sim" }],
+      tier: "alta", priority: "1", recommendation: null,
       completed_at: "2026-06-26T12:00:00Z", expires_at: null
     });
     const r = await fetchReport("abc");
     expect(r?.tier).toBe("alta");
-    expect(r?.summary?.[0]?.step).toBe("s1");
+    expect(r?.completed_at).toBe("2026-06-26T12:00:00Z");
   });
   it("null em 404", async () => { mockFetch(404); expect(await fetchReport("x")).toBe(null); });
   it("lança em 500", async () => { mockFetch(500); await expect(fetchReport("x")).rejects.toThrow(); });

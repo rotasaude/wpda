@@ -22,7 +22,6 @@ const frozen = {
   tier: "alta",
   priority: "1",
   recommendation: { title: "Procure a UPA hoje", body: "Leve um documento com foto." },
-  summary: [ { step: "febre", answer: "sim" } ],
   completed_at: "2026-09-20T15:30:00Z",
   expires_at: "2026-10-20T15:30:00Z"
 };
@@ -60,7 +59,7 @@ describe("Report", () => {
 
   it("sem recomendação, mostra a nota genérica e omite tier/prioridade/datas ausentes", async () => {
     stubFetch(json(200, {
-      tier: null, priority: null, recommendation: null, summary: null,
+      tier: null, priority: null, recommendation: null,
       completed_at: null, expires_at: null
     }));
     render(<Report token="abc" />);
@@ -71,9 +70,9 @@ describe("Report", () => {
     expect(screen.queryByText(/Válido até/)).not.toBeInTheDocument();
   });
 
-  it("não exibe a trilha (summary) que a API devolve", async () => {
-    // Registra o comportamento atual: summary vem no JSON mas a tela não o mostra.
-    stubFetch(json(200, frozen));
+  it("nunca exibe respostas, mesmo se uma API antiga ainda mandar summary", async () => {
+    // F-03.17: a API parou de devolver as respostas; a tela também não as mostra.
+    stubFetch(json(200, { ...frozen, summary: [ { step: "febre", answer: "sim" } ] }));
     render(<Report token="abc" />);
 
     await screen.findByText("Seu resultado");

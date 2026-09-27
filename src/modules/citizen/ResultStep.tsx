@@ -1,6 +1,6 @@
 // O relatório é gerado por um job depois de triage.completed: consulta a
-// triagem até o link aparecer (spec §3.1) e então mostra o mesmo relatório que
-// o link do WhatsApp mostrava.
+// triagem até o link aparecer (spec §3.1) e então mostra o mesmo relatório do
+// link público /r/:token.
 import { useEffect, useState } from "react";
 import { citizenApi } from "../../lib/citizenApi";
 import { tokenFromUrl } from "../../lib/report";
