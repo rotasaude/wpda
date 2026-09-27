@@ -1,10 +1,20 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AppointmentsSection } from "./AppointmentsSection";
 import { citizenApi, ApiError, type AppointmentItem } from "../../lib/citizenApi";
 
-afterEach(() => vi.restoreAllMocks());
+// Relógio fixo antes dos prazos das fixtures (2026-10-01 14:30): a tela
+// esconde "Confirmar" depois do prazo, então o relógio real quebraria os
+// testes quando a data passasse. Só Date é falso: os timers do findBy seguem reais.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: [ "Date" ] });
+  vi.setSystemTime(new Date("2026-09-30T10:00:00-03:00"));
+});
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 // Mesma formatação da spec (item 9): weekday/day/month/hour/minute no fuso
 // da cidade. Usada aqui para montar o texto esperado sem depender do fuso
@@ -54,8 +64,6 @@ describe("AppointmentsSection", () => {
   });
 
   it("3. horário 'scheduled' mostra data, unidade, prazo de confirmação e os botões Confirmar/Cancelar", async () => {
-    vi.useFakeTimers({ toFake: [ "Date" ] });
-    vi.setSystemTime(new Date("2026-09-30T10:00:00-03:00"));
     mockAppointments([{
       request: { id: "r4", kind: "return", target_unit_name: "UBS Centro", status: "scheduled", closed_reason: null, reopened_reason: null },
       appointment: {
@@ -69,11 +77,9 @@ describe("AppointmentsSection", () => {
     expect(await screen.findByText(`Agendado: ${scheduledAt} — UBS Centro. Confirme até ${deadline}`)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirmar" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancelar" })).toBeInTheDocument();
-    vi.useRealTimers();
   });
 
   it("3b. depois do prazo, some o Confirmar e avisa que a unidade pode marcar outro horário", async () => {
-    vi.useFakeTimers({ toFake: [ "Date" ] });
     vi.setSystemTime(new Date("2026-10-01T14:30:00-03:00"));
     mockAppointments([{
       request: { id: "r4", kind: "return", target_unit_name: "UBS Centro", status: "scheduled", closed_reason: null, reopened_reason: null },
@@ -88,7 +94,6 @@ describe("AppointmentsSection", () => {
     )).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Confirmar" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancelar" })).toBeInTheDocument();
-    vi.useRealTimers();
   });
 
   it("4. horário 'confirmed' mostra data, unidade e o botão Cancelar, sem check-in se indisponível", async () => {
