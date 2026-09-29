@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PhoneStep } from "./PhoneStep";
 import { CodeStep } from "./CodeStep";
@@ -54,10 +54,11 @@ describe("PeopleStep", () => {
     vi.spyOn(citizenApi, "people").mockResolvedValue({
       people: [{ id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" }]
     });
-    const onChoose = vi.fn();
+    vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue([]);
+    const onChoose = vi.fn().mockResolvedValue("done");
     render(<PeopleStep onChoose={onChoose} onHistory={vi.fn()} />);
     await userEvent.click(await screen.findByRole("button", { name: "CPF ***.982.247-**" }));
-    expect(onChoose).toHaveBeenCalledWith({ citizenId: "p1" });
+    await waitFor(() => expect(onChoose).toHaveBeenCalledWith({ citizenId: "p1" }));
 
     await userEvent.type(screen.getByLabelText("CPF de outra pessoa"), "52998224724");
     await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));

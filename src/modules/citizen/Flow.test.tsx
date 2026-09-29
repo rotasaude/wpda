@@ -18,6 +18,7 @@ async function reachQuestionStep() {
   vi.spyOn(citizenApi, "people").mockResolvedValue({
     people: [{ id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" }]
   });
+  vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue([]);
   vi.spyOn(citizenApi, "start").mockResolvedValue({
     conversation_id: "c1", citizen_id: "p1", resumed: false, step: boolStep
   });
@@ -98,6 +99,7 @@ describe("Flow", () => {
     vi.spyOn(citizenApi, "people").mockResolvedValue({
       people: [{ id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" }]
     });
+    vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue([]);
     vi.spyOn(citizenApi, "triages").mockResolvedValue({
       citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" },
       triages: [{
@@ -120,5 +122,32 @@ describe("Flow", () => {
     await userEvent.click(screen.getByRole("button", { name: /rerender/ }));
 
     expect(issueCheckInCode).toHaveBeenCalledTimes(1);
+  });
+
+  it("422 invalid_neighborhood ao começar: sem erro genérico, pede o bairro de novo e segue", async () => {
+    vi.spyOn(citizenApi, "currentSession").mockResolvedValue({ phone_masked: "(**) *****-5432" });
+    vi.spyOn(citizenApi, "consentTerm").mockResolvedValue({ version: "1", body: "Termo" });
+    vi.spyOn(citizenApi, "people").mockResolvedValue({
+      people: [{ id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", neighborhood: null }]
+    });
+    vi.spyOn(citizenApi, "neighborhoods")
+      .mockResolvedValueOnce([ { id: "n1", name: "Batel" }, { id: "n2", name: "São Francisco" } ])
+      .mockResolvedValueOnce([ { id: "n2", name: "São Francisco" } ]);
+    const start = vi.spyOn(citizenApi, "start")
+      .mockRejectedValueOnce(new ApiError(422, "invalid_neighborhood"))
+      .mockResolvedValue({ conversation_id: "c1", citizen_id: "p1", resumed: false, step: boolStep });
+
+    render(<Flow />);
+    await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
+    await userEvent.click(await screen.findByRole("button", { name: "CPF ***.982.247-**" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Batel" }));
+
+    expect(await screen.findByText("Esse bairro não está mais na lista. Escolha de novo.")).toBeInTheDocument();
+    expect(screen.queryByText("Algo deu errado. Tente de novo.")).not.toBeInTheDocument();
+    expect(start).toHaveBeenNthCalledWith(1, { citizenId: "p1", neighborhoodId: "n1", consentVersion: "1" });
+
+    await userEvent.click(screen.getByRole("button", { name: "São Francisco" }));
+    expect(await screen.findByText("Você está com tosse?")).toBeInTheDocument();
+    expect(start).toHaveBeenNthCalledWith(2, { citizenId: "p1", neighborhoodId: "n2", consentVersion: "1" });
   });
 });

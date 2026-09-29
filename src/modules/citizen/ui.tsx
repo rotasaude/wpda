@@ -78,7 +78,8 @@ const MESSAGES: Record<string, string> = {
   appointment_ended: "Este agendamento já foi encerrado.",
   reason_too_short: "Escreva um motivo com pelo menos 10 caracteres.",
   not_today: "Isso só pode ser feito no dia do horário marcado.",
-  appointment_not_eligible: "Este agendamento não está disponível para check-in."
+  appointment_not_eligible: "Este agendamento não está disponível para check-in.",
+  invalid_neighborhood: "Esse bairro não está mais na lista. Escolha de novo."
 };
 
 export function messageFor(error: unknown): string {

@@ -5,7 +5,7 @@ import { citizenApi, ApiError, type Step } from "../../lib/citizenApi";
 import { PhoneStep } from "./PhoneStep";
 import { CodeStep } from "./CodeStep";
 import { ConsentStep } from "./ConsentStep";
-import { PeopleStep, type PersonChoice } from "./PeopleStep";
+import { PeopleStep, type ChooseOutcome, type PersonChoice } from "./PeopleStep";
 import { QuestionStep } from "./QuestionStep";
 import { ResultStep } from "./ResultStep";
 import { HistoryStep } from "./HistoryStep";
@@ -45,7 +45,7 @@ export function Flow() {
     return () => window.removeEventListener("citizen:unauthenticated", onUnauthenticated);
   }, []);
 
-  async function choose(consentVersion: string, choice: PersonChoice) {
+  async function choose(consentVersion: string, choice: PersonChoice): Promise<ChooseOutcome> {
     setError(null);
     try {
       const r = await citizenApi.start({ ...choice, consentVersion });
@@ -53,10 +53,14 @@ export function Flow() {
     } catch (e) {
       if (e instanceof ApiError && (e.code === "consent_outdated" || e.code === "no_consent")) {
         setState({ at: "consent" });
-        return;
+        return "done";
       }
+      // O bairro saiu da lista entre a leitura e o envio: a PeopleStep relê e
+      // pergunta de novo (spec §6), sem o erro genérico.
+      if (e instanceof ApiError && e.code === "invalid_neighborhood") return "invalid_neighborhood";
       setError(messageFor(e));
     }
+    return "done";
   }
 
   // Conflitos que retentar não resolve (§ spec de erros): o termo mudou no
