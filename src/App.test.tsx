@@ -15,7 +15,7 @@ describe("App — link público /r/:token", () => {
     render(<App />);
 
     const link = await screen.findByRole("link", { name: "Voltar ao início" });
-    expect(link).toHaveAttribute("href", "/");
+    expect(link).toHaveAttribute("href", import.meta.env.BASE_URL);
     expect(link.closest("article")).not.toBeNull();
     expect(parseInt(link.style.minHeight, 10)).toBeGreaterThanOrEqual(48);
     expect(screen.queryByText("UBS Batel")).not.toBeInTheDocument();
