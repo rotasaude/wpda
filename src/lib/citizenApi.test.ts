@@ -180,4 +180,63 @@ describe("citizenApi", () => {
     expect(init.method).toBe("POST");
     expect(result).toEqual({ code: "123456", expires_at: "2026-09-24T12:10:00Z" });
   });
+  it("people normaliza neighborhood ausente para null e preserva o presente", async () => {
+    mockFetch(200, { people: [
+      { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" },
+      { id: "p2", cpf_masked: "***.111.222-**", verification_level: "declared", neighborhood: { id: "n1", name: "Batel" } }
+    ] });
+    const { people } = await citizenApi.people();
+    expect(people[0].neighborhood).toBeNull();
+    expect(people[1].neighborhood).toEqual({ id: "n1", name: "Batel" });
+  });
+
+  it("neighborhoods faz GET /citizen/neighborhoods e desembrulha { neighborhoods }", async () => {
+    const fn = mockFetch(200, { neighborhoods: [ { id: "n1", name: "Batel" } ] });
+    expect(await citizenApi.neighborhoods()).toEqual([ { id: "n1", name: "Batel" } ]);
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/neighborhoods");
+    expect(init.method).toBe("GET");
+  });
+
+  it("start manda neighborhood_id quando veio", async () => {
+    const fn = mockFetch(201, { conversation_id: "c", citizen_id: "p", resumed: false, step: {} });
+    await citizenApi.start({ cpf: "529.982.247-25", neighborhoodId: "n1", consentVersion: "1" });
+    const init = (fn.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(JSON.parse(init.body as string)).toEqual({ cpf: "529.982.247-25", neighborhood_id: "n1", consent_version: "1" });
+  });
+
+  it("start sem bairro não manda a chave neighborhood_id", async () => {
+    const fn = mockFetch(201, { conversation_id: "c", citizen_id: "p", resumed: false, step: {} });
+    await citizenApi.start({ citizenId: "p1", consentVersion: "1" });
+    const body = JSON.parse((fn.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect("neighborhood_id" in body).toBe(false);
+  });
+
+  it("setNeighborhood manda POST com o id ou null", async () => {
+    const fn = mockFetch(200, {});
+    await citizenApi.setNeighborhood("p1", null);
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/people/p1/neighborhood");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ neighborhood_id: null });
+  });
+
+  it("setNeighborhood com bairro inválido rejeita com invalid_neighborhood", async () => {
+    mockFetch(422, { error: "invalid_neighborhood" });
+    await expect(citizenApi.setNeighborhood("p1", "n9")).rejects.toEqual(new ApiError(422, "invalid_neighborhood"));
+  });
+
+  it("triage() sem reference_units normaliza para [] e preserva a lista quando vem", async () => {
+    const base = {
+      id: "t1", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-28T12:00:00Z",
+      completed_at: "2026-09-28T12:05:00Z", report_url: null, consent_active: true, origin_phone_masked: null
+    };
+    mockFetch(200, base);
+    expect((await citizenApi.triage("t1")).reference_units).toEqual([]);
+
+    const units = [ { id: "u1", name: "UBS Batel", kind: "ubs",
+      address: { street: "Rua Padre Anchieta", number: null, complement: null, zip: null } } ];
+    mockFetch(200, { ...base, reference_units: units });
+    expect((await citizenApi.triage("t1")).reference_units).toEqual(units);
+  });
 });

@@ -9,6 +9,24 @@ export class ApiError extends Error {
 
 export interface Option { id: string; title: string }
 
+// Território (spec 2026-09-28 §4.1; ADR 0023).
+export interface Neighborhood { id: string; name: string }
+
+// Endereço em texto da unidade: o objeto sempre vem, cada campo pode ser null.
+export interface UnitAddress {
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  zip: string | null;
+}
+
+export interface ReferenceUnit {
+  id: string;
+  name: string;
+  kind: string;
+  address: UnitAddress;
+}
+
 export interface Step {
   triage_id: string;
   step_id: string;
@@ -29,6 +47,8 @@ export interface Person {
   cpf_masked: string;
   verification_level: "declared" | "verified";
   verified_at?: string | null;
+  // Bairro declarado (ADR 0023). Ausente numa api anterior: normalizado em people().
+  neighborhood?: Neighborhood | null;
 }
 
 export interface AttendanceSummary {
@@ -60,6 +80,9 @@ export interface TriageSummary {
   // que pode chegar `undefined`.
   attendance?: AttendanceSummary | null;
   check_in_available?: boolean;
+  // Unidades ativas que cobrem o bairro da triagem. Ausente numa api anterior:
+  // normalizado para [] (ver normalizeTriage).
+  reference_units?: ReferenceUnit[];
 }
 
 export interface StartResult { conversation_id: string; citizen_id: string; resumed: boolean; step: Step }
@@ -118,8 +141,13 @@ function normalizeTriage(t: TriageSummary): TriageSummary {
           request_kind: a.request_kind ?? null
         }
       : (a ?? null),
-    check_in_available: t.check_in_available ?? false
+    check_in_available: t.check_in_available ?? false,
+    reference_units: t.reference_units ?? []
   };
+}
+
+function normalizePerson(p: Person): Person {
+  return { ...p, neighborhood: p.neighborhood ?? null };
 }
 
 function normalizeAppointment(item: AppointmentItem): AppointmentItem {
@@ -147,10 +175,19 @@ export const citizenApi = {
   currentSession: () => call<{ phone_masked: string }>("GET", "/session"),
   signOut: () => call<void>("DELETE", "/session"),
   consentTerm: () => call<{ version: string; body: string }>("GET", "/consent_term"),
-  people: () => call<{ people: Person[] }>("GET", "/people"),
-  start: (p: { citizenId?: string; cpf?: string; consentVersion: string }) =>
+  people: async () => {
+    const data = await call<{ people: Person[] }>("GET", "/people");
+    return { people: data.people.map(normalizePerson) };
+  },
+  // Bairros ativos da cidade, por nome (spec §4.1).
+  neighborhoods: async () => (await call<{ neighborhoods: Neighborhood[] }>("GET", "/neighborhoods")).neighborhoods,
+  // null = "Prefiro não informar" (tira o bairro). Troca não muda triagens antigas.
+  setNeighborhood: (citizenId: string, neighborhoodId: string | null) =>
+    call<unknown>("POST", `/people/${encodeURIComponent(citizenId)}/neighborhood`, { neighborhood_id: neighborhoodId }),
+  start: (p: { citizenId?: string; cpf?: string; neighborhoodId?: string; consentVersion: string }) =>
     call<StartResult>("POST", "/conversations", {
       ...(p.citizenId ? { citizen_id: p.citizenId } : { cpf: p.cpf }),
+      ...(p.neighborhoodId ? { neighborhood_id: p.neighborhoodId } : {}),
       consent_version: p.consentVersion
     }),
   answer: (conversationId: string, answer: string, idempotencyKey: string) =>
