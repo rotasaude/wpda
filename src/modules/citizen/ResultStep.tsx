@@ -35,7 +35,7 @@ export function ResultStep({ triageId, onAgain, onHistory }:
   }, [triageId]);
 
   const actions = (
-    <div style={{ display: "grid", gap: 12, padding: 16, maxWidth: 520, margin: "0 auto" }}>
+    <div style={{ display: "grid", gap: 12, padding: 0 }}>
       <BigButton onClick={onAgain}>Fazer outra triagem</BigButton>
       <BigButton variant="secondary" onClick={onHistory}>Minhas triagens</BigButton>
     </div>
@@ -44,11 +44,7 @@ export function ResultStep({ triageId, onAgain, onHistory }:
   // Área logada: a unidade de referência vem sempre de GET /citizen/triages/:id.
   // O Report (link público) não a mostra.
   if (token) {
-    return <>
-      <Report token={token} />
-      <div style={{ padding: "0 16px", maxWidth: 520, margin: "0 auto" }}><ReferenceUnits units={units} /></div>
-      {actions}
-    </>;
+    return <Report token={token}><ReferenceUnits units={units} />{actions}</Report>;
   }
   return (
     <Screen title="Triagem concluída" footer={actions}>

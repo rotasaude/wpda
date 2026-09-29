@@ -115,4 +115,12 @@ describe("Report", () => {
     expect(screen.queryByText("UBS Batel")).not.toBeInTheDocument();
     expect(screen.queryByText(/Rua Padre Anchieta/)).not.toBeInTheDocument();
   });
+
+  it("renderiza children dentro do cartão do relatório", async () => {
+    stubFetch(json(200, frozen));
+    render(<Report token="abc"><p>extra</p></Report>);
+
+    const extra = await screen.findByText("extra");
+    expect(extra.closest("article")).not.toBeNull();
+  });
 });

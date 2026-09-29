@@ -8,7 +8,7 @@ type State =
   | { kind: "invalid" }
   | { kind: "error" };
 
-export function Report({ token }: { token: string }) {
+export function Report({ token, children }: { token: string; children?: ReactNode }) {
   const [ state, setState ] = useState<State>({ kind: "loading" });
 
   useEffect(() => {
@@ -48,11 +48,11 @@ export function Report({ token }: { token: string }) {
           {r.priority && <span style={{ fontSize: 12, color: "var(--ink2, #555)" }}>prioridade: {r.priority}</span>}
         </div>
         {note.title && (
-          <p style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.4, margin: "0 0 8px" }}>
+          <p style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.4, margin: "0 0 8px" }}>
             {note.title}
           </p>
         )}
-        <p style={{ fontSize: 15, lineHeight: 1.5, margin: "0 0 24px" }}>
+        <p style={{ fontSize: 18, lineHeight: 1.5, margin: "0 0 24px" }}>
           {note.body}
         </p>
         <footer style={{ fontSize: 12, color: "var(--ink3, #888)", borderTop: "1px solid var(--line, #eee)", paddingTop: 12 }}>
@@ -60,6 +60,7 @@ export function Report({ token }: { token: string }) {
           {r.expires_at && <div>Válido até {fmtDateTime(r.expires_at)}.</div>}
           <p style={{ marginTop: 12 }}>Estas informações são pessoais — não compartilhe este link.</p>
         </footer>
+        {children && <div style={{ marginTop: 16 }}>{children}</div>}
       </article>
     </Centered>
   );

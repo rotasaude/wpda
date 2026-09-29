@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ResultStep } from "./ResultStep";
 import { citizenApi, type TriageSummary } from "../../lib/citizenApi";
@@ -85,6 +85,21 @@ describe("ResultStep — unidade de referência", () => {
     expect(screen.getAllByRole("heading", { name: "Suas unidades de referência" })).toHaveLength(1);
     expect(screen.getByText("UBS Batel")).toBeInTheDocument();
     expect(screen.getByText("UPA Matriz")).toBeInTheDocument();
+  });
+
+  it("com o relatório pronto, unidades e botões ficam dentro do cartão do relatório", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({
+      ...summary("http://curitiba.localhost/wpda/?token=abc"), reference_units: units
+    });
+    stubReport();
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} />);
+
+    const card = (await screen.findByText("Procure atendimento hoje")).closest("article")!;
+    expect(card).not.toBeNull();
+    expect(within(card).getByRole("heading", { name: "Suas unidades de referência" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Fazer outra triagem" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Minhas triagens" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Fazer outra triagem" })).toHaveLength(1);
   });
 
   it("triagem sem unidade de referência: bloco ausente", async () => {
