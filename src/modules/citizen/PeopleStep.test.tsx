@@ -14,11 +14,12 @@ const LIST = [
 const semBairro: Person = { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", neighborhood: null };
 const comBairro: Person = { ...semBairro, neighborhood: { id: "n1", name: "Batel" } };
 
-function setup(people: Person[], list: typeof LIST | Error = LIST) {
+function setup(people: Person[], list: typeof LIST | Error | { once: typeof LIST[] } = LIST) {
   vi.spyOn(citizenApi, "people").mockResolvedValue({ people });
-  const neighborhoods = list instanceof Error
-    ? vi.spyOn(citizenApi, "neighborhoods").mockRejectedValue(list)
-    : vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue(list);
+  const neighborhoods = vi.spyOn(citizenApi, "neighborhoods");
+  if (list instanceof Error) neighborhoods.mockRejectedValue(list);
+  else if (Array.isArray(list)) neighborhoods.mockResolvedValue(list);
+  else list.once.forEach(l => neighborhoods.mockResolvedValueOnce(l));
   const onChoose = vi.fn<(c: unknown) => Promise<ChooseOutcome>>().mockResolvedValue("done");
   render(<PeopleStep onChoose={onChoose} onHistory={vi.fn()} />);
   return { onChoose, neighborhoods };
@@ -103,8 +104,8 @@ describe("PeopleStep — bairro antes de começar", () => {
   });
 
   it("422 invalid_neighborhood: relê a lista, avisa e pede nova escolha", async () => {
-    const { onChoose, neighborhoods } = setup([ semBairro ]);
-    neighborhoods.mockResolvedValueOnce(LIST).mockResolvedValueOnce(LIST.filter(n => n.id !== "n1"));
+    const { onChoose, neighborhoods } = setup([ semBairro ],
+      { once: [ LIST, LIST.filter(n => n.id !== "n1") ] });
     onChoose.mockResolvedValueOnce("invalid_neighborhood").mockResolvedValue("done");
 
     await userEvent.click(await screen.findByRole("button", { name: "CPF ***.982.247-**" }));
@@ -119,8 +120,7 @@ describe("PeopleStep — bairro antes de começar", () => {
   });
 
   it("422 com a lista agora vazia: começa sem bairro", async () => {
-    const { onChoose, neighborhoods } = setup([ semBairro ]);
-    neighborhoods.mockResolvedValueOnce(LIST).mockResolvedValueOnce([]);
+    const { onChoose } = setup([ semBairro ], { once: [ LIST, [] ] });
     onChoose.mockResolvedValueOnce("invalid_neighborhood").mockResolvedValue("done");
 
     await userEvent.click(await screen.findByRole("button", { name: "CPF ***.982.247-**" }));
@@ -140,5 +140,20 @@ describe("PeopleStep — bairro antes de começar", () => {
 
     expect(onChoose).toHaveBeenCalledTimes(1);
     expect(batel).toBeDisabled();
+  });
+
+  it("toque duplo na pessoa com a lista ainda pendente começa uma vez só", async () => {
+    vi.spyOn(citizenApi, "people").mockResolvedValue({ people: [ comBairro ] });
+    let resolve!: (l: typeof LIST) => void;
+    vi.spyOn(citizenApi, "neighborhoods").mockReturnValue(new Promise(r => { resolve = r; }));
+    const onChoose = vi.fn<(c: unknown) => Promise<ChooseOutcome>>().mockResolvedValue("done");
+    render(<PeopleStep onChoose={onChoose} onHistory={vi.fn()} />);
+    const btn = await screen.findByRole("button", { name: "CPF ***.982.247-**" });
+    await userEvent.click(btn);
+    await userEvent.click(btn);
+    resolve(LIST);
+    await waitFor(() => expect(onChoose).toHaveBeenCalledTimes(1));
+    await new Promise(r => setTimeout(r, 50));
+    expect(onChoose).toHaveBeenCalledTimes(1);
   });
 });

@@ -51,6 +51,8 @@ export function ErrorText({ children }: { children: ReactNode }) {
   return <p role="alert" style={{ color: "var(--down, #c0392b)", margin: 0 }}>{children}</p>;
 }
 
+export const INVALID_NEIGHBORHOOD_MESSAGE = "Esse bairro não está mais na lista. Escolha de novo.";
+
 const MESSAGES: Record<string, string> = {
   invalid_phone: "Digite um celular com DDD, como (41) 99876-5432.",
   too_soon: "Aguarde um minuto antes de pedir outro código.",
@@ -79,7 +81,7 @@ const MESSAGES: Record<string, string> = {
   reason_too_short: "Escreva um motivo com pelo menos 10 caracteres.",
   not_today: "Isso só pode ser feito no dia do horário marcado.",
   appointment_not_eligible: "Este agendamento não está disponível para check-in.",
-  invalid_neighborhood: "Esse bairro não está mais na lista. Escolha de novo."
+  invalid_neighborhood: INVALID_NEIGHBORHOOD_MESSAGE
 };
 
 export function messageFor(error: unknown): string {

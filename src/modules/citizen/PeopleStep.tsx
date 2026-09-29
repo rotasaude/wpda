@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { citizenApi, type Neighborhood, type Person } from "../../lib/citizenApi";
 import { isValidCpf, maskCpf } from "../../lib/masks";
 import { NeighborhoodPicker } from "./NeighborhoodPicker";
-import { BigButton, ErrorText, Field, Screen, messageFor } from "./ui";
+import { BigButton, ErrorText, Field, INVALID_NEIGHBORHOOD_MESSAGE, Screen, messageFor } from "./ui";
 
 export type Who = { citizenId: string } | { cpf: string };
 export type PersonChoice = Who & { neighborhoodId?: string };
@@ -13,8 +13,6 @@ export type ChooseOutcome = "done" | "invalid_neighborhood";
 type Mode =
   | { at: "list" }
   | { at: "pick-for-start"; who: Who; notice: string | null };
-
-export const STALE_NEIGHBORHOOD = "Esse bairro não está mais na lista. Escolha de novo.";
 
 const linkStyle = { minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 18 } as const;
 
@@ -27,13 +25,16 @@ export function PeopleStep({ onChoose, onHistory }:
   const [cpf, setCpf] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Guarda síncrona: setBusy só vale no próximo render, e dois toques cabem antes dele.
+  const inFlight = useRef(false);
 
   // Lista vazia ou com erro = a cidade não tem bairros (sem semente, spec §9):
   // não pergunta, e a triagem segue sem bairro.
   function reloadNeighborhoods(): Promise<Neighborhood[]> {
     const p = citizenApi.neighborhoods().catch(() => [] as Neighborhood[]);
     listRef.current = p;
-    void p.then(setNeighborhoods);
+    // Resposta velha não sobrescreve a mais nova.
+    void p.then(list => { if (listRef.current === p) setNeighborhoods(list); });
     return p;
   }
 
@@ -42,13 +43,12 @@ export function PeopleStep({ onChoose, onHistory }:
   }
 
   useEffect(() => {
-    // A lista de bairros vem logo depois das pessoas (mesma montagem, uma
-    // chamada só; a pergunta espera por ela em currentNeighborhoods).
-    citizenApi.people().then(r => setPeople(r.people)).catch(e => setError(messageFor(e)))
-      .finally(() => { void currentNeighborhoods(); });
+    citizenApi.people().then(r => setPeople(r.people)).catch(e => setError(messageFor(e)));
+    void reloadNeighborhoods();
   }, []);
 
   async function begin(who: Who, neighborhoodId: string | null) {
+    inFlight.current = true;
     setBusy(true);
     try {
       const outcome = await onChoose(neighborhoodId ? { ...who, neighborhoodId } : who);
@@ -59,8 +59,9 @@ export function PeopleStep({ onChoose, onHistory }:
         await onChoose(who);
         return;
       }
-      setMode({ at: "pick-for-start", who, notice: STALE_NEIGHBORHOOD });
+      setMode({ at: "pick-for-start", who, notice: INVALID_NEIGHBORHOOD_MESSAGE });
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
@@ -68,8 +69,13 @@ export function PeopleStep({ onChoose, onHistory }:
   // Pergunta o bairro uma vez, antes de começar, a quem ainda não tem; quem
   // já tem começa direto (a troca é pelo "Trocar bairro").
   async function ask(who: Who, hasNeighborhood: boolean) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
     const list = await currentNeighborhoods();
     if (hasNeighborhood || list.length === 0) return begin(who, null);
+    inFlight.current = false;
+    setBusy(false);
     setMode({ at: "pick-for-start", who, notice: null });
   }
 
@@ -83,7 +89,7 @@ export function PeopleStep({ onChoose, onHistory }:
     const who = mode.who;
     return <NeighborhoodPicker title="Em que bairro esta pessoa mora?" neighborhoods={neighborhoods}
       notice={mode.notice} busy={busy}
-      onPick={id => void begin(who, id)} onBack={() => setMode({ at: "list" })} />;
+      onPick={id => { if (!inFlight.current) void begin(who, id); }} onBack={() => setMode({ at: "list" })} />;
   }
 
   const cityHasNeighborhoods = neighborhoods.length > 0;
