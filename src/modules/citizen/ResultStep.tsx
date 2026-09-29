@@ -2,9 +2,10 @@
 // triagem até o link aparecer (spec §3.1) e então mostra o mesmo relatório do
 // link público /r/:token.
 import { useEffect, useState } from "react";
-import { citizenApi } from "../../lib/citizenApi";
+import { citizenApi, type ReferenceUnit } from "../../lib/citizenApi";
 import { tokenFromUrl } from "../../lib/report";
 import { Report } from "../Report";
+import { ReferenceUnits } from "../ReferenceUnits";
 import { BigButton, Screen } from "./ui";
 
 const TRIES = 15;
@@ -13,6 +14,7 @@ export function ResultStep({ triageId, onAgain, onHistory }:
   { triageId: string; onAgain: () => void; onHistory: () => void }) {
   const [token, setToken] = useState<string | null>(null);
   const [gaveUp, setGaveUp] = useState(false);
+  const [units, setUnits] = useState<ReferenceUnit[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -21,6 +23,7 @@ export function ResultStep({ triageId, onAgain, onHistory }:
       tries += 1;
       try {
         const t = await citizenApi.triage(triageId);
+        if (alive) setUnits(t.reference_units ?? []);
         const found = t.report_url ? tokenFromUrl(new URL(t.report_url).search) : null;
         if (found) { if (alive) setToken(found); return; }
       } catch { /* tenta de novo */ }
@@ -38,10 +41,19 @@ export function ResultStep({ triageId, onAgain, onHistory }:
     </div>
   );
 
-  if (token) return <><Report token={token} />{actions}</>;
+  // Área logada: a unidade de referência vem sempre de GET /citizen/triages/:id.
+  // O Report (link público) não a mostra.
+  if (token) {
+    return <>
+      <Report token={token} />
+      <div style={{ padding: "0 16px", maxWidth: 520, margin: "0 auto" }}><ReferenceUnits units={units} /></div>
+      {actions}
+    </>;
+  }
   return (
     <Screen title="Triagem concluída" footer={actions}>
       <p>{gaveUp ? "Seu resultado ainda está sendo preparado. Veja em \"Minhas triagens\" daqui a pouco." : "Preparando seu resultado…"}</p>
+      <ReferenceUnits units={units} />
     </Screen>
   );
 }

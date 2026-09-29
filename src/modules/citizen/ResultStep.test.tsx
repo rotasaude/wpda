@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ResultStep } from "./ResultStep";
 import { citizenApi, type TriageSummary } from "../../lib/citizenApi";
@@ -51,5 +51,46 @@ describe("ResultStep", () => {
 
     expect(onAgain).toHaveBeenCalled();
     expect(onHistory).toHaveBeenCalled();
+  });
+});
+
+describe("ResultStep — unidade de referência", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: [ "Date" ] });
+    vi.setSystemTime(new Date("2026-09-28T10:00:00-03:00"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const units = [
+    { id: "u1", name: "UBS Batel", kind: "ubs",
+      address: { street: "Rua Padre Anchieta", number: "1500", complement: null, zip: "80730000" } },
+    { id: "u2", name: "UPA Matriz", kind: "upa", address: { street: null, number: null, complement: null, zip: null } }
+  ];
+
+  it("enquanto o relatório não fica pronto, mostra a unidade vinda da triagem", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), reference_units: [ units[0] ] });
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Sua unidade de referência" })).toBeInTheDocument();
+    expect(screen.getByText("UBS Batel")).toBeInTheDocument();
+  });
+
+  it("com o relatório pronto, continua mostrando as unidades da triagem (duas), uma vez só", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({
+      ...summary("http://curitiba.localhost/wpda/?token=abc"), reference_units: units
+    });
+    stubReport();
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} />);
+
+    expect(await screen.findByText("Procure atendimento hoje")).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Suas unidades de referência" })).toHaveLength(1);
+    expect(screen.getByText("UBS Batel")).toBeInTheDocument();
+    expect(screen.getByText("UPA Matriz")).toBeInTheDocument();
+  });
+
+  it("triagem sem unidade de referência: bloco ausente", async () => {
+    const triage = vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), reference_units: [] });
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} />);
+    await waitFor(() => expect(triage).toHaveBeenCalled());
+    expect(screen.queryByText(/unidade de referência|unidades de referência/)).not.toBeInTheDocument();
   });
 });

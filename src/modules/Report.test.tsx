@@ -102,4 +102,17 @@ describe("Report", () => {
 
     expect(await screen.findByText("Não foi possível carregar. Tente novamente.")).toBeInTheDocument();
   });
+
+  it("link público não mostra a unidade de referência, mesmo que a API mande reference_units", async () => {
+    stubFetch(json(200, { ...frozen, reference_units: [
+      { id: "u1", name: "UBS Batel", kind: "ubs",
+        address: { street: "Rua Padre Anchieta", number: "1500", complement: null, zip: "80730000" } }
+    ] }));
+    render(<Report token="abc" />);
+
+    await screen.findByText("Seu resultado");
+    expect(screen.queryByText(/unidade de referência|unidades de referência/)).not.toBeInTheDocument();
+    expect(screen.queryByText("UBS Batel")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Rua Padre Anchieta/)).not.toBeInTheDocument();
+  });
 });
