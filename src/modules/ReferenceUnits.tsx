@@ -10,23 +10,23 @@ export function ReferenceUnits({ units }: { units: ReferenceUnit[] | null | unde
   if (!units || units.length === 0) return null;
   const title = units.length === 1 ? "Sua unidade de referência" : "Suas unidades de referência";
   return (
-    <section aria-label={title}
+    <section aria-labelledby="reference-units-title"
       style={{ margin: "0 0 24px", padding: 12, borderRadius: 12, border: "1px solid var(--line, #eee)" }}>
-      <h2 style={{ fontSize: 16, margin: "0 0 8px" }}>{title}</h2>
+      <h2 id="reference-units-title" style={{ fontSize: 20, margin: "0 0 8px" }}>{title}</h2>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 12 }}>
         {units.map(u => {
           const kind = unitKindLabel(u.kind);
           const address = formatAddress(u.address);
           return (
             <li key={u.id}>
-              <strong>{u.name}</strong>
-              {kind && <span style={{ marginLeft: 8, fontSize: 13, color: "var(--ink2, #555)" }}>{kind}</span>}
-              {address && <div style={{ fontSize: 14, color: "var(--ink2, #555)" }}>{address}</div>}
+              <strong style={{ fontSize: 18 }}>{u.name}</strong>
+              {kind && <span style={{ marginLeft: 8, fontSize: 18, color: "var(--ink2, #555)" }}>{kind}</span>}
+              {address && <div style={{ fontSize: 18, color: "var(--ink2, #555)" }}>{address}</div>}
             </li>
           );
         })}
       </ul>
-      <p style={{ fontSize: 13, color: "var(--ink3, #888)", margin: "8px 0 0" }}>
+      <p style={{ fontSize: 18, color: "var(--ink2, #555)", margin: "8px 0 0" }}>
         Atende o bairro informado. Você pode procurar qualquer unidade de saúde.
       </p>
     </section>

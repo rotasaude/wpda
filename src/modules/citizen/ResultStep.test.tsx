@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ResultStep } from "./ResultStep";
 import { citizenApi, type TriageSummary } from "../../lib/citizenApi";
@@ -90,7 +90,9 @@ describe("ResultStep — unidade de referência", () => {
   it("triagem sem unidade de referência: bloco ausente", async () => {
     const triage = vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), reference_units: [] });
     render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} />);
+    expect(screen.getByText("Preparando seu resultado…")).toBeInTheDocument();
     await waitFor(() => expect(triage).toHaveBeenCalled());
+    await act(async () => { await Promise.resolve(); });
     expect(screen.queryByText(/unidade de referência|unidades de referência/)).not.toBeInTheDocument();
   });
 });
