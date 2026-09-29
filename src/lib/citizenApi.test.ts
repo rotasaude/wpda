@@ -244,4 +244,69 @@ describe("citizenApi", () => {
     mockFetch(200, { ...base, reference_units: units });
     expect((await citizenApi.triage("t1")).reference_units).toEqual(units);
   });
+
+  it("notices faz GET /citizen/notices e normaliza cpf_masked ausente para null", async () => {
+    const fn = mockFetch(200, { notices: [
+      { id: "r1", title: "Vacinação", body: "Texto", dispatched_at: "2026-09-28T13:00:00-03:00", read: false },
+      { id: "r2", title: "Mutirão", body: "Texto", dispatched_at: "2026-09-27T13:00:00-03:00", read: true,
+        cpf_masked: "***.982.247-**" }
+    ], unread_count: 1 });
+    const r = await citizenApi.notices();
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/notices");
+    expect(init.method).toBe("GET");
+    expect(r.unread_count).toBe(1);
+    expect(r.notices.map(n => n.id)).toEqual([ "r1", "r2" ]);
+    expect(r.notices[0].cpf_masked).toBeNull();
+    expect(r.notices[1].cpf_masked).toBe("***.982.247-**");
+    expect(r.notices[1].read).toBe(true);
+  });
+
+  it("notices sem lista nem unread_count vira lista vazia e zero", async () => {
+    mockFetch(200, {});
+    expect(await citizenApi.notices()).toEqual({ notices: [], unread_count: 0 });
+  });
+
+  it("readNotice faz POST no id do aviso, codificado", async () => {
+    const fn = mockFetch(200, { ok: true });
+    expect(await citizenApi.readNotice("r/1")).toEqual({ ok: true });
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/notices/r%2F1/read");
+    expect(init.method).toBe("POST");
+  });
+
+  it("readNotice de outro telefone rejeita com 404", async () => {
+    mockFetch(404, { error: "not_found" });
+    await expect(citizenApi.readNotice("r9")).rejects.toEqual(new ApiError(404, "not_found"));
+  });
+
+  it("contactPreferences faz GET e só liga sms_available com true explícito", async () => {
+    const people = [ { citizen_id: "p1", cpf_masked: "***.982.247-**", sms_opt_in: false, notices_muted: true } ];
+    const fn = mockFetch(200, { sms_available: true, people });
+    expect(await citizenApi.contactPreferences()).toEqual({ sms_available: true, people });
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/contact_preferences");
+    expect(init.method).toBe("GET");
+
+    mockFetch(200, { people });
+    expect((await citizenApi.contactPreferences()).sms_available).toBe(false);
+    mockFetch(200, {});
+    expect(await citizenApi.contactPreferences()).toEqual({ sms_available: false, people: [] });
+  });
+
+  it("updateContactPreference manda PUT só com o campo mudado", async () => {
+    const entry = { citizen_id: "p1", cpf_masked: "***.982.247-**", sms_opt_in: true, notices_muted: false };
+    const fn = mockFetch(200, entry);
+    expect(await citizenApi.updateContactPreference("p1", { sms_opt_in: true })).toEqual(entry);
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/contact_preferences/p1");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body as string)).toEqual({ sms_opt_in: true });
+  });
+
+  it("updateContactPreference de outro telefone rejeita com 404", async () => {
+    mockFetch(404, { error: "not_found" });
+    await expect(citizenApi.updateContactPreference("p9", { notices_muted: true }))
+      .rejects.toEqual(new ApiError(404, "not_found"));
+  });
 });

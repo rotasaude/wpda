@@ -27,6 +27,37 @@ export interface ReferenceUnit {
   address: UnitAddress;
 }
 
+// Campanhas (spec 2026-09-29 §6.2; ADR 0024). Cidadão não tem nome: com mais de
+// uma pessoa no telefone, o aviso diz de quem é pelo CPF mascarado.
+export interface Notice {
+  id: string; // id do campaign_recipient
+  title: string;
+  body: string; // texto simples, com quebras de linha
+  dispatched_at: string;
+  read: boolean;
+  cpf_masked: string | null; // null quando o telefone tem uma pessoa só
+}
+
+export interface NoticesResult {
+  notices: Notice[];
+  // Já desconta as pessoas que silenciaram os avisos (0 se todas silenciaram).
+  unread_count: number;
+}
+
+export interface ContactPreference {
+  citizen_id: string;
+  cpf_masked: string;
+  sms_opt_in: boolean;
+  notices_muted: boolean;
+}
+
+export interface ContactPreferences {
+  sms_available: boolean; // chave de SMS da cidade
+  people: ContactPreference[];
+}
+
+export type ContactPreferenceChange = { sms_opt_in?: boolean; notices_muted?: boolean };
+
 export interface Step {
   triage_id: string;
   step_id: string;
@@ -214,5 +245,22 @@ export const citizenApi = {
   cancelAppointment: (id: string, reason: string) =>
     call<{ appointment: Appointment }>("POST", `/appointments/${id}/cancel`, { reason }),
   issueAppointmentCheckInCode: (id: string) =>
-    call<{ code: string; expires_at: string }>("POST", `/appointments/${id}/check_in_code`)
+    call<{ code: string; expires_at: string }>("POST", `/appointments/${id}/check_in_code`),
+  // Caixa de avisos (spec §6.2): avisos de todas as pessoas do telefone da
+  // sessão, mais novo primeiro. Campos ausentes são normalizados aqui.
+  notices: async (): Promise<NoticesResult> => {
+    const data = await call<{ notices?: Notice[]; unread_count?: number }>("GET", "/notices");
+    return {
+      notices: (data.notices ?? []).map(n => ({ ...n, read: n.read === true, cpf_masked: n.cpf_masked ?? null })),
+      unread_count: data.unread_count ?? 0
+    };
+  },
+  readNotice: (id: string) => call<{ ok: boolean }>("POST", `/notices/${encodeURIComponent(id)}/read`),
+  contactPreferences: async (): Promise<ContactPreferences> => {
+    const data = await call<{ sms_available?: boolean; people?: ContactPreference[] }>("GET", "/contact_preferences");
+    return { sms_available: data.sms_available === true, people: data.people ?? [] };
+  },
+  // Manda só o que mudou; a resposta é a entrada inteira da pessoa.
+  updateContactPreference: (citizenId: string, change: ContactPreferenceChange) =>
+    call<ContactPreference>("PUT", `/contact_preferences/${encodeURIComponent(citizenId)}`, change)
 };
