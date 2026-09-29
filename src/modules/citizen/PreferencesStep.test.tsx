@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PreferencesStep, SMS_EXPLANATION, MUTE_EXPLANATION } from "./PreferencesStep";
+import { PreferencesStep, SMS_EXPLANATION, MUTE_EXPLANATION, EMPTY_PREFERENCES } from "./PreferencesStep";
 import { citizenApi, type ContactPreference, type ContactPreferences } from "../../lib/citizenApi";
 
 afterEach(() => vi.restoreAllMocks());
@@ -23,6 +23,16 @@ const smsSwitch = (el: HTMLElement) => within(el).getByRole("switch", { name: "R
 const muteSwitch = (el: HTMLElement) => within(el).getByRole("switch", { name: "Silenciar avisos" });
 
 describe("PreferencesStep", () => {
+  it.each([true, false])("sem nenhum cidadão (sms_available=%s): explica e não mostra interruptores, mantendo o voltar", async smsAvailable => {
+    const { onBack } = setup({ sms_available: smsAvailable, people: [] });
+    expect(await screen.findByText(EMPTY_PREFERENCES)).toBeInTheDocument();
+    expect(EMPTY_PREFERENCES).toBe(
+      "Você ainda não tem cadastro nesta cidade. Depois da sua primeira triagem, suas preferências de aviso aparecem aqui.");
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Voltar aos avisos" }));
+    expect(onBack).toHaveBeenCalled();
+  });
+
   it("com SMS disponível: cada pessoa tem os dois interruptores, com o estado da API e as explicações", async () => {
     setup();
     const a = await person("***.982.247-**");

@@ -12,6 +12,9 @@ export const SMS_EXPLANATION =
 export const MUTE_EXPLANATION =
   "Os avisos novos deixam de aparecer no número ao lado de Avisos. Eles continuam na lista de avisos.";
 
+export const EMPTY_PREFERENCES =
+  "Você ainda não tem cadastro nesta cidade. Depois da sua primeira triagem, suas preferências de aviso aparecem aqui.";
+
 type Feedback = { citizenId: string; ok: boolean; text: string };
 
 export function PreferencesStep({ onBack, onSaved }: { onBack: () => void; onSaved?: () => void }) {
@@ -61,6 +64,7 @@ export function PreferencesStep({ onBack, onSaved }: { onBack: () => void; onSav
         <BigButton style={{ marginTop: 12 }} onClick={load}>Tentar de novo</BigButton>
       </>}
       {prefs === null && !error && <p>Carregando…</p>}
+      {prefs !== null && prefs.people.length === 0 && <p>{EMPTY_PREFERENCES}</p>}
       {prefs?.people.map(p => {
         const title = `CPF ${p.cpf_masked}`;
         const mine = feedback?.citizenId === p.citizen_id ? feedback : null;
