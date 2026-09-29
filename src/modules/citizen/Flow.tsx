@@ -11,6 +11,8 @@ import { ResultStep } from "./ResultStep";
 import { HistoryStep } from "./HistoryStep";
 import { VerificationCodeStep } from "./VerificationCodeStep";
 import { CounterCodeStep } from "./CounterCodeStep";
+import { NoticesLink } from "./NoticesLink";
+import { NoticesStep } from "./NoticesStep";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
 type State =
@@ -25,11 +27,15 @@ type State =
   | { at: "verify-code"; citizenId: string; consentVersion: string | null }
   | { at: "check-in-code"; triageId: string; citizenId: string; consentVersion: string | null }
   | { at: "appointment-check-in-code"; appointmentId: string; citizenId: string; consentVersion: string | null }
+  | { at: "notices"; consentVersion: string | null }
   | { at: "declined" };
 
 export function Flow() {
   const [state, setState] = useState<State>({ at: "boot" });
   const [error, setError] = useState<string | null>(null);
+  // Muda a key do link do topo: o selo é relido depois de ler ou silenciar.
+  const [badgeTick, setBadgeTick] = useState(0);
+  const refreshBadge = () => setBadgeTick(t => t + 1);
 
   useEffect(() => {
     citizenApi.currentSession()
@@ -95,11 +101,21 @@ export function Flow() {
     [checkInAppointmentId]
   );
 
-  const exit = state.at !== "boot" && state.at !== "phone" && state.at !== "code" && (
-    <button type="button" onClick={signOut}
-      style={{ position: "fixed", top: 8, right: 8, minHeight: 48, background: "none", border: "none", fontSize: 18 }}>
-      Sair
-    </button>
+  // Topo de toda tela logada (decisão do usuário, 2026-09-29): "Avisos" com o
+  // selo e "Sair". A key relê o selo a cada troca de tela e a cada refreshBadge.
+  const signedIn = state.at !== "boot" && state.at !== "phone" && state.at !== "code";
+  const consentVersion = "consentVersion" in state ? state.consentVersion : null;
+  const top = signedIn && (
+    <nav aria-label="Conta"
+      style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8,
+        maxWidth: 520, margin: "0 auto", padding: "8px 16px 0" }}>
+      <NoticesLink key={`${state.at}-${badgeTick}`}
+        onOpen={() => setState({ at: "notices", consentVersion })} />
+      <button type="button" onClick={signOut}
+        style={{ minHeight: 48, padding: "0 12px", background: "none", border: "none", fontSize: 18 }}>
+        Sair
+      </button>
+    </nav>
   );
 
   let view;
@@ -155,6 +171,12 @@ export function Flow() {
         issue={issueAppointmentCheckIn}
         onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
       break;
+    case "notices":
+      // A caixa não depende do termo (ADR 0024): sem versão guardada, voltar
+      // leva ao termo, que segue obrigatório para começar a triagem.
+      view = <NoticesStep onRead={refreshBadge}
+        onBack={() => setState(state.consentVersion ? { at: "people", consentVersion: state.consentVersion } : { at: "consent" })} />;
+      break;
     case "declined":
       view = <Screen title="Tudo bem" footer={<BigButton onClick={() => setState({ at: "consent" })}>Ler o termo de novo</BigButton>}>
         <p>Sem o seu consentimento não fazemos a triagem, e nenhum CPF ou resposta sua foi guardado.</p>
@@ -162,5 +184,5 @@ export function Flow() {
       break;
   }
 
-  return <>{exit}{view}</>;
+  return <>{top}{view}</>;
 }
