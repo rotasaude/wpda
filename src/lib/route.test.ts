@@ -8,7 +8,9 @@ describe("routeFromPath", () => {
     [ "/wpda/avisos/", "/wpda/", "avisos" ],
     [ "/wpda/preferencias", "/wpda/", "preferencias" ],
     [ "/avisos", "/", "avisos" ],
-    [ "/wpda/avisos", "/wpda", "avisos" ]
+    [ "/wpda/avisos", "/wpda", "avisos" ],
+    [ "/wpda//avisos", "/wpda/", "avisos" ],
+    [ "/wpda//preferencias/", "/wpda/", "preferencias" ]
   ])("%s com base %s → %s", (path, base, route) => expect(routeFromPath(path, base)).toBe(route));
 
   it.each([

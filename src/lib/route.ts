@@ -11,8 +11,9 @@ function withSlash(base: string): string {
 
 export function routeFromPath(pathname: string, base: string): AppRoute | null {
   const b = withSlash(base);
-  if (!pathname.startsWith(b)) return null;
-  const rest = pathname.slice(b.length).replace(/\/+$/, "");
+  const path = pathname.replace(/\/{2,}/g, "/");
+  if (!path.startsWith(b)) return null;
+  const rest = path.slice(b.length).replace(/\/+$/, "");
   return ROUTES.includes(rest) ? (rest as AppRoute) : null;
 }
 
