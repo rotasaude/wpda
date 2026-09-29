@@ -51,6 +51,27 @@ export function ErrorText({ children }: { children: ReactNode }) {
   return <p role="alert" style={{ color: "var(--down, #c0392b)", margin: 0 }}>{children}</p>;
 }
 
+// Interruptor liga/desliga: o rótulo inteiro é o alvo de toque (48 px ou mais).
+export function Toggle({ label, description, checked, disabled, onChange }:
+  { label: string; description?: string; checked: boolean; disabled?: boolean; onChange: (checked: boolean) => void }) {
+  const id = useId();
+  const descriptionId = `${id}-description`;
+  return (
+    <div style={{ display: "grid", gap: 4, marginBottom: 16 }}>
+      <label htmlFor={id}
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, minHeight: 48,
+          fontSize: 18, fontWeight: 600, cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.6 : 1 }}>
+        {label}
+        <input id={id} type="checkbox" role="switch" checked={checked} disabled={disabled}
+          aria-describedby={description ? descriptionId : undefined}
+          onChange={e => onChange(e.target.checked)}
+          style={{ width: 28, height: 28, flexShrink: 0, margin: 0 }} />
+      </label>
+      {description && <p id={descriptionId} style={{ margin: 0, fontSize: 18, color: "var(--ink2, #555)" }}>{description}</p>}
+    </div>
+  );
+}
+
 export const INVALID_NEIGHBORHOOD_MESSAGE = "Esse bairro não está mais na lista. Escolha de novo.";
 
 const MESSAGES: Record<string, string> = {

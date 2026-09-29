@@ -13,6 +13,7 @@ import { VerificationCodeStep } from "./VerificationCodeStep";
 import { CounterCodeStep } from "./CounterCodeStep";
 import { NoticesLink } from "./NoticesLink";
 import { NoticesStep } from "./NoticesStep";
+import { PreferencesStep } from "./PreferencesStep";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
 type State =
@@ -28,6 +29,7 @@ type State =
   | { at: "check-in-code"; triageId: string; citizenId: string; consentVersion: string | null }
   | { at: "appointment-check-in-code"; appointmentId: string; citizenId: string; consentVersion: string | null }
   | { at: "notices"; consentVersion: string | null }
+  | { at: "preferences"; consentVersion: string | null }
   | { at: "declined" };
 
 export function Flow() {
@@ -175,7 +177,12 @@ export function Flow() {
       // A caixa não depende do termo (ADR 0024): sem versão guardada, voltar
       // leva ao termo, que segue obrigatório para começar a triagem.
       view = <NoticesStep onRead={refreshBadge}
+        onPreferences={() => setState({ at: "preferences", consentVersion: state.consentVersion })}
         onBack={() => setState(state.consentVersion ? { at: "people", consentVersion: state.consentVersion } : { at: "consent" })} />;
+      break;
+    case "preferences":
+      view = <PreferencesStep onSaved={refreshBadge}
+        onBack={() => setState({ at: "notices", consentVersion: state.consentVersion })} />;
       break;
     case "declined":
       view = <Screen title="Tudo bem" footer={<BigButton onClick={() => setState({ at: "consent" })}>Ler o termo de novo</BigButton>}>

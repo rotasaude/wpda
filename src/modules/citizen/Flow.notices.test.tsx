@@ -112,4 +112,40 @@ describe("Flow — link Avisos no topo", () => {
     expect(within(bar()).getByRole("link", { name: "Avisos" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  it("silenciar nas preferências tira o selo do topo na hora; os avisos continuam na lista como 'novo'", async () => {
+    signedIn();
+    const { box } = inbox();
+    vi.spyOn(citizenApi, "contactPreferences").mockResolvedValue({
+      sms_available: false,
+      people: [ { citizen_id: "p1", cpf_masked: "***.982.247-**", sms_opt_in: false, notices_muted: false } ]
+    });
+    // Silenciar zera o selo no api, mas o aviso continua não lido.
+    const update = vi.spyOn(citizenApi, "updateContactPreference").mockImplementation(async () => {
+      box.unread = 0;
+      return { citizen_id: "p1", cpf_masked: "***.982.247-**", sms_opt_in: false, notices_muted: true };
+    });
+    vi.mocked(citizenApi.notices).mockImplementation(async () => ({
+      notices: [ notice ], unread_count: box.unread
+    }));
+
+    render(<Flow />);
+    await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
+    await userEvent.click(await within(bar()).findByRole("link", { name: "Avisos, 1 novo" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Preferências de avisos" }));
+
+    expect(await screen.findByRole("heading", { name: "Preferências de avisos" })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("switch", { name: "Silenciar avisos" }));
+    expect(update).toHaveBeenCalledWith("p1", { notices_muted: true });
+    expect(await screen.findByText("Preferência salva.")).toBeInTheDocument();
+    // Ainda nas preferências, o selo do topo já foi relido.
+    expect(await within(bar()).findByRole("link", { name: "Avisos" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Voltar aos avisos" }));
+    expect(within(await screen.findByRole("button", { name: /Vacinação/ })).getByText("novo")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Voltar ao início" }));
+    expect(await screen.findByText("Para quem é esta triagem?")).toBeInTheDocument();
+    expect(within(bar()).getByRole("link", { name: "Avisos" }).textContent).toBe("Avisos");
+  });
 });
