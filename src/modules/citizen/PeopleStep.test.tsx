@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PeopleStep, type ChooseOutcome } from "./PeopleStep";
-import { citizenApi, type Person } from "../../lib/citizenApi";
+import { ApiError, citizenApi, type Person } from "../../lib/citizenApi";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -155,5 +155,97 @@ describe("PeopleStep — bairro antes de começar", () => {
     await waitFor(() => expect(onChoose).toHaveBeenCalledTimes(1));
     await new Promise(r => setTimeout(r, 50));
     expect(onChoose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PeopleStep — Trocar bairro", () => {
+  it("troca o bairro, relê as pessoas e confirma", async () => {
+    const people = vi.spyOn(citizenApi, "people")
+      .mockResolvedValueOnce({ people: [ comBairro ] })
+      .mockResolvedValue({ people: [ { ...comBairro, neighborhood: { id: "n2", name: "São Francisco" } } ] });
+    vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue(LIST);
+    const set = vi.spyOn(citizenApi, "setNeighborhood").mockResolvedValue({});
+    const onChoose = vi.fn().mockResolvedValue("done");
+    render(<PeopleStep onChoose={onChoose} onHistory={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Trocar bairro de ***.982.247-**" }));
+    expect(await screen.findByRole("heading", { name: "Bairro de ***.982.247-**" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "São Francisco" }));
+
+    expect(await screen.findByText("Bairro atualizado.")).toBeInTheDocument();
+    expect(await screen.findByText("Bairro: São Francisco")).toBeInTheDocument();
+    expect(set).toHaveBeenCalledWith("p1", "n2");
+    expect(people).toHaveBeenCalledTimes(2);
+    expect(onChoose).not.toHaveBeenCalled();
+  });
+
+  it("'Prefiro não informar' na troca tira o bairro (manda null)", async () => {
+    vi.spyOn(citizenApi, "people")
+      .mockResolvedValueOnce({ people: [ comBairro ] })
+      .mockResolvedValue({ people: [ semBairro ] });
+    vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue(LIST);
+    const set = vi.spyOn(citizenApi, "setNeighborhood").mockResolvedValue({});
+    render(<PeopleStep onChoose={vi.fn().mockResolvedValue("done")} onHistory={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Trocar bairro de ***.982.247-**" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Prefiro não informar" }));
+
+    expect(await screen.findByText("Bairro não informado")).toBeInTheDocument();
+    expect(set).toHaveBeenCalledWith("p1", null);
+  });
+
+  it("422 invalid_neighborhood na troca: relê a lista e avisa, sem sair da pergunta", async () => {
+    vi.spyOn(citizenApi, "people").mockResolvedValue({ people: [ comBairro ] });
+    const neighborhoods = vi.spyOn(citizenApi, "neighborhoods")
+      .mockResolvedValueOnce(LIST).mockResolvedValue(LIST.filter(n => n.id !== "n2"));
+    vi.spyOn(citizenApi, "setNeighborhood").mockRejectedValue(new ApiError(422, "invalid_neighborhood"));
+    render(<PeopleStep onChoose={vi.fn().mockResolvedValue("done")} onHistory={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Trocar bairro de ***.982.247-**" }));
+    await userEvent.click(await screen.findByRole("button", { name: "São Francisco" }));
+
+    expect(await screen.findByText("Esse bairro não está mais na lista. Escolha de novo.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bairro de ***.982.247-**" })).toBeInTheDocument();
+    expect(neighborhoods).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "São Francisco" })).not.toBeInTheDocument());
+  });
+
+  it("404 (CPF fora da sessão): mostra a mensagem, sem sair da pergunta", async () => {
+    vi.spyOn(citizenApi, "people").mockResolvedValue({ people: [ comBairro ] });
+    vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue(LIST);
+    vi.spyOn(citizenApi, "setNeighborhood").mockRejectedValue(new ApiError(404, "not_found"));
+    render(<PeopleStep onChoose={vi.fn().mockResolvedValue("done")} onHistory={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Trocar bairro de ***.982.247-**" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Batel" }));
+
+    expect(await screen.findByText("Algo deu errado. Tente de novo.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bairro de ***.982.247-**" })).toBeInTheDocument();
+  });
+
+  it("'Voltar' na troca não grava nada", async () => {
+    vi.spyOn(citizenApi, "people").mockResolvedValue({ people: [ comBairro ] });
+    vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue(LIST);
+    const set = vi.spyOn(citizenApi, "setNeighborhood");
+    render(<PeopleStep onChoose={vi.fn().mockResolvedValue("done")} onHistory={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Trocar bairro de ***.982.247-**" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Voltar" }));
+
+    expect(await screen.findByText("Para quem é esta triagem?")).toBeInTheDocument();
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  it("toque duplo em um bairro grava uma vez só", async () => {
+    vi.spyOn(citizenApi, "people").mockResolvedValue({ people: [ comBairro ] });
+    vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue(LIST);
+    const set = vi.spyOn(citizenApi, "setNeighborhood").mockImplementation(() => new Promise(r => setTimeout(() => r({}), 20)));
+    render(<PeopleStep onChoose={vi.fn().mockResolvedValue("done")} onHistory={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Trocar bairro de ***.982.247-**" }));
+    await userEvent.dblClick(await screen.findByRole("button", { name: "São Francisco" }));
+
+    expect(await screen.findByText("Bairro atualizado.")).toBeInTheDocument();
+    expect(set).toHaveBeenCalledTimes(1);
   });
 });

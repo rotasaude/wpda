@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { citizenApi, type Neighborhood, type Person } from "../../lib/citizenApi";
+import { ApiError, citizenApi, type Neighborhood, type Person } from "../../lib/citizenApi";
 import { isValidCpf, maskCpf } from "../../lib/masks";
 import { NeighborhoodPicker } from "./NeighborhoodPicker";
 import { BigButton, ErrorText, Field, INVALID_NEIGHBORHOOD_MESSAGE, Screen, messageFor } from "./ui";
@@ -12,7 +12,8 @@ export type ChooseOutcome = "done" | "invalid_neighborhood";
 
 type Mode =
   | { at: "list" }
-  | { at: "pick-for-start"; who: Who; notice: string | null };
+  | { at: "pick-for-start"; who: Who; notice: string | null }
+  | { at: "pick-for-change"; person: Person; notice: string | null };
 
 const linkStyle = { minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 18 } as const;
 
@@ -25,6 +26,7 @@ export function PeopleStep({ onChoose, onHistory }:
   const [cpf, setCpf] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
   // Guarda síncrona: setBusy só vale no próximo render, e dois toques cabem antes dele.
   const inFlight = useRef(false);
 
@@ -42,8 +44,12 @@ export function PeopleStep({ onChoose, onHistory }:
     return listRef.current ?? reloadNeighborhoods();
   }
 
-  useEffect(() => {
+  function loadPeople() {
     citizenApi.people().then(r => setPeople(r.people)).catch(e => setError(messageFor(e)));
+  }
+
+  useEffect(() => {
+    loadPeople();
     void reloadNeighborhoods();
   }, []);
 
@@ -70,6 +76,7 @@ export function PeopleStep({ onChoose, onHistory }:
   // já tem começa direto (a troca é pelo "Trocar bairro").
   async function ask(who: Who, hasNeighborhood: boolean) {
     if (inFlight.current) return;
+    setSaved(null);
     inFlight.current = true;
     setBusy(true);
     const list = await currentNeighborhoods();
@@ -85,6 +92,36 @@ export function PeopleStep({ onChoose, onHistory }:
     void ask({ cpf }, false);
   }
 
+  // "Trocar bairro" (spec §4.1): null tira o bairro. Não muda triagens antigas.
+  async function change(person: Person, neighborhoodId: string | null) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    try {
+      await citizenApi.setNeighborhood(person.id, neighborhoodId);
+      setMode({ at: "list" });
+      setSaved("Bairro atualizado.");
+      loadPeople();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "invalid_neighborhood") {
+        await reloadNeighborhoods();
+        setMode({ at: "pick-for-change", person, notice: INVALID_NEIGHBORHOOD_MESSAGE });
+      } else {
+        setMode({ at: "pick-for-change", person, notice: messageFor(e) });
+      }
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
+
+  if (mode.at === "pick-for-change") {
+    const person = mode.person;
+    return <NeighborhoodPicker title={`Bairro de ${person.cpf_masked}`} neighborhoods={neighborhoods}
+      notice={mode.notice} busy={busy}
+      onPick={id => void change(person, id)} onBack={() => setMode({ at: "list" })} />;
+  }
+
   if (mode.at === "pick-for-start") {
     const who = mode.who;
     return <NeighborhoodPicker title="Em que bairro esta pessoa mora?" neighborhoods={neighborhoods}
@@ -96,6 +133,7 @@ export function PeopleStep({ onChoose, onHistory }:
   return (
     <Screen title="Para quem é esta triagem?">
       {people === null && !error && <p>Carregando…</p>}
+      {saved && <p role="status">{saved}</p>}
       <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
         {people?.map(p => (
           <div key={p.id} style={{ display: "grid", gap: 8 }}>
@@ -104,6 +142,11 @@ export function PeopleStep({ onChoose, onHistory }:
             </BigButton>
             {(cityHasNeighborhoods || p.neighborhood) &&
               <p style={{ margin: 0 }}>{p.neighborhood ? `Bairro: ${p.neighborhood.name}` : "Bairro não informado"}</p>}
+            {cityHasNeighborhoods &&
+              <button type="button" disabled={busy} style={linkStyle}
+                onClick={() => { setSaved(null); setMode({ at: "pick-for-change", person: p, notice: null }); }}>
+                Trocar bairro de {p.cpf_masked}
+              </button>}
             <button type="button" onClick={() => onHistory(p.id)} style={linkStyle}>
               Ver triagens de {p.cpf_masked}
             </button>
