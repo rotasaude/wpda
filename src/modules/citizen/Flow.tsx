@@ -1,7 +1,10 @@
 // Máquina de telas do canal web do cidadão (spec §4). Sem biblioteca de rotas:
-// o estado mora aqui, e um F5 volta ao começo com a sessão (cookie) preservada.
-import { useCallback, useEffect, useState } from "react";
+// o estado mora aqui. Só a caixa de avisos e as preferências têm endereço
+// (<base>avisos, <base>preferencias; spec 2026-09-29 §8): o link do SMS passa
+// pelo login e volta para lá. Nas outras telas, um F5 volta ao começo.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { citizenApi, ApiError, type Step } from "../../lib/citizenApi";
+import { pathFor, routeFromPath, type AppRoute } from "../../lib/route";
 import { PhoneStep } from "./PhoneStep";
 import { CodeStep } from "./CodeStep";
 import { ConsentStep } from "./ConsentStep";
@@ -38,20 +41,50 @@ export function Flow() {
   // Muda a key do link do topo: o selo é relido depois de ler ou silenciar.
   const [badgeTick, setBadgeTick] = useState(0);
   const refreshBadge = () => setBadgeTick(t => t + 1);
+  // Destino pedido pela URL no carregamento (link do SMS). Vale uma vez; a
+  // sessão que cai numa dessas telas o guarda de novo; "Sair" o esquece.
+  const target = useRef<AppRoute | null>(routeFromPath(window.location.pathname, import.meta.env.BASE_URL));
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // Depois da sessão confirmada: o destino pedido, ou o termo, como sempre.
+  // A caixa de avisos não depende do termo (ADR 0024).
+  function enter() {
+    const route = target.current;
+    target.current = null;
+    if (route === "avisos") setState({ at: "notices", consentVersion: null });
+    else if (route === "preferencias") setState({ at: "preferences", consentVersion: null });
+    else setState({ at: "consent" });
+  }
 
   useEffect(() => {
+    // StrictMode monta duas vezes em dev: a resposta da montagem desfeita não
+    // pode gastar o destino nem sobrescrever a tela.
+    let alive = true;
     citizenApi.currentSession()
-      .then(() => setState({ at: "consent" }))
-      .catch(() => setState({ at: "phone" }));
+      .then(() => { if (alive) enter(); })
+      .catch(() => { if (alive) setState({ at: "phone" }); });
+    return () => { alive = false; };
   }, []);
 
   useEffect(() => {
     function onUnauthenticated() {
+      const s = stateRef.current;
+      if (s.at === "notices") target.current = "avisos";
+      else if (s.at === "preferences") target.current = "preferencias";
       setState({ at: "phone" });
     }
     window.addEventListener("citizen:unauthenticated", onUnauthenticated);
     return () => window.removeEventListener("citizen:unauthenticated", onUnauthenticated);
   }, []);
+
+  // URL em dia fora do login (no login, a URL pedida fica para o F5).
+  useEffect(() => {
+    if (state.at === "boot" || state.at === "phone" || state.at === "code") return;
+    const route: AppRoute | null = state.at === "notices" ? "avisos" : state.at === "preferences" ? "preferencias" : null;
+    const path = pathFor(route, import.meta.env.BASE_URL);
+    if (window.location.pathname !== path) window.history.replaceState(null, "", path);
+  }, [state.at]);
 
   async function choose(consentVersion: string, choice: PersonChoice): Promise<ChooseOutcome> {
     setError(null);
@@ -84,6 +117,8 @@ export function Flow() {
   }
 
   async function signOut() {
+    target.current = null;
+    window.history.replaceState(null, "", pathFor(null, import.meta.env.BASE_URL));
     try { await citizenApi.signOut(); } finally { setState({ at: "phone" }); }
   }
 
@@ -125,7 +160,7 @@ export function Flow() {
     case "boot": view = <Screen title="Triagem de saúde"><p>Carregando…</p></Screen>; break;
     case "phone": view = <PhoneStep onSent={phone => setState({ at: "code", phone })} />; break;
     case "code":
-      view = <CodeStep phone={state.phone} onVerified={() => setState({ at: "consent" })}
+      view = <CodeStep phone={state.phone} onVerified={enter}
         onChangePhone={() => setState({ at: "phone" })} />;
       break;
     case "consent":
