@@ -9,7 +9,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: [ "Date" ] });
   vi.setSystemTime(new Date("2026-09-29T10:00:00-03:00"));
 });
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); window.history.replaceState(null, "", "/"); });
 
 const notice: Notice = {
   id: "r1", title: "Vacinação contra a gripe", body: "Leve a carteirinha.",
@@ -147,5 +147,21 @@ describe("Flow — link Avisos no topo", () => {
     await userEvent.click(screen.getByRole("button", { name: "Voltar ao início" }));
     expect(await screen.findByText("Para quem é esta triagem?")).toBeInTheDocument();
     expect(within(bar()).getByRole("link", { name: "Avisos" }).textContent).toBe("Avisos");
+  });
+
+  it("tocar em Avisos no topo com um aviso aberto volta à lista", async () => {
+    signedIn();
+    inbox();
+    render(<Flow />);
+    await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
+    await userEvent.click(await within(bar()).findByRole("link", { name: "Avisos, 1 novo" }));
+    await userEvent.click(await screen.findByRole("button", { name: /Vacinação/ }));
+    expect(await screen.findByRole("button", { name: "Voltar aos avisos" })).toBeInTheDocument();
+
+    await userEvent.click(await within(bar()).findByRole("link", { name: "Avisos" }));
+
+    expect(await screen.findByRole("heading", { name: "Avisos" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Vacinação/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Voltar aos avisos" })).not.toBeInTheDocument();
   });
 });

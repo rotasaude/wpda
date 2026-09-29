@@ -41,6 +41,8 @@ export function Flow() {
   // Muda a key do link do topo: o selo é relido depois de ler ou silenciar.
   const [badgeTick, setBadgeTick] = useState(0);
   const refreshBadge = () => setBadgeTick(t => t + 1);
+  // Muda a key da caixa: "Avisos" no topo sempre volta à lista, mesmo com um aviso aberto.
+  const [navTick, setNavTick] = useState(0);
   // Destino pedido pela URL no carregamento (link do SMS). Vale uma vez; a
   // sessão que cai numa dessas telas o guarda de novo; "Sair" o esquece.
   const target = useRef<AppRoute | null>(routeFromPath(window.location.pathname, import.meta.env.BASE_URL));
@@ -153,7 +155,7 @@ export function Flow() {
       style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8,
         maxWidth: 520, margin: "0 auto", padding: "8px 16px 0" }}>
       <NoticesLink key={`${state.at}-${badgeTick}`}
-        onOpen={() => setState({ at: "notices", consentVersion })} />
+        onOpen={() => { setNavTick(t => t + 1); setState({ at: "notices", consentVersion }); }} />
       <button type="button" onClick={signOut}
         style={{ minHeight: 48, padding: "0 12px", background: "none", border: "none", fontSize: 18 }}>
         Sair
@@ -217,7 +219,7 @@ export function Flow() {
     case "notices":
       // A caixa não depende do termo (ADR 0024): sem versão guardada, voltar
       // leva ao termo, que segue obrigatório para começar a triagem.
-      view = <NoticesStep onRead={refreshBadge}
+      view = <NoticesStep key={navTick} onRead={refreshBadge}
         onPreferences={() => setState({ at: "preferences", consentVersion: state.consentVersion })}
         onBack={() => setState(state.consentVersion ? { at: "people", consentVersion: state.consentVersion } : { at: "consent" })} />;
       break;
