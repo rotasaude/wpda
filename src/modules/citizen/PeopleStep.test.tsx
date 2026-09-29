@@ -210,6 +210,20 @@ describe("PeopleStep — Trocar bairro", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "São Francisco" })).not.toBeInTheDocument());
   });
 
+  it("422 na troca com a lista relida vazia: volta para a lista com aviso", async () => {
+    vi.spyOn(citizenApi, "people").mockResolvedValue({ people: [ comBairro ] });
+    vi.spyOn(citizenApi, "neighborhoods").mockResolvedValueOnce(LIST).mockResolvedValue([]);
+    vi.spyOn(citizenApi, "setNeighborhood").mockRejectedValue(new ApiError(422, "invalid_neighborhood"));
+    render(<PeopleStep onChoose={vi.fn().mockResolvedValue("done")} onHistory={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Trocar bairro de ***.982.247-**" }));
+    await userEvent.click(await screen.findByRole("button", { name: "São Francisco" }));
+
+    expect(await screen.findByText("Para quem é esta triagem?")).toBeInTheDocument();
+    expect(screen.getByText("Esse bairro não está mais na lista. Escolha de novo.")).toBeInTheDocument();
+    expect(screen.queryByText("Nenhum bairro encontrado com esse nome")).not.toBeInTheDocument();
+  });
+
   it("404 (CPF fora da sessão): mostra a mensagem, sem sair da pergunta", async () => {
     vi.spyOn(citizenApi, "people").mockResolvedValue({ people: [ comBairro ] });
     vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue(LIST);
@@ -239,11 +253,16 @@ describe("PeopleStep — Trocar bairro", () => {
   it("toque duplo em um bairro grava uma vez só", async () => {
     vi.spyOn(citizenApi, "people").mockResolvedValue({ people: [ comBairro ] });
     vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue(LIST);
-    const set = vi.spyOn(citizenApi, "setNeighborhood").mockImplementation(() => new Promise(r => setTimeout(() => r({}), 20)));
+    let finish!: (v: unknown) => void;
+    const gate = new Promise(r => { finish = r; });
+    const set = vi.spyOn(citizenApi, "setNeighborhood").mockImplementation(() => gate);
     render(<PeopleStep onChoose={vi.fn().mockResolvedValue("done")} onHistory={vi.fn()} />);
 
     await userEvent.click(await screen.findByRole("button", { name: "Trocar bairro de ***.982.247-**" }));
-    await userEvent.dblClick(await screen.findByRole("button", { name: "São Francisco" }));
+    const btn = await screen.findByRole("button", { name: "São Francisco" });
+    await userEvent.click(btn);
+    await userEvent.click(btn);
+    finish({});
 
     expect(await screen.findByText("Bairro atualizado.")).toBeInTheDocument();
     expect(set).toHaveBeenCalledTimes(1);

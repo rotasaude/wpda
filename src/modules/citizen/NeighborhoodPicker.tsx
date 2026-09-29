@@ -18,13 +18,15 @@ export function NeighborhoodPicker({ title, neighborhoods, notice, busy, onPick,
     </>}>
       <p>Usamos o bairro para indicar a unidade de saúde que atende você. Você pode trocar depois.</p>
       {notice && <ErrorText>{notice}</ErrorText>}
-      <Field label="Buscar bairro" value={query} autoComplete="off" onChange={e => setQuery(e.target.value)} />
-      {shown.length === 0 && <p>Nenhum bairro encontrado com esse nome.</p>}
-      <div style={{ display: "grid", gap: 8 }}>
+      <Field label="Buscar bairro" type="search" value={query} autoComplete="off" onChange={e => setQuery(e.target.value)} />
+      {shown.length === 0 && query.trim() !== "" && <p role="status">Nenhum bairro encontrado com esse nome.</p>}
+      <ul style={{ display: "grid", gap: 8, listStyle: "none", margin: 0, padding: 0 }}>
         {shown.map(n => (
-          <BigButton key={n.id} variant="secondary" disabled={busy} onClick={() => onPick(n.id)}>{n.name}</BigButton>
+          <li key={n.id}>
+            <BigButton variant="secondary" disabled={busy} onClick={() => onPick(n.id)}>{n.name}</BigButton>
+          </li>
         ))}
-      </div>
+      </ul>
     </Screen>
   );
 }

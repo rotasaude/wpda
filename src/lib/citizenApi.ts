@@ -180,7 +180,8 @@ export const citizenApi = {
     return { people: data.people.map(normalizePerson) };
   },
   // Bairros ativos da cidade, por nome (spec §4.1).
-  neighborhoods: async () => (await call<{ neighborhoods: Neighborhood[] }>("GET", "/neighborhoods")).neighborhoods,
+  neighborhoods: async () =>
+    (await call<{ neighborhoods?: Neighborhood[] }>("GET", "/neighborhoods")).neighborhoods ?? [],
   // null = "Prefiro não informar" (tira o bairro). Troca não muda triagens antigas.
   setNeighborhood: (citizenId: string, neighborhoodId: string | null) =>
     call<unknown>("POST", `/people/${encodeURIComponent(citizenId)}/neighborhood`, { neighborhood_id: neighborhoodId }),

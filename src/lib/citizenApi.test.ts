@@ -190,6 +190,11 @@ describe("citizenApi", () => {
     expect(people[1].neighborhood).toEqual({ id: "n1", name: "Batel" });
   });
 
+  it("neighborhoods devolve [] quando a resposta 200 vem sem a chave", async () => {
+    mockFetch(200, {});
+    expect(await citizenApi.neighborhoods()).toEqual([]);
+  });
+
   it("neighborhoods faz GET /citizen/neighborhoods e desembrulha { neighborhoods }", async () => {
     const fn = mockFetch(200, { neighborhoods: [ { id: "n1", name: "Batel" } ] });
     expect(await citizenApi.neighborhoods()).toEqual([ { id: "n1", name: "Batel" } ]);

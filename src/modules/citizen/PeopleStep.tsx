@@ -104,8 +104,13 @@ export function PeopleStep({ onChoose, onHistory }:
       loadPeople();
     } catch (e) {
       if (e instanceof ApiError && e.code === "invalid_neighborhood") {
-        await reloadNeighborhoods();
-        setMode({ at: "pick-for-change", person, notice: INVALID_NEIGHBORHOOD_MESSAGE });
+        const list = await reloadNeighborhoods();
+        if (list.length === 0) {
+          setMode({ at: "list" });
+          setSaved(INVALID_NEIGHBORHOOD_MESSAGE);
+        } else {
+          setMode({ at: "pick-for-change", person, notice: INVALID_NEIGHBORHOOD_MESSAGE });
+        }
       } else {
         setMode({ at: "pick-for-change", person, notice: messageFor(e) });
       }
