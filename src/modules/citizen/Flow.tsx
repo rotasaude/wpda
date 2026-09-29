@@ -119,7 +119,13 @@ export function Flow() {
   async function signOut() {
     target.current = null;
     window.history.replaceState(null, "", pathFor(null, import.meta.env.BASE_URL));
-    try { await citizenApi.signOut(); } finally { setState({ at: "phone" }); }
+    // Um 401 no logout (sessão já vencida) dispara citizen:unauthenticated, que
+    // guardaria o destino de novo: limpa depois do pedido também. O erro é
+    // engolido: saiu de qualquer jeito, e o onClick não tem quem o trate.
+    try { await citizenApi.signOut(); } catch { /* sessão já encerrada */ } finally {
+      target.current = null;
+      setState({ at: "phone" });
+    }
   }
 
   // Mesmo cuidado que VerificationCodeStep: sem memoizar por triageId, cada

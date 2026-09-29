@@ -143,6 +143,24 @@ describe("Flow — link do SMS (/avisos)", () => {
     expect(await screen.findByRole("button", { name: "Concordo" })).toBeInTheDocument();
   });
 
+  it("'Sair' com a sessão já vencida (401 no logout) também esquece o destino", async () => {
+    at("/wpda/avisos");
+    api({ session: true });
+    vi.spyOn(citizenApi, "signOut").mockImplementation(async () => {
+      window.dispatchEvent(new Event("citizen:unauthenticated"));
+      throw new ApiError(401, "unauthenticated");
+    });
+    render(<Flow />);
+    expect(await screen.findByRole("heading", { name: "Avisos" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Sair" }));
+    expect(await screen.findByLabelText("Seu celular")).toBeInTheDocument();
+
+    await signIn();
+    expect(await screen.findByRole("button", { name: "Concordo" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/wpda/");
+  });
+
   it("abrir Avisos pela tela inicial põe /avisos na URL", async () => {
     at("/wpda/");
     api({ session: true });
