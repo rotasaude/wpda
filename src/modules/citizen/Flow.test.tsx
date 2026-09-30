@@ -125,10 +125,10 @@ describe("Flow", () => {
   });
 
   it.each([
-    [ "triage_too_old", "Esta triagem tem mais de 3 dias. Faça uma triagem nova." ],
-    [ "already_checked_in", "Você já fez o check-in desta triagem." ],
-    [ "triage_not_eligible", "Esta triagem não está disponível para check-in." ]
-  ])("'Cheguei na unidade' recusado com %s mostra a mensagem ao cidadão", async (code, message) => {
+    [ "triage_too_old", 422, "Esta triagem tem mais de 3 dias. Faça uma triagem nova." ],
+    [ "already_checked_in", 409, "Você já fez o check-in desta triagem." ],
+    [ "triage_not_eligible", 422, "Esta triagem não está disponível para check-in." ]
+  ])("'Cheguei na unidade' recusado com %s mostra a mensagem ao cidadão", async (code, status, message) => {
     vi.spyOn(citizenApi, "currentSession").mockResolvedValue({ phone_masked: "(**) *****-5432" });
     vi.spyOn(citizenApi, "consentTerm").mockResolvedValue({ version: "1", body: "Termo" });
     vi.spyOn(citizenApi, "people").mockResolvedValue({
@@ -143,7 +143,7 @@ describe("Flow", () => {
         origin_phone_masked: null, tier: "azul", check_in_available: true
       }]
     });
-    vi.spyOn(citizenApi, "issueCheckInCode").mockRejectedValue(new ApiError(422, code));
+    vi.spyOn(citizenApi, "issueCheckInCode").mockRejectedValue(new ApiError(status, code));
 
     render(<Flow />);
     await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
