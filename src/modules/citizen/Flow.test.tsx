@@ -124,6 +124,35 @@ describe("Flow", () => {
     expect(issueCheckInCode).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    [ "triage_too_old", "Esta triagem tem mais de 3 dias. Faça uma triagem nova." ],
+    [ "already_checked_in", "Você já fez o check-in desta triagem." ],
+    [ "triage_not_eligible", "Esta triagem não está disponível para check-in." ]
+  ])("'Cheguei na unidade' recusado com %s mostra a mensagem ao cidadão", async (code, message) => {
+    vi.spyOn(citizenApi, "currentSession").mockResolvedValue({ phone_masked: "(**) *****-5432" });
+    vi.spyOn(citizenApi, "consentTerm").mockResolvedValue({ version: "1", body: "Termo" });
+    vi.spyOn(citizenApi, "people").mockResolvedValue({
+      people: [{ id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" }]
+    });
+    vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue([]);
+    vi.spyOn(citizenApi, "triages").mockResolvedValue({
+      citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" },
+      triages: [{
+        id: "t1", status: "completed", priority: 3, created_at: "2026-09-24T12:00:00Z",
+        completed_at: "2026-09-24T12:05:00Z", report_url: null, consent_active: true,
+        origin_phone_masked: null, tier: "azul", check_in_available: true
+      }]
+    });
+    vi.spyOn(citizenApi, "issueCheckInCode").mockRejectedValue(new ApiError(422, code));
+
+    render(<Flow />);
+    await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
+    await userEvent.click(await screen.findByText("Ver triagens de ***.982.247-**"));
+    await userEvent.click(await screen.findByRole("button", { name: "Cheguei na unidade" }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
   it("422 invalid_neighborhood ao começar: sem erro genérico, pede o bairro de novo e segue", async () => {
     vi.spyOn(citizenApi, "currentSession").mockResolvedValue({ phone_masked: "(**) *****-5432" });
     vi.spyOn(citizenApi, "consentTerm").mockResolvedValue({ version: "1", body: "Termo" });
