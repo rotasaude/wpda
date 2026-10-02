@@ -10,7 +10,7 @@ import { BigButton, ErrorText, Screen, Toggle, messageFor } from "./ui";
 export const SMS_EXPLANATION =
   "A Secretaria de Saúde pode enviar um SMS avisando que há um aviso novo aqui. Você pode desligar quando quiser.";
 export const REMINDER_EXPLANATION =
-  "Um dia antes do prazo para confirmar um horário, a Secretaria de Saúde manda um SMS lembrando. A mensagem não diz o local nem o motivo.";
+  "Antes do prazo para confirmar um horário, a Secretaria de Saúde manda um SMS lembrando. A mensagem não diz o local nem o motivo.";
 export const MUTE_EXPLANATION =
   "Os avisos novos deixam de aparecer no número ao lado de Avisos. Eles continuam na lista de avisos.";
 
