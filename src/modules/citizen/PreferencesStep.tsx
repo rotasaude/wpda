@@ -9,6 +9,8 @@ import { BigButton, ErrorText, Screen, Toggle, messageFor } from "./ui";
 
 export const SMS_EXPLANATION =
   "A Secretaria de Saúde pode enviar um SMS avisando que há um aviso novo aqui. Você pode desligar quando quiser.";
+export const REMINDER_EXPLANATION =
+  "Um dia antes do prazo para confirmar um horário, a Secretaria de Saúde manda um SMS lembrando. A mensagem não diz o local nem o motivo.";
 export const MUTE_EXPLANATION =
   "Os avisos novos deixam de aparecer no número ao lado de Avisos. Eles continuam na lista de avisos.";
 
@@ -42,7 +44,8 @@ export function PreferencesStep({ onBack, onSaved }: { onBack: () => void; onSav
       setPrefs(p => p && {
         ...p,
         people: p.people.map(x => x.citizen_id === person.citizen_id
-          ? { ...x, sms_opt_in: saved.sms_opt_in, notices_muted: saved.notices_muted }
+          ? { ...x, sms_opt_in: saved.sms_opt_in, notices_muted: saved.notices_muted,
+              appointment_reminders_muted: saved.appointment_reminders_muted }
           : x)
       });
       setFeedback({ citizenId: person.citizen_id, ok: true, text: "Preferência salva." });
@@ -76,6 +79,10 @@ export function PreferencesStep({ onBack, onSaved }: { onBack: () => void; onSav
               <Toggle label="Receber avisos por SMS" description={SMS_EXPLANATION}
                 checked={p.sms_opt_in} disabled={saving}
                 onChange={v => void change(p, { sms_opt_in: v })} />}
+            {prefs.sms_available &&
+              <Toggle label="Lembrete de horário por SMS" description={REMINDER_EXPLANATION}
+                checked={!p.appointment_reminders_muted} disabled={saving}
+                onChange={v => void change(p, { appointment_reminders_muted: !v })} />}
             <Toggle label="Silenciar avisos" description={MUTE_EXPLANATION}
               checked={p.notices_muted} disabled={saving}
               onChange={v => void change(p, { notices_muted: v })} />

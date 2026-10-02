@@ -51,6 +51,8 @@ export interface ContactPreference {
   cpf_masked: string;
   sms_opt_in: boolean;
   notices_muted: boolean;
+  // Lembrete de horário por SMS desligado pelo cidadão (api#39); ligado por padrão.
+  appointment_reminders_muted?: boolean;
 }
 
 export interface ContactPreferences {
@@ -58,7 +60,9 @@ export interface ContactPreferences {
   people: ContactPreference[];
 }
 
-export type ContactPreferenceChange = { sms_opt_in?: boolean; notices_muted?: boolean };
+export type ContactPreferenceChange = {
+  sms_opt_in?: boolean; notices_muted?: boolean; appointment_reminders_muted?: boolean
+};
 
 export interface Step {
   triage_id: string;
