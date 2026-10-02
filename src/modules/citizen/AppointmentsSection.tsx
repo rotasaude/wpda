@@ -3,12 +3,12 @@
 // "Minhas triagens" em HistoryStep. Só aparece quando há algo a mostrar.
 import { useEffect, useState } from "react";
 import { citizenApi, type Appointment, type AppointmentItem, type AppointmentRequest } from "../../lib/citizenApi";
+import { cityDateFormat } from "../../lib/format";
 import { BigButton, ErrorText, Field, messageFor } from "./ui";
 
 function fmt(iso: string): string {
-  return new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
-  }).format(new Date(iso));
+  return cityDateFormat({ weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    .format(new Date(iso));
 }
 
 // Só pedido sem horário nenhum chega aqui: um pedido reaberto sempre traz o

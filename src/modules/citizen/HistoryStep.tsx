@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { citizenApi, type AttendanceSummary, type Person, type TriageSummary } from "../../lib/citizenApi";
-import { fmtDateTime } from "../../lib/format";
+import { cityDateFormat, fmtDateTime } from "../../lib/format";
 import { AppointmentsSection } from "./AppointmentsSection";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
 function fmtTime(iso: string): string {
-  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  return cityDateFormat({ hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 }
 
 function attendanceStatusText(a: AttendanceSummary): string {

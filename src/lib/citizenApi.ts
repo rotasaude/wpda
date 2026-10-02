@@ -1,6 +1,8 @@
 // Cliente das rotas /citizen/* (apps/api, CitizenApi). Mesma origem: o cookie
 // httpOnly `citizen_session` vai sozinho. Toda escrita é JSON (a API recusa
 // o resto com 415).
+import { setCityTimeZone } from "./format";
+
 export class ApiError extends Error {
   constructor(public status: number, public code: string) {
     super(code);
@@ -198,12 +200,25 @@ function normalizeAppointment(item: AppointmentItem): AppointmentItem {
   };
 }
 
+export interface CitizenSession {
+  phone_masked: string;
+  // Fuso IANA da cidade; ausente em api antigo.
+  time_zone?: string;
+}
+
+function withCityTimeZone(session: CitizenSession): CitizenSession {
+  setCityTimeZone(session?.time_zone);
+  return session;
+}
+
 export const citizenApi = {
   requestCode: (phone: string) =>
     call<{ status: string; resend_after: number }>("POST", "/otp", { phone }),
+  // A sessão traz o fuso da cidade (api#27): instalado aqui, toda tela que
+  // formata hora passa a usá-lo.
   verifyCode: (phone: string, code: string) =>
-    call<{ phone_masked: string }>("POST", "/session", { phone, code }),
-  currentSession: () => call<{ phone_masked: string }>("GET", "/session"),
+    call<CitizenSession>("POST", "/session", { phone, code }).then(withCityTimeZone),
+  currentSession: () => call<CitizenSession>("GET", "/session").then(withCityTimeZone),
   signOut: () => call<void>("DELETE", "/session"),
   consentTerm: () => call<{ version: string; body: string }>("GET", "/consent_term"),
   people: async () => {
