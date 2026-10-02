@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fmtDate, fmtDateTime } from "./format";
+import { cityTimeZone, fmtDate, fmtDateTime, setCityTimeZone } from "./format";
 
 describe("fmtDateTime", () => {
   it("formata ISO em pt-BR (data)", () => {
@@ -24,5 +24,23 @@ describe("fmtDate", () => {
   });
   it.each([ null, undefined, "", "xxx" ])("%s vira —", (iso) => {
     expect(fmtDate(iso)).toBe("—");
+  });
+});
+
+describe("fuso da cidade (api#27)", () => {
+  afterEach(() => setCityTimeZone(null));
+
+  // 03h30 UTC: 00h30 de 3/10 em São Paulo, 23h30 de 2/10 em Manaus.
+  const AT = "2026-10-03T03:30:00Z";
+
+  it("sem sessão, horário de Brasília", () => {
+    expect(cityTimeZone()).toBe("America/Sao_Paulo");
+    expect(fmtDateTime(AT)).toBe("03/10/2026, 00:30");
+  });
+
+  it("em Manaus, data e hora no fuso dela", () => {
+    setCityTimeZone("America/Manaus");
+    expect(fmtDateTime(AT)).toBe("02/10/2026, 23:30");
+    expect(fmtDate(AT)).toBe("02/10/2026");
   });
 });

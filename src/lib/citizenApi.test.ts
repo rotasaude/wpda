@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { citizenApi, ApiError } from "./citizenApi";
+import { cityTimeZone, setCityTimeZone } from "./format";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); setCityTimeZone(null); });
 
 function mockFetch(status: number, body?: unknown) {
   const fn = vi.fn(async () => new Response(body === undefined ? null : JSON.stringify(body), {
@@ -308,5 +309,19 @@ describe("citizenApi", () => {
     mockFetch(404, { error: "not_found" });
     await expect(citizenApi.updateContactPreference("p9", { notices_muted: true }))
       .rejects.toEqual(new ApiError(404, "not_found"));
+  });
+
+  it("a sessão instala o fuso da cidade (api#27)", async () => {
+    mockFetch(200, { phone_masked: "(**) *****-5432", time_zone: "America/Manaus" });
+    await citizenApi.currentSession();
+    expect(cityTimeZone()).toBe("America/Manaus");
+
+    mockFetch(201, { phone_masked: "(**) *****-5432", time_zone: "America/Rio_Branco" });
+    await citizenApi.verifyCode("(41) 99876-5432", "123456");
+    expect(cityTimeZone()).toBe("America/Rio_Branco");
+
+    mockFetch(200, { phone_masked: "(**) *****-5432" });
+    await citizenApi.currentSession();
+    expect(cityTimeZone()).toBe("America/Sao_Paulo");
   });
 });
