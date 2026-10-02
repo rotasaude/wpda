@@ -134,4 +134,21 @@ describe("PreferencesStep", () => {
     await userEvent.click(screen.getByRole("button", { name: "Voltar aos avisos" }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
+
+  it("lembrete de horário (api#39): ligado por padrão e desligar manda appointment_reminders_muted", async () => {
+    const { put } = setup();
+    put.mockResolvedValue({ ...p1, appointment_reminders_muted: true });
+    const a = await person("***.982.247-**");
+    const reminder = within(a).getByRole("switch", { name: "Lembrete de horário por SMS" });
+    expect(reminder).toBeChecked();
+    await userEvent.click(reminder);
+    expect(put).toHaveBeenCalledWith("p1", { appointment_reminders_muted: true });
+    expect(await within(a).findByRole("switch", { name: "Lembrete de horário por SMS" })).not.toBeChecked();
+  });
+
+  it("sem SMS na cidade, o lembrete de horário não aparece", async () => {
+    setup({ sms_available: false, people: [ p1 ] });
+    const a = await person("***.982.247-**");
+    expect(within(a).queryByRole("switch", { name: "Lembrete de horário por SMS" })).not.toBeInTheDocument();
+  });
 });

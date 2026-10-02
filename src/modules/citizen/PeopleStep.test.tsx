@@ -16,6 +16,7 @@ const comBairro: Person = { ...semBairro, neighborhood: { id: "n1", name: "Batel
 
 function setup(people: Person[], list: typeof LIST | Error | { once: typeof LIST[] } = LIST) {
   vi.spyOn(citizenApi, "people").mockResolvedValue({ people });
+  vi.spyOn(citizenApi, "appointments").mockResolvedValue({ appointments: [] });
   const neighborhoods = vi.spyOn(citizenApi, "neighborhoods");
   if (list instanceof Error) neighborhoods.mockRejectedValue(list);
   else if (Array.isArray(list)) neighborhoods.mockResolvedValue(list);

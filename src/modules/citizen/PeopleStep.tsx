@@ -3,6 +3,7 @@ import { ApiError, citizenApi, type Neighborhood, type Person } from "../../lib/
 import { isValidCpf, maskCpf } from "../../lib/masks";
 import { NeighborhoodPicker } from "./NeighborhoodPicker";
 import { BigButton, ErrorText, Field, INVALID_NEIGHBORHOOD_MESSAGE, Screen, messageFor } from "./ui";
+import { PendingConfirmations } from "./PendingConfirmations";
 
 export type Who = { citizenId: string } | { cpf: string };
 export type PersonChoice = Who & { neighborhoodId?: string };
@@ -138,6 +139,7 @@ export function PeopleStep({ onChoose, onHistory }:
   return (
     <Screen title="Para quem é esta triagem?">
       {people === null && !error && <p>Carregando…</p>}
+      {people && people.length > 0 && <PendingConfirmations people={people} onOpen={onHistory} />}
       {saved && <p role="status">{saved}</p>}
       <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
         {people?.map(p => (
