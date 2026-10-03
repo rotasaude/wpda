@@ -34,14 +34,23 @@ export function BigButton({ variant = "primary", style, ...props }:
   );
 }
 
-export function Field({ label, error, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string }) {
+// Aviso de texto livre que fica congelado depois do envio (api#32).
+export const FROZEN_TEXT_NOTICE =
+  "Depois de enviado, este texto não pode ser alterado. Não escreva nome, telefone, CPF ou outros dados pessoais.";
+
+// `hint` aparece sob o campo antes de qualquer envio e é a descrição dele
+// (aria-describedby), lida junto pelo leitor de tela.
+export function Field({ label, error, hint, ...props }:
+  InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string; hint?: string }) {
   const id = useId();
+  const hintId = `${id}-hint`;
   return (
     <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
       <label htmlFor={id} style={{ fontWeight: 600 }}>{label}</label>
-      <input id={id} {...props} aria-invalid={Boolean(error)}
+      <input id={id} {...props} aria-invalid={Boolean(error)} aria-describedby={hint ? hintId : undefined}
         style={{ minHeight: 56, fontSize: 20, padding: "0 12px", borderRadius: 12,
           border: `1px solid ${error ? "var(--down, #c0392b)" : "var(--rule2, #ccc)"}` }} />
+      {hint && <p id={hintId} style={{ margin: 0, fontSize: 15 }}>{hint}</p>}
       {error && <ErrorText>{error}</ErrorText>}
     </div>
   );

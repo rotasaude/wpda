@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { citizenApi, type Appointment, type AppointmentItem, type AppointmentRequest } from "../../lib/citizenApi";
 import { cityDateFormat } from "../../lib/format";
-import { BigButton, ErrorText, Field, messageFor } from "./ui";
+import { BigButton, ErrorText, FROZEN_TEXT_NOTICE, Field, messageFor } from "./ui";
 
 function fmt(iso: string): string {
   return cityDateFormat({ weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
@@ -130,7 +130,8 @@ function AppointmentRow({ item, onReload, onCheckIn }:
 
       {cancelling && appointment && (appointment.status === "scheduled" || appointment.status === "confirmed") && (
         <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
-          <Field label="Motivo do cancelamento" value={reason} onChange={e => setReason(e.target.value)} />
+          <Field label="Motivo do cancelamento" value={reason} onChange={e => setReason(e.target.value)}
+            hint={FROZEN_TEXT_NOTICE} />
           <BigButton variant="danger" onClick={cancel} disabled={busy || reason.trim().length < 10}>
             Cancelar agendamento
           </BigButton>

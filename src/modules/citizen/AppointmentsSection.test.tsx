@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AppointmentsSection } from "./AppointmentsSection";
+import { FROZEN_TEXT_NOTICE } from "./ui";
 import { citizenApi, ApiError, type AppointmentItem } from "../../lib/citizenApi";
 
 // Relógio fixo antes dos prazos das fixtures (2026-10-01 14:30): a tela
@@ -140,6 +141,8 @@ describe("AppointmentsSection", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Cancelar" }));
 
     const field = await screen.findByLabelText("Motivo do cancelamento");
+    // api#32: o aviso de texto congelado já está na tela antes de enviar.
+    expect(field).toHaveAccessibleDescription(FROZEN_TEXT_NOTICE);
     const submit = screen.getByRole("button", { name: "Cancelar agendamento" }) as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
 
