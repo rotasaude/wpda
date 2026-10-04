@@ -276,4 +276,15 @@ describe("AppointmentsSection", () => {
     const text = screen.getByText(/Agendado:/);
     expect(text).toHaveStyle({ fontSize: "18px" });
   });
+
+  it("pedido movido de unidade (api#29): avisa que o local mudou e de onde veio", async () => {
+    mockAppointments([{
+      request: { id: "r9", kind: "return", target_unit_name: "UBS Destino", status: "scheduled", closed_reason: null,
+                 reopened_reason: null, moved_from_unit_name: "UBS Fechando" },
+      appointment: { id: "a9", scheduled_at: "2026-10-02T14:30:00-03:00", status: "scheduled",
+                     confirmation_deadline_at: "2026-10-01T14:30:00-03:00", check_in_available: false }
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText("Local alterado: este atendimento passou da UBS Fechando para a UBS Destino.")).toBeInTheDocument();
+  });
 });

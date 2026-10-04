@@ -133,12 +133,14 @@ export interface AppointmentRequest {
   // normalizeAppointment).
   closed_reason?: "fulfilled" | "citizen_cancelled" | "dismissed" | null;
   reopened_reason?: "expired" | "no_show" | null;
+  // Unidade de onde o pedido foi movido (api#29); ausente se nunca mudou.
+  moved_from_unit_name?: string | null;
 }
 
 export interface Appointment {
   id: string;
   scheduled_at: string;
-  status: "scheduled" | "confirmed" | "checked_in" | "cancelled_by_citizen" | "expired" | "no_show";
+  status: "scheduled" | "confirmed" | "checked_in" | "cancelled_by_citizen" | "expired" | "no_show" | "moved";
   confirmation_deadline_at?: string | null;
   check_in_available?: boolean;
 }
