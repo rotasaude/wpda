@@ -90,6 +90,12 @@ function AppointmentRow({ item, onReload, onCheckIn }:
     <li style={{ border: "1px solid var(--rule2, #ccc)", borderRadius: 12, padding: 12 }}>
       {error && <ErrorText>{error}</ErrorText>}
 
+      {request.moved_from_unit_name && (
+        <p style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px" }}>
+          {`Local alterado: este atendimento passou da ${request.moved_from_unit_name} para a ${request.target_unit_name}.`}
+        </p>
+      )}
+
       {!appointment && request.status === "open" && (
         <p style={{ fontSize: 18 }}>{openRequestText(request)}</p>
       )}
