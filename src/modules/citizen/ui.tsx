@@ -81,6 +81,31 @@ export function Toggle({ label, description, checked, disabled, onChange }:
   );
 }
 
+// Escolha única: a opção inteira é o alvo de toque (48 px ou mais). Aceita
+// null como valor ("Prefiro não informar").
+export function RadioGroup<T extends string | null>({ legend, options, value, onChange, error, disabled }: {
+  legend: string; options: readonly { value: T; label: string }[]; value: T | undefined;
+  onChange: (value: T) => void; error?: string; disabled?: boolean;
+}) {
+  const name = useId();
+  return (
+    <fieldset style={{ border: "none", padding: 0, margin: "0 0 16px", display: "grid", gap: 8 }}>
+      <legend style={{ fontWeight: 600, padding: 0, marginBottom: 6 }}>{legend}</legend>
+      {options.map(o => (
+        <label key={o.value ?? "none"}
+          style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 48, fontSize: 18, padding: "0 12px",
+            borderRadius: 12, border: "1px solid var(--rule2, #ccc)", cursor: disabled ? "default" : "pointer",
+            opacity: disabled ? 0.6 : 1 }}>
+          <input type="radio" name={name} checked={value === o.value} disabled={disabled}
+            onChange={() => onChange(o.value)} style={{ width: 24, height: 24, margin: 0, flexShrink: 0 }} />
+          {o.label}
+        </label>
+      ))}
+      {error && <ErrorText>{error}</ErrorText>}
+    </fieldset>
+  );
+}
+
 export const INVALID_NEIGHBORHOOD_MESSAGE = "Esse bairro não está mais na lista. Escolha de novo.";
 
 const MESSAGES: Record<string, string> = {
