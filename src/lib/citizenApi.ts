@@ -29,6 +29,48 @@ export interface ReferenceUnit {
   address: UnitAddress;
 }
 
+// Perfil do par (ADR 0027; contrato do módulo 15 §2). Dado sensível: nunca em
+// URL, query string ou console; os corpos abaixo são montados campo a campo.
+export type Sex = "female" | "male";
+export type GenderIdentity =
+  "cis_woman" | "cis_man" | "trans_woman" | "trans_man" | "travesti" | "non_binary" | "other";
+
+export interface ProfileInput {
+  birth_date: string; // AAAA-MM-DD
+  sex: Sex;
+  gender_identity: GenderIdentity | null; // null = "Prefiro não informar"
+}
+
+export interface Profile extends ProfileInput {
+  profile_source: "declared" | "verified";
+}
+
+// Catálogo de triagens de uma pessoa (contrato §3.4). O api decide o que é
+// oferecido; o wpda só mostra.
+export interface CatalogEntry { protocol_name: string; title: string; summary: string | null }
+export interface SuggestedEntry extends CatalogEntry {
+  suggestion_id: string;
+  source_triage_id: string;
+  source_title: string; // título da triagem que gerou a sugestão
+  suggested_on: string; // AAAA-MM-DD
+}
+export interface RecentEntry extends CatalogEntry {
+  last_completed_on: string; // AAAA-MM-DD
+  next_available_on: string; // AAAA-MM-DD
+}
+export interface InProgressEntry { conversation_id: string; protocol_name: string; title: string }
+export interface Catalog {
+  in_progress: InProgressEntry | null;
+  suggested: SuggestedEntry[];
+  available: CatalogEntry[];
+  recent: RecentEntry[];
+  // Unidades do bairro atual do par ([] sem bairro). Ausente numa api anterior: [].
+  reference_units: ReferenceUnit[];
+}
+
+// "Recomendamos também" (contrato §3.6): [] em resultado urgente.
+export interface TriageSuggestion { suggestion_id: string; protocol_name: string; title: string; summary: string | null }
+
 // Campanhas (spec 2026-09-29 §6.2; ADR 0024). Cidadão não tem nome: com mais de
 // uma pessoa no telefone, o aviso diz de quem é pelo CPF mascarado.
 export interface Notice {
@@ -86,6 +128,8 @@ export interface Person {
   verified_at?: string | null;
   // Bairro declarado (ADR 0023). Ausente numa api anterior: normalizado em people().
   neighborhood?: Neighborhood | null;
+  // Perfil (ADR 0027). Ausente numa api anterior: normalizado em normalizePerson.
+  profile?: Profile | null;
 }
 
 export interface AttendanceSummary {
@@ -120,6 +164,9 @@ export interface TriageSummary {
   // Unidades ativas que cobrem o bairro da triagem. Ausente numa api anterior:
   // normalizado para [] (ver normalizeTriage).
   reference_units?: ReferenceUnit[];
+  // Sugestões nascidas desta triagem (módulo 15). Ausente numa api anterior:
+  // normalizado para [] (ver normalizeTriage).
+  suggestions?: TriageSuggestion[];
 }
 
 export interface StartResult { conversation_id: string; citizen_id: string; resumed: boolean; step: Step }
@@ -181,12 +228,21 @@ function normalizeTriage(t: TriageSummary): TriageSummary {
         }
       : (a ?? null),
     check_in_available: t.check_in_available ?? false,
-    reference_units: t.reference_units ?? []
+    reference_units: t.reference_units ?? [],
+    suggestions: (t.suggestions ?? []).map(s => ({ ...s, summary: s.summary ?? null }))
   };
 }
 
 function normalizePerson(p: Person): Person {
-  return { ...p, neighborhood: p.neighborhood ?? null };
+  return { ...p, neighborhood: p.neighborhood ?? null, profile: p.profile ?? null };
+}
+
+function withSummary<T extends CatalogEntry>(e: T): T {
+  return { ...e, summary: e.summary ?? null };
+}
+
+function profileBody(profile: ProfileInput) {
+  return { birth_date: profile.birth_date, sex: profile.sex, gender_identity: profile.gender_identity };
 }
 
 function normalizeAppointment(item: AppointmentItem): AppointmentItem {
@@ -237,6 +293,34 @@ export const citizenApi = {
   // null = "Prefiro não informar" (tira o bairro). Troca não muda triagens antigas.
   setNeighborhood: (citizenId: string, neighborhoodId: string | null) =>
     call<unknown>("POST", `/people/${encodeURIComponent(citizenId)}/neighborhood`, { neighborhood_id: neighborhoodId }),
+  // Par novo já com perfil (contrato §0.1 e §3.2): confere o termo antes de
+  // gravar o CPF. 200 = o par já existia (perfil não é sobrescrito).
+  createPerson: async (p: { cpf: string; consentVersion: string; profile: ProfileInput; neighborhoodId?: string }) =>
+    normalizePerson((await call<{ person: Person }>("POST", "/people", {
+      cpf: p.cpf,
+      consent_version: p.consentVersion,
+      ...profileBody(p.profile),
+      ...(p.neighborhoodId ? { neighborhood_id: p.neighborhoodId } : {})
+    })).person),
+  // Correção pelo cidadão enquanto declared (409 profile_verified depois do posto).
+  setProfile: async (citizenId: string, profile: ProfileInput) =>
+    normalizePerson((await call<{ person: Person }>(
+      "POST", `/people/${encodeURIComponent(citizenId)}/profile`, profileBody(profile))).person),
+  catalog: async (citizenId: string): Promise<Catalog> => {
+    const d = await call<Partial<Catalog>>("GET", `/people/${encodeURIComponent(citizenId)}/catalog`);
+    return {
+      in_progress: d.in_progress ?? null,
+      suggested: (d.suggested ?? []).map(withSummary),
+      available: (d.available ?? []).map(withSummary),
+      recent: (d.recent ?? []).map(withSummary),
+      reference_units: d.reference_units ?? []
+    };
+  },
+  // Início pela triagem escolhida (contrato §3.5). Mesmo protocolo em andamento = retoma.
+  startTriage: (p: { citizenId: string; protocolName: string; consentVersion: string }) =>
+    call<StartResult>("POST", "/conversations", {
+      citizen_id: p.citizenId, protocol_name: p.protocolName, consent_version: p.consentVersion
+    }),
   start: (p: { citizenId?: string; cpf?: string; neighborhoodId?: string; consentVersion: string }) =>
     call<StartResult>("POST", "/conversations", {
       ...(p.citizenId ? { citizen_id: p.citizenId } : { cpf: p.cpf }),

@@ -111,7 +111,16 @@ const MESSAGES: Record<string, string> = {
   reason_too_short: "Escreva um motivo com pelo menos 10 caracteres.",
   not_today: "Isso só pode ser feito no dia do horário marcado.",
   appointment_not_eligible: "Este agendamento não está disponível para check-in.",
-  invalid_neighborhood: INVALID_NEIGHBORHOOD_MESSAGE
+  invalid_neighborhood: INVALID_NEIGHBORHOOD_MESSAGE,
+  // Módulo 15 (contrato §3).
+  invalid_birth_date: "Data de nascimento inválida. Confira dia, mês e ano.",
+  invalid_sex: "Escolha o sexo.",
+  invalid_gender_identity: "Escolha uma opção de identidade de gênero.",
+  profile_verified: "Este perfil foi conferido no posto e só pode ser corrigido lá.",
+  profile_required: "Antes, informe a data de nascimento e o sexo desta pessoa.",
+  not_offered: "Esta triagem não está mais disponível para esta pessoa.",
+  triage_in_progress: "Já existe uma triagem em andamento para esta pessoa. Continue a que está aberta.",
+  protocol_name_required: "Escolha uma triagem para começar."
 };
 
 export function messageFor(error: unknown): string {

@@ -325,3 +325,128 @@ describe("citizenApi", () => {
     expect(cityTimeZone()).toBe("America/Sao_Paulo");
   });
 });
+
+describe("citizenApi — módulo 15 (perfil, catálogo, sugestões)", () => {
+  const profile = { birth_date: "1963-04-02", sex: "female" as const, gender_identity: null };
+  const person = {
+    id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" as const, neighborhood: null,
+    profile: { ...profile, profile_source: "declared" as const }
+  };
+
+  it("people normaliza profile ausente para null e preserva o presente", async () => {
+    mockFetch(200, { people: [ { id: "p0", cpf_masked: "***.111.222-**", verification_level: "declared" }, person ] });
+    const { people } = await citizenApi.people();
+    expect(people[0].profile).toBeNull();
+    expect(people[1].profile).toEqual({ ...profile, profile_source: "declared" });
+  });
+
+  it("createPerson manda CPF, termo e perfil, sem bairro quando não veio", async () => {
+    const fn = mockFetch(201, { person });
+    const result = await citizenApi.createPerson({ cpf: "529.982.247-25", consentVersion: "3", profile });
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/people");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      cpf: "529.982.247-25", consent_version: "3", birth_date: "1963-04-02", sex: "female", gender_identity: null
+    });
+    expect(result.id).toBe("p1");
+    expect(result.profile?.profile_source).toBe("declared");
+  });
+
+  it("createPerson manda neighborhood_id quando veio", async () => {
+    const fn = mockFetch(201, { person });
+    await citizenApi.createPerson({ cpf: "529.982.247-25", consentVersion: "3", profile, neighborhoodId: "n1" });
+    const body = JSON.parse((fn.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(body.neighborhood_id).toBe("n1");
+  });
+
+  it("createPerson (200, par que já existia) normaliza profile e neighborhood ausentes", async () => {
+    mockFetch(200, { person: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" } });
+    const result = await citizenApi.createPerson({ cpf: "529.982.247-25", consentVersion: "3", profile });
+    expect(result.profile).toBeNull();
+    expect(result.neighborhood).toBeNull();
+  });
+
+  it("createPerson 409 consent_outdated vira ApiError", async () => {
+    mockFetch(409, { error: "consent_outdated" });
+    await expect(citizenApi.createPerson({ cpf: "529.982.247-25", consentVersion: "2", profile }))
+      .rejects.toEqual(new ApiError(409, "consent_outdated"));
+  });
+
+  it("setProfile manda só os três campos, com gender_identity null explícito", async () => {
+    const fn = mockFetch(200, { person });
+    const result = await citizenApi.setProfile("p1", profile);
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/people/p1/profile");
+    expect(init.method).toBe("POST");
+    const body = JSON.parse(init.body as string);
+    expect(body).toEqual({ birth_date: "1963-04-02", sex: "female", gender_identity: null });
+    expect("gender_identity" in body).toBe(true);
+    expect(result.id).toBe("p1");
+  });
+
+  it("setProfile 409 profile_verified vira ApiError", async () => {
+    mockFetch(409, { error: "profile_verified" });
+    await expect(citizenApi.setProfile("p1", profile)).rejects.toEqual(new ApiError(409, "profile_verified"));
+  });
+
+  it("nenhuma URL carrega dado de perfil", async () => {
+    const fn = mockFetch(200, { person });
+    await citizenApi.setProfile("p1", { birth_date: "1963-04-02", sex: "female", gender_identity: "trans_woman" });
+    await citizenApi.createPerson({ cpf: "529.982.247-25", consentVersion: "3", profile });
+    for (const call of fn.mock.calls) {
+      expect(String((call as unknown[])[0])).not.toMatch(/1963|female|trans_woman|birth|sex|gender/);
+    }
+  });
+
+  it("catalog faz GET em /people/:id/catalog e preserva o que veio", async () => {
+    const full = {
+      in_progress: { conversation_id: "c1", protocol_name: "triage-respiratoria", title: "Sintomas respiratórios" },
+      suggested: [ { protocol_name: "saude-mental-aprofundada", title: "Saúde mental — aprofundamento", summary: "Mais perguntas.",
+        suggestion_id: "s1", source_triage_id: "t0", source_title: "Saúde mental", suggested_on: "2026-10-02" } ],
+      available: [ { protocol_name: "saude-do-idoso", title: "Saúde do idoso", summary: "Quedas, memória e medicamentos." } ],
+      recent: [ { protocol_name: "saude-mental", title: "Saúde mental", summary: null,
+        last_completed_on: "2026-10-02", next_available_on: "2027-04-02" } ],
+      reference_units: [ { id: "u1", name: "UBS Batel", kind: "ubs",
+        address: { street: null, number: null, complement: null, zip: null } } ]
+    };
+    const fn = mockFetch(200, full);
+    expect(await citizenApi.catalog("p1")).toEqual(full);
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/people/p1/catalog");
+    expect(init.method).toBe("GET");
+  });
+
+  it("catalog normaliza chaves ausentes (api anterior ou campo opcional)", async () => {
+    mockFetch(200, { suggested: [ { protocol_name: "a", title: "A", suggestion_id: "s1", source_triage_id: "t0", source_title: "Saúde mental", suggested_on: "2026-10-02" } ] });
+    expect(await citizenApi.catalog("p1")).toEqual({
+      in_progress: null,
+      suggested: [ { protocol_name: "a", title: "A", summary: null, suggestion_id: "s1", source_triage_id: "t0", source_title: "Saúde mental", suggested_on: "2026-10-02" } ],
+      available: [], recent: [], reference_units: []
+    });
+  });
+
+  it("catalog 409 profile_required vira ApiError", async () => {
+    mockFetch(409, { error: "profile_required" });
+    await expect(citizenApi.catalog("p1")).rejects.toEqual(new ApiError(409, "profile_required"));
+  });
+
+  it("startTriage manda citizen_id, protocol_name e a versão do termo, nada mais", async () => {
+    const fn = mockFetch(201, { conversation_id: "c", citizen_id: "p1", resumed: false, step: {} });
+    await citizenApi.startTriage({ citizenId: "p1", protocolName: "saude-do-idoso", consentVersion: "3" });
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/conversations");
+    expect(JSON.parse(init.body as string)).toEqual({ citizen_id: "p1", protocol_name: "saude-do-idoso", consent_version: "3" });
+  });
+
+  it("triage() sem suggestions normaliza para []; com a lista, normaliza summary ausente", async () => {
+    const base = {
+      id: "t1", status: "completed", tier: "alta", priority: 1, created_at: "2026-10-05T12:00:00Z",
+      completed_at: "2026-10-05T12:05:00Z", report_url: null, consent_active: true, origin_phone_masked: null
+    };
+    mockFetch(200, base);
+    expect((await citizenApi.triage("t1")).suggestions).toEqual([]);
+    mockFetch(200, { ...base, suggestions: [ { suggestion_id: "s1", protocol_name: "b", title: "B" } ] });
+    expect((await citizenApi.triage("t1")).suggestions).toEqual([ { suggestion_id: "s1", protocol_name: "b", title: "B", summary: null } ]);
+  });
+});
