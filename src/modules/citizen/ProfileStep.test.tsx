@@ -32,10 +32,7 @@ describe("ProfileStep", () => {
   it("declared: 'Meu perfil' vem preenchido, salva e avisa o Flow", async () => {
     const set = vi.spyOn(citizenApi, "setProfile").mockResolvedValue(declared);
     const { onSaved } = setup(declared);
-    await waitFor(() => {
-      vi.runAllTimers();
-      expect(screen.getByRole("heading", { name: "Meu perfil" })).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Meu perfil" })).toBeInTheDocument());
     expect(screen.getByText("CPF ***.982.247-**")).toBeInTheDocument();
     const birth = screen.getByLabelText("Data de nascimento");
     expect(birth).toHaveValue("02/04/1963");
@@ -49,10 +46,7 @@ describe("ProfileStep", () => {
   it("sem perfil (obrigatório): 'Sobre esta pessoa', campos vazios e 'Continuar'", async () => {
     const set = vi.spyOn(citizenApi, "setProfile").mockResolvedValue(declared);
     const { onSaved } = setup(noProfile, true);
-    await waitFor(() => {
-      vi.runAllTimers();
-      expect(screen.getByRole("heading", { name: "Sobre esta pessoa" })).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Sobre esta pessoa" })).toBeInTheDocument());
     expect(screen.getByLabelText("Data de nascimento")).toHaveValue("");
     await userEvent.type(screen.getByLabelText("Data de nascimento"), "02041963");
     await userEvent.click(screen.getByRole("radio", { name: "Feminino" }));
@@ -104,7 +98,7 @@ describe("ProfileStep", () => {
     await userEvent.click(btn);
     await userEvent.click(btn);
     finish(declared);
-    expect(set).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(set).toHaveBeenCalledTimes(1));
   });
 
   it("pessoa fora da sessão: mensagem e 'Voltar'", async () => {
