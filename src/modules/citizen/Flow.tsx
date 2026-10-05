@@ -9,6 +9,8 @@ import { PhoneStep } from "./PhoneStep";
 import { CodeStep } from "./CodeStep";
 import { ConsentStep } from "./ConsentStep";
 import { PeopleStep, type ChooseOutcome, type PersonChoice } from "./PeopleStep";
+import { CatalogStep } from "./CatalogStep";
+import { ProfileStep } from "./ProfileStep";
 import { QuestionStep } from "./QuestionStep";
 import { ResultStep } from "./ResultStep";
 import { HistoryStep } from "./HistoryStep";
@@ -25,6 +27,8 @@ type State =
   | { at: "code"; phone: string }
   | { at: "consent" }
   | { at: "people"; consentVersion: string }
+  | { at: "catalog"; consentVersion: string; citizenId: string; notice: string | null }
+  | { at: "profile"; consentVersion: string; citizenId: string; required: boolean }
   | { at: "question"; consentVersion: string; conversationId: string; citizenId: string; step: Step }
   | { at: "result"; consentVersion: string; triageId: string; citizenId: string }
   | { at: "history"; consentVersion: string | null; citizenId: string }
@@ -88,22 +92,54 @@ export function Flow() {
     if (window.location.pathname !== path) window.history.replaceState(null, "", path);
   }, [state.at]);
 
+  // "Para quem é?" (spec 2026-10-05 §8): pessoa nova nasce com o perfil
+  // (POST /citizen/people); quem já existe grava o bairro escolhido, se houver.
+  // Os dois seguem para o catálogo, que pede o perfil se faltar (409).
   async function choose(consentVersion: string, choice: PersonChoice): Promise<ChooseOutcome> {
     setError(null);
     try {
-      const r = await citizenApi.start({ ...choice, consentVersion });
-      setState({ at: "question", consentVersion, conversationId: r.conversation_id, citizenId: r.citizen_id, step: r.step });
+      let citizenId: string;
+      if ("cpf" in choice) {
+        const person = await citizenApi.createPerson({
+          cpf: choice.cpf, consentVersion, profile: choice.profile,
+          ...(choice.neighborhoodId ? { neighborhoodId: choice.neighborhoodId } : {})
+        });
+        // 200 = o par já existia (contrato §3.2): sem perfil, grava o informado agora.
+        if (!person.profile) await citizenApi.setProfile(person.id, choice.profile);
+        // R1 (contrato §7): com o par existente, o POST ignora perfil e bairro; o bairro
+        // escolhido vai pela rota própria, e nunca sobrescreve um bairro já gravado.
+        if (choice.neighborhoodId && !person.neighborhood) {
+          await citizenApi.setNeighborhood(person.id, choice.neighborhoodId);
+        }
+        citizenId = person.id;
+      } else {
+        if (choice.neighborhoodId) await citizenApi.setNeighborhood(choice.citizenId, choice.neighborhoodId);
+        citizenId = choice.citizenId;
+      }
+      setState({ at: "catalog", consentVersion, citizenId, notice: null });
     } catch (e) {
       if (e instanceof ApiError && (e.code === "consent_outdated" || e.code === "no_consent")) {
         setState({ at: "consent" });
         return "done";
       }
       // O bairro saiu da lista entre a leitura e o envio: a PeopleStep relê e
-      // pergunta de novo (spec §6), sem o erro genérico.
+      // pergunta de novo (spec 2026-09-28 §6), sem o erro genérico.
       if (e instanceof ApiError && e.code === "invalid_neighborhood") return "invalid_neighborhood";
       setError(messageFor(e));
     }
     return "done";
+  }
+
+  // Começa (ou retoma) a triagem escolhida no catálogo ou sugerida no
+  // resultado. null = trocou de tela; texto = recusa para a tela mostrar.
+  async function startTriage(consentVersion: string, citizenId: string, protocolName: string): Promise<string | null> {
+    try {
+      const r = await citizenApi.startTriage({ citizenId, protocolName, consentVersion });
+      setState({ at: "question", consentVersion, conversationId: r.conversation_id, citizenId: r.citizen_id, step: r.step });
+      return null;
+    } catch (e) {
+      return messageFor(e);
+    }
   }
 
   // Conflitos que retentar não resolve (§ spec de erros): o termo mudou no
@@ -181,6 +217,22 @@ export function Flow() {
         <PeopleStep onChoose={c => choose(state.consentVersion, c)}
           onHistory={id => setState({ at: "history", consentVersion: state.consentVersion, citizenId: id })} />
       </>;
+      break;
+    case "catalog":
+      view = <CatalogStep key={state.citizenId} citizenId={state.citizenId} notice={state.notice}
+        onStart={name => startTriage(state.consentVersion, state.citizenId, name)}
+        onProfileRequired={() => setState({ at: "profile", consentVersion: state.consentVersion, citizenId: state.citizenId, required: true })}
+        onProfile={() => setState({ at: "profile", consentVersion: state.consentVersion, citizenId: state.citizenId, required: false })}
+        onHistory={() => setState({ at: "history", consentVersion: state.consentVersion, citizenId: state.citizenId })}
+        onBack={() => setState({ at: "people", consentVersion: state.consentVersion })} />;
+      break;
+    case "profile":
+      view = <ProfileStep key={`${state.citizenId}-${state.required}`} citizenId={state.citizenId} required={state.required}
+        onSaved={() => setState({ at: "catalog", consentVersion: state.consentVersion, citizenId: state.citizenId,
+          notice: state.required ? null : "Perfil atualizado." })}
+        onBack={() => setState(state.required
+          ? { at: "people", consentVersion: state.consentVersion }
+          : { at: "catalog", consentVersion: state.consentVersion, citizenId: state.citizenId, notice: null })} />;
       break;
     case "question":
       view = <QuestionStep conversationId={state.conversationId} step={state.step}

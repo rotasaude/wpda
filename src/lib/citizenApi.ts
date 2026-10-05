@@ -321,12 +321,6 @@ export const citizenApi = {
     call<StartResult>("POST", "/conversations", {
       citizen_id: p.citizenId, protocol_name: p.protocolName, consent_version: p.consentVersion
     }),
-  start: (p: { citizenId?: string; cpf?: string; neighborhoodId?: string; consentVersion: string }) =>
-    call<StartResult>("POST", "/conversations", {
-      ...(p.citizenId ? { citizen_id: p.citizenId } : { cpf: p.cpf }),
-      ...(p.neighborhoodId ? { neighborhood_id: p.neighborhoodId } : {}),
-      consent_version: p.consentVersion
-    }),
   answer: (conversationId: string, answer: string, idempotencyKey: string) =>
     call<AnswerState>("POST", `/conversations/${conversationId}/answers`, { answer, idempotency_key: idempotencyKey }),
   undo: (conversationId: string) => call<AnswerState>("POST", `/conversations/${conversationId}/undo`),

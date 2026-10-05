@@ -34,13 +34,6 @@ describe("citizenApi", () => {
     await expect(citizenApi.signOut()).resolves.toBeUndefined();
   });
 
-  it("start manda citizen_id ou cpf e a versão do termo", async () => {
-    const fn = mockFetch(201, { conversation_id: "c", citizen_id: "p", resumed: false, step: {} });
-    await citizenApi.start({ cpf: "529.982.247-25", consentVersion: "1" });
-    const init = (fn.mock.calls[0] as unknown as [string, RequestInit])[1];
-    expect(JSON.parse(init.body as string)).toEqual({ cpf: "529.982.247-25", consent_version: "1" });
-  });
-
   it("401 dispara citizen:unauthenticated e ainda rejeita com ApiError", async () => {
     mockFetch(401, { error: "unauthenticated" });
     const spy = vi.spyOn(window, "dispatchEvent");
@@ -202,20 +195,6 @@ describe("citizenApi", () => {
     const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/citizen/neighborhoods");
     expect(init.method).toBe("GET");
-  });
-
-  it("start manda neighborhood_id quando veio", async () => {
-    const fn = mockFetch(201, { conversation_id: "c", citizen_id: "p", resumed: false, step: {} });
-    await citizenApi.start({ cpf: "529.982.247-25", neighborhoodId: "n1", consentVersion: "1" });
-    const init = (fn.mock.calls[0] as unknown as [string, RequestInit])[1];
-    expect(JSON.parse(init.body as string)).toEqual({ cpf: "529.982.247-25", neighborhood_id: "n1", consent_version: "1" });
-  });
-
-  it("start sem bairro não manda a chave neighborhood_id", async () => {
-    const fn = mockFetch(201, { conversation_id: "c", citizen_id: "p", resumed: false, step: {} });
-    await citizenApi.start({ citizenId: "p1", consentVersion: "1" });
-    const body = JSON.parse((fn.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
-    expect("neighborhood_id" in body).toBe(false);
   });
 
   it("setNeighborhood manda POST com o id ou null", async () => {
