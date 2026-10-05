@@ -93,12 +93,13 @@ describe("ProfileStep", () => {
   it("toque duplo em 'Salvar' grava uma vez só", async () => {
     let finish!: (p: Person) => void;
     const set = vi.spyOn(citizenApi, "setProfile").mockReturnValue(new Promise(r => { finish = r; }));
-    setup(declared);
+    const { onSaved } = setup(declared);
     const btn = await screen.findByRole("button", { name: "Salvar" });
     await userEvent.click(btn);
     await userEvent.click(btn);
     finish(declared);
-    await waitFor(() => expect(set).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    expect(set).toHaveBeenCalledTimes(1);
   });
 
   it("pessoa fora da sessão: mensagem e 'Voltar'", async () => {
