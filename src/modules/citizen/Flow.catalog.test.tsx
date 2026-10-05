@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Flow } from "./Flow";
 import { citizenApi, ApiError, type Catalog, type Person, type Step } from "../../lib/citizenApi";
@@ -210,5 +210,72 @@ describe("Flow — bairro de CPF que já existia (R1, contrato §7)", () => {
 
     expect(await screen.findByRole("region", { name: "Disponíveis" })).toBeInTheDocument();
     expect(setN).not.toHaveBeenCalled();
+  });
+});
+
+describe("Flow — recusas ao começar", () => {
+  it.each([
+    [ "not_offered", "Esta triagem não está mais disponível para esta pessoa." ],
+    [ "triage_in_progress", "Já existe uma triagem em andamento para esta pessoa. Continue a que está aberta." ]
+  ])("409 %s: fica no catálogo relido, com o aviso", async (code, message) => {
+    signedIn([ avo ]);
+    const catalog = vi.spyOn(citizenApi, "catalog").mockResolvedValue(CATALOG);
+    vi.spyOn(citizenApi, "startTriage").mockRejectedValue(new ApiError(409, code));
+    await choosePerson();
+
+    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    await waitFor(() => expect(catalog).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText("Algo deu errado. Tente de novo.")).not.toBeInTheDocument();
+  });
+
+  it("409 profile_required ao começar: vai para o perfil obrigatório", async () => {
+    signedIn([ avo ]);
+    vi.spyOn(citizenApi, "catalog").mockResolvedValue(CATALOG);
+    vi.spyOn(citizenApi, "startTriage").mockRejectedValue(new ApiError(409, "profile_required"));
+    await choosePerson();
+
+    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+
+    expect(await screen.findByRole("heading", { name: "Sobre esta pessoa" })).toBeInTheDocument();
+  });
+
+  it.each([ "consent_outdated", "no_consent" ])("409 %s ao começar: volta ao termo", async (code) => {
+    signedIn([ avo ]);
+    vi.spyOn(citizenApi, "catalog").mockResolvedValue(CATALOG);
+    vi.spyOn(citizenApi, "startTriage").mockRejectedValue(new ApiError(409, code));
+    await choosePerson();
+
+    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+
+    expect(await screen.findByRole("button", { name: "Concordo" })).toBeInTheDocument();
+  });
+});
+
+describe("Flow — privacidade do perfil (ADR 0027, invariantes)", () => {
+  it("nenhum dado de perfil vai para a URL ou para o console, nem no erro do api", async () => {
+    const methods = [ "log", "info", "warn", "error", "debug" ] as const;
+    const spies = methods.map(m => vi.spyOn(console, m).mockImplementation(() => {}));
+    signedIn([]);
+    vi.spyOn(citizenApi, "createPerson")
+      .mockRejectedValueOnce(new ApiError(422, "invalid_birth_date"))
+      .mockResolvedValue({ ...avo, id: "p9" });
+    vi.spyOn(citizenApi, "catalog").mockResolvedValue(CATALOG);
+
+    render(<Flow />);
+    await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
+    await userEvent.type(await screen.findByLabelText("CPF de outra pessoa"), "52998224725");
+    await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
+    await fillProfile();
+    await userEvent.click(screen.getByRole("radio", { name: "Mulher trans" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    expect(await screen.findByText("Data de nascimento inválida. Confira dia, mês e ano.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    expect(await screen.findByRole("region", { name: "Disponíveis" })).toBeInTheDocument();
+
+    const leaked = /1963|02\/04|female|trans_woman|Feminino|Mulher trans/;
+    expect(window.location.href).not.toMatch(leaked);
+    for (const spy of spies) for (const call of spy.mock.calls) expect(JSON.stringify(call)).not.toMatch(leaked);
   });
 });

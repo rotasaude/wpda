@@ -138,6 +138,17 @@ export function Flow() {
       setState({ at: "question", consentVersion, conversationId: r.conversation_id, citizenId: r.citizen_id, step: r.step });
       return null;
     } catch (e) {
+      if (e instanceof ApiError) {
+        if (e.code === "consent_outdated" || e.code === "no_consent") {
+          setState({ at: "consent" });
+          return null;
+        }
+        if (e.code === "profile_required") {
+          setState({ at: "profile", consentVersion, citizenId, required: true });
+          return null;
+        }
+      }
+      // not_offered, triage_in_progress e o resto: a tela mostra e relê o catálogo.
       return messageFor(e);
     }
   }
