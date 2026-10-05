@@ -23,6 +23,7 @@ function ConsentTermLink() {
     const next = !open;
     setOpen(next);
     if (next && term === null) {
+      setError(null);
       citizenApi.consentTerm().then(t => setTerm(t.body)).catch(e => setError(messageFor(e)));
     }
   }

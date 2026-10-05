@@ -88,9 +88,9 @@ export function CatalogStep({ citizenId, notice, onStart, onProfileRequired, onP
 
   return (
     <Screen title="Qual triagem fazer?" footer={<>
-      <BigButton variant="secondary" onClick={onProfile}>Meu perfil</BigButton>
-      <BigButton variant="secondary" onClick={onHistory}>Minhas triagens</BigButton>
-      <BigButton variant="secondary" onClick={onBack}>Voltar</BigButton>
+      <BigButton variant="secondary" disabled={busy} onClick={onProfile}>Meu perfil</BigButton>
+      <BigButton variant="secondary" disabled={busy} onClick={onHistory}>Minhas triagens</BigButton>
+      <BigButton variant="secondary" disabled={busy} onClick={onBack}>Voltar</BigButton>
     </>}>
       {message && <p role="status">{message}</p>}
       {error && <ErrorText>{error}</ErrorText>}
@@ -104,7 +104,9 @@ export function CatalogStep({ citizenId, notice, onStart, onProfileRequired, onP
         <Section id="catalog-suggested" title="Sugeridas para você">
           {c.suggested.map(s => (
             <Item key={s.suggestion_id} title={s.title} summary={s.summary}
-              lines={[ `Sugerida pelo resultado da triagem ${s.source_title} de ${fmtCalendarDate(s.suggested_on)}` ]}
+              lines={[ s.source_title
+                ? `Sugerida pelo resultado da triagem ${s.source_title} de ${fmtCalendarDate(s.suggested_on)}`
+                : `Sugerida pelo resultado de uma triagem de ${fmtCalendarDate(s.suggested_on)}` ]}
               action={startButton(s.protocol_name)} />
           ))}
         </Section>

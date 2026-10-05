@@ -133,11 +133,16 @@ export function Flow() {
   // Começa (ou retoma) a triagem escolhida no catálogo ou sugerida no
   // resultado. null = trocou de tela; texto = recusa para a tela mostrar.
   async function startTriage(consentVersion: string, citizenId: string, protocolName: string): Promise<string | null> {
+    // O cidadão pode sair da tela enquanto o POST demora: só age se a tela que
+    // pediu o início ainda é a atual (stateRef acompanha o último render).
+    const issuedFrom = stateRef.current;
     try {
       const r = await citizenApi.startTriage({ citizenId, protocolName, consentVersion });
+      if (stateRef.current !== issuedFrom) return null;
       setState({ at: "question", consentVersion, conversationId: r.conversation_id, citizenId: r.citizen_id, step: r.step });
       return null;
     } catch (e) {
+      if (stateRef.current !== issuedFrom) return null;
       if (e instanceof ApiError) {
         if (e.code === "consent_outdated" || e.code === "no_consent") {
           setState({ at: "consent" });

@@ -96,6 +96,18 @@ describe("ProfileForm", () => {
     expect(screen.getByRole("button", { name: "Fechar o termo" })).toHaveAttribute("aria-expanded", "true");
   });
 
+  it("termo que falhou ao carregar: reabrir tenta de novo e limpa o erro", async () => {
+    vi.spyOn(citizenApi, "consentTerm")
+      .mockRejectedValueOnce(new Error("rede")).mockResolvedValue({ version: "3", body: "Texto do termo" });
+    setup();
+    await userEvent.click(screen.getByRole("button", { name: "Ler o termo de consentimento" }));
+    const err = await screen.findByRole("alert");
+    await userEvent.click(screen.getByRole("button", { name: "Fechar o termo" }));
+    await userEvent.click(screen.getByRole("button", { name: "Ler o termo de consentimento" }));
+    expect(await screen.findByText("Texto do termo")).toBeInTheDocument();
+    expect(err).not.toBeInTheDocument();
+  });
+
   it("sem <form> nativo e sem preenchimento automático da data", () => {
     const { container } = setup();
     expect(container.querySelector("form")).toBeNull();

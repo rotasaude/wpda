@@ -315,4 +315,19 @@ describe("Flow — resultado com sugestão", () => {
     await userEvent.click(screen.getByRole("button", { name: "Fazer outra triagem" }));
     expect(await screen.findByRole("heading", { name: "Qual triagem fazer?" })).toBeInTheDocument();
   });
+
+  it("início tardio de uma sugestão não puxa o cidadão que já saiu do resultado", async () => {
+    const { start } = await reachResult();
+    let resolve!: (r: Awaited<ReturnType<typeof citizenApi.startTriage>>) => void;
+    start.mockReset();
+    start.mockReturnValue(new Promise(r => { resolve = r; }));
+    await userEvent.click(screen.getByRole("button", { name: "Fazer agora" }));
+    await userEvent.click(screen.getByRole("button", { name: "Fazer outra triagem" }));
+    expect(await screen.findByRole("heading", { name: "Qual triagem fazer?" })).toBeInTheDocument();
+    resolve({ conversation_id: "c2", citizen_id: "p1", resumed: false,
+      step: { ...step, triage_id: "t2", step_id: "humor", prompt: "Como está o seu humor?" } });
+    await new Promise(r => setTimeout(r, 20));
+    expect(screen.getByRole("heading", { name: "Qual triagem fazer?" })).toBeInTheDocument();
+    expect(screen.queryByText("Como está o seu humor?")).not.toBeInTheDocument();
+  });
 });

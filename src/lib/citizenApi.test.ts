@@ -405,6 +405,11 @@ describe("citizenApi — módulo 15 (perfil, catálogo, sugestões)", () => {
     });
   });
 
+  it("catalog: suggested sem source_title normaliza para null", async () => {
+    mockFetch(200, { suggested: [ { protocol_name: "a", title: "A", suggestion_id: "s1", source_triage_id: "t0", suggested_on: "2026-10-02" } ] });
+    expect((await citizenApi.catalog("p1")).suggested[0].source_title).toBeNull();
+  });
+
   it("catalog 409 profile_required vira ApiError", async () => {
     mockFetch(409, { error: "profile_required" });
     await expect(citizenApi.catalog("p1")).rejects.toEqual(new ApiError(409, "profile_required"));

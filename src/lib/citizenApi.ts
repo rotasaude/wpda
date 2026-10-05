@@ -51,7 +51,7 @@ export interface CatalogEntry { protocol_name: string; title: string; summary: s
 export interface SuggestedEntry extends CatalogEntry {
   suggestion_id: string;
   source_triage_id: string;
-  source_title: string; // título da triagem que gerou a sugestão
+  source_title: string | null; // título da triagem que gerou a sugestão
   suggested_on: string; // AAAA-MM-DD
 }
 export interface RecentEntry extends CatalogEntry {
@@ -310,7 +310,7 @@ export const citizenApi = {
     const d = await call<Partial<Catalog>>("GET", `/people/${encodeURIComponent(citizenId)}/catalog`);
     return {
       in_progress: d.in_progress ?? null,
-      suggested: (d.suggested ?? []).map(withSummary),
+      suggested: (d.suggested ?? []).map(e => ({ ...withSummary(e), source_title: e.source_title ?? null })),
       available: (d.available ?? []).map(withSummary),
       recent: (d.recent ?? []).map(withSummary),
       reference_units: d.reference_units ?? []

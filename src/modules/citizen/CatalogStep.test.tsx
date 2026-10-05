@@ -150,4 +150,21 @@ describe("CatalogStep", () => {
     expect(onHistory).toHaveBeenCalled();
     expect(onBack).toHaveBeenCalled();
   });
+
+  it("sem source_title: frase sem o título, sem 'undefined' nem 'null'", async () => {
+    const cat: Catalog = { ...EMPTY, suggested: [ { ...FULL.suggested[0], source_title: null } ] };
+    setup(cat);
+    const suggested = await region("Sugeridas para você");
+    expect(within(suggested).getByText("Sugerida pelo resultado de uma triagem de 02/10/2026")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/undefined|null/);
+  });
+
+  it("com um início pendente, os botões do rodapé ficam desabilitados", async () => {
+    const { onStart } = setup(FULL);
+    onStart.mockReturnValue(new Promise(() => {}));
+    await region("Disponíveis");
+    await userEvent.click(within(item("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+    for (const name of [ "Meu perfil", "Minhas triagens", "Voltar" ])
+      expect(screen.getByRole("button", { name })).toBeDisabled();
+  });
 });
