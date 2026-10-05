@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { ApiError, citizenApi, type Neighborhood, type Person } from "../../lib/citizenApi";
+import { ApiError, citizenApi, type Neighborhood, type Person, type ProfileInput } from "../../lib/citizenApi";
 import { isValidCpf, maskCpf } from "../../lib/masks";
 import { NeighborhoodPicker } from "./NeighborhoodPicker";
+import { ProfileForm } from "./ProfileForm";
 import { BigButton, ErrorText, Field, INVALID_NEIGHBORHOOD_MESSAGE, Screen, messageFor } from "./ui";
 import { PendingConfirmations } from "./PendingConfirmations";
 
-export type Who = { citizenId: string } | { cpf: string };
+// CPF novo leva o perfil junto: o par nasce com ele (contrato §3.2).
+export type Who = { citizenId: string } | { cpf: string; profile: ProfileInput };
 export type PersonChoice = Who & { neighborhoodId?: string };
 // "invalid_neighborhood": o bairro saiu da lista entre a leitura e o envio (422);
 // "done": o Flow cuidou do resto (pergunta, termo ou erro).
@@ -13,6 +15,7 @@ export type ChooseOutcome = "done" | "invalid_neighborhood";
 
 type Mode =
   | { at: "list" }
+  | { at: "profile-for-new"; cpf: string }
   | { at: "pick-for-start"; who: Who; notice: string | null }
   | { at: "pick-for-change"; person: Person; notice: string | null };
 
@@ -87,10 +90,12 @@ export function PeopleStep({ onChoose, onHistory }:
     setMode({ at: "pick-for-start", who, notice: null });
   }
 
+  // CPF novo: perfil primeiro, depois o bairro (o 422 de bairro continua
+  // tratado em begin(), sem perder o perfil digitado).
   function submitNew() {
     if (!isValidCpf(cpf)) return setError("CPF inválido. Confira os números.");
     setError(null);
-    void ask({ cpf }, false);
+    setMode({ at: "profile-for-new", cpf });
   }
 
   // "Trocar bairro" (spec §4.1): null tira o bairro. Não muda triagens antigas.
@@ -119,6 +124,13 @@ export function PeopleStep({ onChoose, onHistory }:
       inFlight.current = false;
       setBusy(false);
     }
+  }
+
+  if (mode.at === "profile-for-new") {
+    const newCpf = mode.cpf;
+    return <ProfileForm title="Sobre esta pessoa" who={`CPF ${newCpf}`} busy={busy} submitLabel="Continuar"
+      onSubmit={profile => void ask({ cpf: newCpf, profile }, false)}
+      onBack={() => setMode({ at: "list" })} />;
   }
 
   if (mode.at === "pick-for-change") {

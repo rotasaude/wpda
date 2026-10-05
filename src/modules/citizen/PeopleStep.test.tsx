@@ -1,10 +1,16 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PeopleStep, type ChooseOutcome } from "./PeopleStep";
 import { ApiError, citizenApi, type Person } from "../../lib/citizenApi";
 
-afterEach(() => vi.restoreAllMocks());
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: [ "Date" ] });
+  vi.setSystemTime(new Date("2026-10-05T10:00:00-03:00"));
+});
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+const PROFILE = { birth_date: "1963-04-02", sex: "female", gender_identity: null };
 
 const LIST = [
   { id: "n1", name: "Batel" },
@@ -26,9 +32,13 @@ function setup(people: Person[], list: typeof LIST | Error | { once: typeof LIST
   return { onChoose, neighborhoods };
 }
 
+// CPF novo: o perfil vem antes do bairro (plano wpda do módulo 15, Divergência 4).
 async function typeNewCpf() {
   await userEvent.type(await screen.findByLabelText("CPF de outra pessoa"), "52998224725");
   await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
+  await userEvent.type(await screen.findByLabelText("Data de nascimento"), "02041963");
+  await userEvent.click(screen.getByRole("radio", { name: "Feminino" }));
+  await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
 }
 
 describe("PeopleStep — bairro antes de começar", () => {
@@ -43,7 +53,7 @@ describe("PeopleStep — bairro antes de começar", () => {
     expect(screen.queryByRole("button", { name: "Batel" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "São Francisco" }));
 
-    await waitFor(() => expect(onChoose).toHaveBeenCalledWith({ cpf: "529.982.247-25", neighborhoodId: "n2" }));
+    await waitFor(() => expect(onChoose).toHaveBeenCalledWith({ cpf: "529.982.247-25", profile: PROFILE, neighborhoodId: "n2" }));
   });
 
   it("CPF novo: 'Prefiro não informar' começa sem bairro", async () => {
@@ -52,7 +62,7 @@ describe("PeopleStep — bairro antes de começar", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Prefiro não informar" }));
 
     await waitFor(() => expect(onChoose).toHaveBeenCalledTimes(1));
-    expect(onChoose.mock.calls[0][0]).toEqual({ cpf: "529.982.247-25" });
+    expect(onChoose.mock.calls[0][0]).toEqual({ cpf: "529.982.247-25", profile: PROFILE });
     expect("neighborhoodId" in (onChoose.mock.calls[0][0] as object)).toBe(false);
   });
 
@@ -101,7 +111,7 @@ describe("PeopleStep — bairro antes de começar", () => {
   it("lista com erro (api antiga ou rede): segue sem perguntar", async () => {
     const { onChoose } = setup([], new Error("offline"));
     await typeNewCpf();
-    await waitFor(() => expect(onChoose).toHaveBeenCalledWith({ cpf: "529.982.247-25" }));
+    await waitFor(() => expect(onChoose).toHaveBeenCalledWith({ cpf: "529.982.247-25", profile: PROFILE }));
   });
 
   it("422 invalid_neighborhood: relê a lista, avisa e pede nova escolha", async () => {
@@ -267,5 +277,46 @@ describe("PeopleStep — Trocar bairro", () => {
 
     expect(await screen.findByText("Bairro atualizado.")).toBeInTheDocument();
     expect(set).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PeopleStep — perfil de pessoa nova (módulo 15)", () => {
+  it("CPF novo: pede data de nascimento e sexo antes do bairro, com o CPF digitado", async () => {
+    const { onChoose } = setup([]);
+    await userEvent.type(await screen.findByLabelText("CPF de outra pessoa"), "52998224725");
+    await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
+
+    expect(await screen.findByRole("heading", { name: "Sobre esta pessoa" })).toBeInTheDocument();
+    expect(screen.getByText("CPF 529.982.247-25")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Em que bairro esta pessoa mora?" })).not.toBeInTheDocument();
+    expect(onChoose).not.toHaveBeenCalled();
+  });
+
+  it("CPF novo: perfil inválido não avança", async () => {
+    const { onChoose } = setup([]);
+    await userEvent.type(await screen.findByLabelText("CPF de outra pessoa"), "52998224725");
+    await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
+    await userEvent.type(await screen.findByLabelText("Data de nascimento"), "06102026");
+    await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
+
+    expect(screen.getByText("A data de nascimento não pode ser depois de hoje.")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Em que bairro esta pessoa mora?" })).not.toBeInTheDocument();
+    expect(onChoose).not.toHaveBeenCalled();
+  });
+
+  it("CPF novo: 'Voltar' no perfil volta à lista sem chamar nada", async () => {
+    const { onChoose } = setup([]);
+    await userEvent.type(await screen.findByLabelText("CPF de outra pessoa"), "52998224725");
+    await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Voltar" }));
+
+    expect(await screen.findByText("Para quem é esta triagem?")).toBeInTheDocument();
+    expect(onChoose).not.toHaveBeenCalled();
+  });
+
+  it("cidade sem bairros: CPF novo começa logo depois do perfil", async () => {
+    const { onChoose } = setup([], []);
+    await typeNewCpf();
+    await waitFor(() => expect(onChoose).toHaveBeenCalledWith({ cpf: "529.982.247-25", profile: PROFILE }));
   });
 });
