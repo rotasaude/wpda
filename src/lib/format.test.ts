@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cityTimeZone, fmtDate, fmtDateTime, setCityTimeZone } from "./format";
+import { cityTimeZone, fmtCalendarDate, fmtDate, fmtDateTime, setCityTimeZone } from "./format";
 
 describe("fmtDateTime", () => {
   it("formata ISO em pt-BR (data)", () => {
@@ -42,5 +42,22 @@ describe("fuso da cidade (api#27)", () => {
     setCityTimeZone("America/Manaus");
     expect(fmtDateTime(AT)).toBe("02/10/2026, 23:30");
     expect(fmtDate(AT)).toBe("02/10/2026");
+  });
+});
+
+// Datas de calendário do módulo 15 (nascimento, sugerida em, próxima a partir
+// de): sem hora nem fuso. new Date("2026-10-02") seria 01/10 em Brasília.
+describe("fmtCalendarDate", () => {
+  it("AAAA-MM-DD vira DD/MM/AAAA, sem deslocar o dia pelo fuso", () => {
+    expect(fmtCalendarDate("2026-10-02")).toBe("02/10/2026");
+    expect(fmtCalendarDate("2027-01-01")).toBe("01/01/2027");
+  });
+  it("vale em qualquer fuso de cidade", () => {
+    setCityTimeZone("America/Manaus");
+    expect(fmtCalendarDate("2026-10-02")).toBe("02/10/2026");
+    setCityTimeZone(null);
+  });
+  it.each([ null, undefined, "", "2026-10-02T00:00:00Z", "02/10/2026", "2026-1-2" ])("%s vira —", (v) => {
+    expect(fmtCalendarDate(v)).toBe("—");
   });
 });
