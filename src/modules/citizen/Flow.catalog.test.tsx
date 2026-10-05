@@ -279,3 +279,40 @@ describe("Flow — privacidade do perfil (ADR 0027, invariantes)", () => {
     for (const spy of spies) for (const call of spy.mock.calls) expect(JSON.stringify(call)).not.toMatch(leaked);
   });
 });
+
+describe("Flow — resultado com sugestão", () => {
+  async function reachResult() {
+    signedIn([ avo ]);
+    vi.spyOn(citizenApi, "catalog").mockResolvedValue(CATALOG);
+    const start = vi.spyOn(citizenApi, "startTriage")
+      .mockResolvedValueOnce({ conversation_id: "c1", citizen_id: "p1", resumed: false, step })
+      .mockResolvedValue({ conversation_id: "c2", citizen_id: "p1", resumed: false,
+        step: { ...step, triage_id: "t2", step_id: "humor", prompt: "Como está o seu humor?" } });
+    vi.spyOn(citizenApi, "answer").mockResolvedValue({ status: "completed", triage_id: "t1" });
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({
+      id: "t1", status: "completed", tier: "media", priority: 2, created_at: "2026-10-05T12:00:00Z",
+      completed_at: "2026-10-05T12:05:00Z", report_url: null, consent_active: true, origin_phone_masked: null,
+      attendance: null, check_in_available: false, reference_units: [],
+      suggestions: [ { suggestion_id: "s1", protocol_name: "saude-mental-aprofundada",
+        title: "Saúde mental — aprofundamento", summary: null } ]
+    });
+    await choosePerson();
+    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Não" }));
+    await screen.findByRole("heading", { name: "Recomendamos também" });
+    return { start };
+  }
+
+  it("'Fazer agora' começa a triagem sugerida para a mesma pessoa", async () => {
+    const { start } = await reachResult();
+    await userEvent.click(screen.getByRole("button", { name: "Fazer agora" }));
+    expect(await screen.findByText("Como está o seu humor?")).toBeInTheDocument();
+    expect(start).toHaveBeenLastCalledWith({ citizenId: "p1", protocolName: "saude-mental-aprofundada", consentVersion: "1" });
+  });
+
+  it("'Fazer outra triagem' abre o catálogo da mesma pessoa", async () => {
+    await reachResult();
+    await userEvent.click(screen.getByRole("button", { name: "Fazer outra triagem" }));
+    expect(await screen.findByRole("heading", { name: "Qual triagem fazer?" })).toBeInTheDocument();
+  });
+});
