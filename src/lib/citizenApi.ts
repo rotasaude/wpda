@@ -80,15 +80,72 @@ export interface SchedulingRequest {
   appointment_type_name: string | null;
 }
 
-// Campanhas (spec 2026-09-29 §6.2; ADR 0024). Cidadão não tem nome: com mais de
-// uma pessoa no telefone, o aviso diz de quem é pelo CPF mascarado.
-export interface Notice {
+// Caixa de avisos (spec 2026-09-29 §6.2; ADR 0024; módulo 17, contrato §5):
+// campanhas e lembretes de horário. Cidadão não tem nome: com mais de uma
+// pessoa no telefone, o aviso diz de quem é pelo CPF mascarado.
+export interface CampaignNotice {
+  kind?: "campaign"; // ausente numa api anterior ao módulo 17
   id: string; // id do campaign_recipient
   title: string;
   body: string; // texto simples, com quebras de linha
   dispatched_at: string;
   read: boolean;
   cpf_masked: string | null; // null quando o telefone tem uma pessoa só
+}
+
+// Lembrete da véspera de um horário confirmado (F-17.8; contrato §8): read e
+// cpf_masked com a mesma regra das campanhas.
+export interface ReminderNotice {
+  kind: "appointment_reminder";
+  id: string;
+  appointment_id: string;
+  appointment_type_name: string | null;
+  unit_name: string | null;
+  unit_address: UnitAddress | null;
+  scheduled_at: string;
+  professional_name: string | null;
+  read: boolean;
+  cpf_masked: string | null;
+}
+
+export type Notice = CampaignNotice | ReminderNotice;
+
+// Forma crua de GET /citizen/notices: tudo pode faltar, menos o id.
+interface RawNotice {
+  kind?: string;
+  id: string;
+  read?: boolean;
+  cpf_masked?: string | null;
+  title?: string;
+  body?: string;
+  dispatched_at?: string;
+  appointment_id?: string;
+  appointment_type_name?: string | null;
+  unit_name?: string | null;
+  unit_address?: UnitAddress | null;
+  scheduled_at?: string;
+  professional_name?: string | null;
+}
+
+// Tipo desconhecido (api mais nova) ou lembrete sem horário: fora da lista,
+// em vez de um item quebrado.
+function normalizeNotice(n: RawNotice): Notice | null {
+  const read = n.read === true;
+  const cpf_masked = n.cpf_masked ?? null;
+  if (n.kind === "appointment_reminder") {
+    if (!n.appointment_id || !n.scheduled_at) return null;
+    return {
+      kind: "appointment_reminder", id: n.id, appointment_id: n.appointment_id,
+      appointment_type_name: n.appointment_type_name ?? null, unit_name: n.unit_name ?? null,
+      unit_address: n.unit_address ?? null, scheduled_at: n.scheduled_at,
+      professional_name: n.professional_name ?? null, read, cpf_masked
+    };
+  }
+  if (n.kind !== undefined && n.kind !== "campaign") return null;
+  return {
+    kind: "campaign", id: n.id, title: n.title ?? "", body: n.body ?? "",
+    dispatched_at: n.dispatched_at ?? "", read, cpf_masked
+  };
 }
 
 export interface NoticesResult {
@@ -410,9 +467,9 @@ export const citizenApi = {
   // Caixa de avisos (spec §6.2): avisos de todas as pessoas do telefone da
   // sessão, mais novo primeiro. Campos ausentes são normalizados aqui.
   notices: async (): Promise<NoticesResult> => {
-    const data = await call<{ notices?: Notice[]; unread_count?: number }>("GET", "/notices");
+    const data = await call<{ notices?: RawNotice[]; unread_count?: number }>("GET", "/notices");
     return {
-      notices: (data.notices ?? []).map(n => ({ ...n, read: n.read === true, cpf_masked: n.cpf_masked ?? null })),
+      notices: (data.notices ?? []).map(normalizeNotice).filter((n): n is Notice => n !== null),
       unread_count: data.unread_count ?? 0
     };
   },

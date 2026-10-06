@@ -531,4 +531,35 @@ describe("citizenApi — módulo 17 (agenda)", () => {
     expect(ret.appointment_type_name).toBeNull();
     expect(ret.due_on).toBeNull();
   });
+
+  it("notices: aviso sem kind (api anterior) é campanha", async () => {
+    mockFetch(200, { notices: [
+      { id: "c1", title: "Vacinação", body: "Texto", dispatched_at: "2026-09-28T13:00:00-03:00", read: false }
+    ], unread_count: 1 });
+    const [n] = (await citizenApi.notices()).notices;
+    expect(n.kind).toBe("campaign");
+  });
+
+  it("notices: lembrete com read e cpf_masked do contrato; campos ausentes viram null/false", async () => {
+    mockFetch(200, { notices: [
+      { kind: "appointment_reminder", id: "rem1", appointment_id: "a1", appointment_type_name: "Consulta médica",
+        unit_name: "UBS Batel", unit_address: { street: "Rua Padre Anchieta", number: "1500", complement: null, zip: "80730000" },
+        scheduled_at: "2026-10-08T09:00:00-03:00", professional_name: "Ana Souza", read: true, cpf_masked: "***.982.247-**" },
+      { kind: "appointment_reminder", id: "rem2", appointment_id: "a2", scheduled_at: "2026-10-08T10:00:00-03:00" }
+    ], unread_count: 1 });
+    const [read, bare] = (await citizenApi.notices()).notices;
+    expect(read).toMatchObject({ kind: "appointment_reminder", id: "rem1", appointment_id: "a1", read: true, cpf_masked: "***.982.247-**" });
+    expect(bare).toEqual({
+      kind: "appointment_reminder", id: "rem2", appointment_id: "a2", appointment_type_name: null, unit_name: null,
+      unit_address: null, scheduled_at: "2026-10-08T10:00:00-03:00", professional_name: null, read: false, cpf_masked: null
+    });
+  });
+
+  it("notices: tipo de aviso desconhecido (api mais nova) fica fora da lista", async () => {
+    mockFetch(200, { notices: [
+      { kind: "exam_result", id: "x1", read: false },
+      { kind: "campaign", id: "c1", title: "Vacinação", body: "Texto", dispatched_at: "2026-09-28T13:00:00-03:00", read: true }
+    ], unread_count: 0 });
+    expect((await citizenApi.notices()).notices.map(n => n.id)).toEqual([ "c1" ]);
+  });
 });

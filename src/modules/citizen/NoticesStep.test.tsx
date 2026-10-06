@@ -2,8 +2,8 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { NoticesStep, EMPTY_NOTICES } from "./NoticesStep";
-import { citizenApi, ApiError, type Notice } from "../../lib/citizenApi";
+import { NoticesStep, EMPTY_NOTICES, REMINDER_TITLE, REMINDER_HINT } from "./NoticesStep";
+import { citizenApi, ApiError, type Notice, type ReminderNotice } from "../../lib/citizenApi";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: [ "Date" ] });
@@ -188,5 +188,58 @@ describe("NoticesStep — abrir um aviso", () => {
 
     await userEvent.click(await item(/Vacinação/));
     await waitFor(() => expect(markRead).toHaveBeenCalledTimes(2));
+  });
+});
+
+// Módulo 17 (F-17.8): o lembrete da véspera do horário confirmado divide a
+// caixa com as campanhas.
+describe("NoticesStep — lembrete de horário", () => {
+  beforeEach(() => vi.setSystemTime(new Date("2026-10-07T18:00:00-03:00")));
+
+  const reminder: ReminderNotice = {
+    kind: "appointment_reminder", id: "rem1", appointment_id: "a1", appointment_type_name: "Consulta médica",
+    unit_name: "UBS Batel", unit_address: { street: "Rua Padre Anchieta", number: "1500", complement: null, zip: "80730000" },
+    scheduled_at: "2026-10-08T09:00:00-03:00", professional_name: "Ana Souza", read: false, cpf_masked: null
+  };
+
+  it("lista lembrete e campanha na ordem da API; o lembrete tem título próprio, dia e hora e 'novo'", async () => {
+    setup([ reminder, read ]);
+    const first = await item(/Lembrete de horário/);
+    expect(REMINDER_TITLE).toBe("Lembrete de horário");
+    expect(within(first).getByText("qui., 08/10, 09:00")).toBeInTheDocument();
+    expect(within(first).getByText("Consulta médica")).toBeInTheDocument();
+    expect(within(first).getByText("novo")).toBeInTheDocument();
+    const items = screen.getAllByRole("listitem").map(li => li.textContent);
+    expect(items[0]).toMatch(/Lembrete de horário/);
+    expect(items[1]).toMatch(/Mutirão/);
+  });
+
+  it("abrir mostra quando, o quê, com quem, onde e o endereço, e marca lido pelo id do lembrete", async () => {
+    const { markRead } = setup([ reminder ]);
+    await userEvent.click(await item(/Lembrete de horário/));
+    expect(screen.getByRole("heading", { name: "Lembrete de horário" })).toBeInTheDocument();
+    expect(screen.getByText("qui., 08/10, 09:00")).toBeInTheDocument();
+    expect(screen.getByText("Consulta médica")).toBeInTheDocument();
+    expect(screen.getByText("Com Ana Souza")).toBeInTheDocument();
+    expect(screen.getByText("UBS Batel")).toBeInTheDocument();
+    expect(screen.getByText("Rua Padre Anchieta, 1500 · CEP 80730-000")).toBeInTheDocument();
+    expect(screen.getByText(REMINDER_HINT)).toBeInTheDocument();
+    expect(markRead).toHaveBeenCalledWith("rem1");
+
+    await userEvent.click(screen.getByRole("button", { name: "Voltar aos avisos" }));
+    await waitFor(() => expect(within(screen.getByRole("button", { name: /Lembrete de horário/ })).queryByText("novo"))
+      .not.toBeInTheDocument());
+  });
+
+  it("lembrete sem profissional, unidade nem endereço: só o que veio, sem 'null'", async () => {
+    setup([ { ...reminder, professional_name: null, unit_name: null, unit_address: null } ]);
+    await userEvent.click(await item(/Lembrete de horário/));
+    expect(screen.queryByText(/^Com /)).not.toBeInTheDocument();
+    expect(screen.queryByText(/null|undefined/)).not.toBeInTheDocument();
+  });
+
+  it("várias pessoas no telefone: o lembrete diz o CPF mascarado de quem é", async () => {
+    setup([ { ...reminder, cpf_masked: "***.982.247-**" } ]);
+    expect(within(await item(/Lembrete de horário/)).getByText("Para o CPF ***.982.247-**")).toBeInTheDocument();
   });
 });

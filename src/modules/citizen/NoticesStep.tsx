@@ -1,14 +1,20 @@
 // src/modules/citizen/NoticesStep.tsx
-// Caixa de avisos da Secretaria (spec 2026-09-29 §8; ADR 0024). Avisos de todas
-// as pessoas do telefone da sessão; com mais de uma, o CPF mascarado diz de quem
-// é (cidadão não tem nome). Tocar abre o texto e marca lido. O texto é simples:
-// o React escapa tudo e o pre-wrap preserva as quebras de linha.
+// Caixa de avisos da Secretaria (spec 2026-09-29 §8; ADR 0024; módulo 17
+// F-17.8). Avisos de todas as pessoas do telefone da sessão: campanhas e o
+// lembrete da véspera de um horário confirmado. Com mais de uma pessoa, o CPF
+// mascarado diz de quem é (cidadão não tem nome). Tocar abre o texto e marca
+// lido. O texto é simples: o React escapa tudo e o pre-wrap preserva as
+// quebras de linha.
 import { useEffect, useRef, useState } from "react";
-import { citizenApi, type Notice } from "../../lib/citizenApi";
-import { fmtDate } from "../../lib/format";
+import { citizenApi, type Notice, type ReminderNotice } from "../../lib/citizenApi";
+import { fmtDate, fmtWeekdayDateTime } from "../../lib/format";
+import { formatAddress } from "../../lib/territory";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
 export const EMPTY_NOTICES = "Nenhum aviso da Secretaria por enquanto.";
+export const REMINDER_TITLE = "Lembrete de horário";
+export const REMINDER_HINT =
+  "Se não puder ir, abra \"Seus agendamentos\", em Minhas triagens, e toque em \"Não posso nesse horário\".";
 
 const itemStyle = {
   display: "grid", gap: 4, width: "100%", minHeight: 56, padding: 12, textAlign: "left",
@@ -20,6 +26,48 @@ const newStyle = {
   alignSelf: "start", padding: "0 8px", borderRadius: 999, fontSize: 18, fontWeight: 600,
   background: "var(--accent, #2b4bd8)", color: "#fff"
 } as const;
+
+function ReminderDetail({ notice, onBack }: { notice: ReminderNotice; onBack: () => void }) {
+  const address = formatAddress(notice.unit_address);
+  return (
+    <Screen title={REMINDER_TITLE}
+      footer={<BigButton variant="secondary" onClick={onBack}>Voltar aos avisos</BigButton>}>
+      <p style={{ margin: "0 0 8px", fontWeight: 600 }}>{fmtWeekdayDateTime(notice.scheduled_at)}</p>
+      {notice.cpf_masked && <p style={{ margin: "0 0 4px" }}>Para o CPF {notice.cpf_masked}</p>}
+      {notice.appointment_type_name && <p style={{ margin: "0 0 4px" }}>{notice.appointment_type_name}</p>}
+      {notice.professional_name && <p style={{ margin: "0 0 4px" }}>Com {notice.professional_name}</p>}
+      {notice.unit_name && <p style={{ margin: "0 0 4px" }}>{notice.unit_name}</p>}
+      {address && <p style={{ margin: "0 0 4px", color: "var(--ink2, #555)" }}>{address}</p>}
+      <p style={{ marginTop: 16 }}>{REMINDER_HINT}</p>
+    </Screen>
+  );
+}
+
+function ItemContent({ notice }: { notice: Notice }) {
+  const badge = !notice.read && <span style={newStyle}>novo</span>;
+  const cpf = notice.cpf_masked && <span>Para o CPF {notice.cpf_masked}</span>;
+  if (notice.kind === "appointment_reminder") {
+    return (
+      <>
+        <span style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+          <strong>{REMINDER_TITLE}</strong>{badge}
+        </span>
+        <span style={{ color: "var(--ink2, #555)" }}>{fmtWeekdayDateTime(notice.scheduled_at)}</span>
+        {notice.appointment_type_name && <span>{notice.appointment_type_name}</span>}
+        {cpf}
+      </>
+    );
+  }
+  return (
+    <>
+      <span style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+        <strong>{notice.title}</strong>{badge}
+      </span>
+      <span style={{ color: "var(--ink2, #555)" }}>{fmtDate(notice.dispatched_at)}</span>
+      {cpf}
+    </>
+  );
+}
 
 export function NoticesStep({ onBack, onPreferences, onRead }:
   { onBack: () => void; onPreferences?: () => void; onRead?: () => void }) {
@@ -51,6 +99,9 @@ export function NoticesStep({ onBack, onPreferences, onRead }:
   }
 
   const current = notices?.find(n => n.id === openId) ?? null;
+  if (current && current.kind === "appointment_reminder") {
+    return <ReminderDetail notice={current} onBack={() => setOpenId(null)} />;
+  }
   if (current) {
     return (
       <Screen title={current.title}
@@ -78,15 +129,10 @@ export function NoticesStep({ onBack, onPreferences, onRead }:
       {notices !== null && notices.length > 0 && (
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 12 }}>
           {notices.map(n => (
-            <li key={n.id}>
+            <li key={`${n.kind ?? "campaign"}:${n.id}`}>
               <button type="button" onClick={() => open(n)}
                 style={{ ...itemStyle, background: n.read ? "transparent" : "var(--accent-bg, #eef1ff)" }}>
-                <span style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <strong>{n.title}</strong>
-                  {!n.read && <span style={newStyle}>novo</span>}
-                </span>
-                <span style={{ color: "var(--ink2, #555)" }}>{fmtDate(n.dispatched_at)}</span>
-                {n.cpf_masked && <span>Para o CPF {n.cpf_masked}</span>}
+                <ItemContent notice={n} />
               </button>
             </li>
           ))}
