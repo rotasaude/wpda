@@ -191,3 +191,67 @@ describe("ResultStep — Recomendamos também (módulo 15)", () => {
     expect(btn).toBeDisabled();
   });
 });
+
+// Módulo 17 (spec §6; ADR 0029): a triagem pode abrir um pedido de
+// agendamento; quem marca é a unidade, o cidadão só fica sabendo do prazo.
+describe("ResultStep — pedido de agendamento (módulo 17)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: [ "Date" ] });
+    vi.setSystemTime(new Date("2026-10-06T10:00:00-03:00"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const request = { unit_name: "UBS Batel", due_on: "2026-11-05", appointment_type_name: "Consulta médica" };
+
+  it("com unidade: diz o tipo, quem vai entrar em contato e o prazo previsto", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), scheduling_request: request });
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+
+    const block = (await screen.findByRole("heading", { name: "Pedido de agendamento" })).closest("section")!;
+    expect(within(block).getByText("Consulta médica")).toBeInTheDocument();
+    expect(within(block).getByText(
+      "A UBS Batel vai entrar em contato para marcar sua consulta. Prazo previsto: até 05/11."
+    )).toBeInTheDocument();
+  });
+
+  it("sem unidade de referência (fila 'sem unidade'): texto próprio, sem 'null'", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), scheduling_request: { ...request, unit_name: null } });
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+
+    const block = (await screen.findByRole("heading", { name: "Pedido de agendamento" })).closest("section")!;
+    expect(within(block).getByText(
+      "A Secretaria de Saúde vai indicar a unidade, que vai entrar em contato para marcar sua consulta. Prazo previsto: até 05/11."
+    )).toBeInTheDocument();
+    expect(within(block).queryByText(/null|undefined/)).not.toBeInTheDocument();
+  });
+
+  it("prazo no último dia do mês não desloca o dia", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), scheduling_request: { ...request, due_on: "2026-10-31" } });
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    expect(await screen.findByText(/Prazo previsto: até 31\/10\./)).toBeInTheDocument();
+  });
+
+  it.each([
+    [ "só orientação ou resultado urgente", { scheduling_request: null } ],
+    [ "api anterior, sem o campo", {} ]
+  ])("sem pedido (%s): bloco ausente", async (_label, extra) => {
+    const triage = vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), ...extra });
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    await waitFor(() => expect(triage).toHaveBeenCalled());
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByRole("heading", { name: "Pedido de agendamento" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Prazo previsto/)).not.toBeInTheDocument();
+  });
+
+  it("com o relatório pronto, o pedido fica dentro do cartão, uma vez só", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({
+      ...summary("http://curitiba.localhost/wpda/?token=abc"), scheduling_request: request
+    });
+    stubReport();
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+
+    const card = (await screen.findByText("Procure atendimento hoje")).closest("article")!;
+    expect(within(card).getByRole("heading", { name: "Pedido de agendamento" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Pedido de agendamento" })).toHaveLength(1);
+  });
+});

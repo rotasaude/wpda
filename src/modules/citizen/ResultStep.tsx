@@ -2,8 +2,9 @@
 // triagem até o link aparecer (spec §3.1) e então mostra o mesmo relatório do
 // link público /r/:token.
 import { useEffect, useState } from "react";
-import { citizenApi, type ReferenceUnit, type TriageSuggestion } from "../../lib/citizenApi";
+import { citizenApi, type ReferenceUnit, type SchedulingRequest, type TriageSuggestion } from "../../lib/citizenApi";
 import { AlsoRecommended } from "./AlsoRecommended";
+import { SchedulingRequestNotice } from "./SchedulingRequestNotice";
 import { tokenFromUrl } from "../../lib/report";
 import { Report } from "../Report";
 import { ReferenceUnits } from "../ReferenceUnits";
@@ -19,6 +20,7 @@ export function ResultStep({ triageId, onAgain, onHistory, onStartSuggestion }: 
   const [gaveUp, setGaveUp] = useState(false);
   const [units, setUnits] = useState<ReferenceUnit[]>([]);
   const [suggestions, setSuggestions] = useState<TriageSuggestion[]>([]);
+  const [scheduling, setScheduling] = useState<SchedulingRequest | null>(null);
   // "Depois" mora aqui: o bloco muda de lugar quando o relatório fica pronto.
   const [later, setLater] = useState<ReadonlySet<string>>(new Set());
 
@@ -32,6 +34,7 @@ export function ResultStep({ triageId, onAgain, onHistory, onStartSuggestion }: 
         if (alive) {
           setUnits(t.reference_units ?? []);
           setSuggestions(t.suggestions ?? []);
+          setScheduling(t.scheduling_request ?? null);
         }
         const found = t.report_url ? tokenFromUrl(new URL(t.report_url).search) : null;
         if (found) { if (alive) setToken(found); return; }
@@ -55,11 +58,16 @@ export function ResultStep({ triageId, onAgain, onHistory, onStartSuggestion }: 
   // Área logada: a unidade de referência vem sempre de GET /citizen/triages/:id.
   // O Report (link público) não a mostra.
   if (token) {
-    return <Report token={token}><ReferenceUnits units={units} />{recommended}{actions}</Report>;
+    return (
+      <Report token={token}>
+        <SchedulingRequestNotice request={scheduling} /><ReferenceUnits units={units} />{recommended}{actions}
+      </Report>
+    );
   }
   return (
     <Screen title="Triagem concluída" footer={actions}>
       <p>{gaveUp ? "Seu resultado ainda está sendo preparado. Veja em \"Minhas triagens\" daqui a pouco." : "Preparando seu resultado…"}</p>
+      <SchedulingRequestNotice request={scheduling} />
       <ReferenceUnits units={units} />
       {recommended}
     </Screen>
