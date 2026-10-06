@@ -78,6 +78,10 @@ export interface SchedulingRequest {
   unit_name: string | null;
   due_on: string | null; // AAAA-MM-DD, prazo previsto
   appointment_type_name: string | null;
+  // "scheduled" = a unidade já marcou; scheduled_at = horário vivo mais
+  // recente (marcado ou confirmado), ou null. Ausentes numa api anterior.
+  status: "open" | "scheduled";
+  scheduled_at: string | null; // ISO 8601 com fuso
 }
 
 // Caixa de avisos (spec 2026-09-29 §6.2; ADR 0024; módulo 17, contrato §5):
@@ -324,7 +328,10 @@ function normalizeTriage(t: TriageSummary): TriageSummary {
       ? {
           unit_name: t.scheduling_request.unit_name ?? null,
           due_on: t.scheduling_request.due_on ?? null,
-          appointment_type_name: t.scheduling_request.appointment_type_name ?? null
+          appointment_type_name: t.scheduling_request.appointment_type_name ?? null,
+          // Api anterior (sem o campo) ou valor desconhecido = pedido aberto.
+          status: (t.scheduling_request.status as string | undefined) === "scheduled" ? "scheduled" : "open",
+          scheduled_at: t.scheduling_request.scheduled_at ?? null
         }
       : null
   };

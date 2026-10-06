@@ -201,7 +201,17 @@ describe("ResultStep — pedido de agendamento (módulo 17)", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  const request = { unit_name: "UBS Batel", due_on: "2026-11-05", appointment_type_name: "Consulta médica" };
+  // Payload cru pelo fetch: passa pelo normalizeTriage de verdade (api anterior).
+  function mockTriageFetch(scheduling_request: unknown) {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...summary(null), scheduling_request }), {
+      status: 200, headers: { "Content-Type": "application/json" }
+    })));
+  }
+
+  const request = {
+    unit_name: "UBS Batel", due_on: "2026-11-05", appointment_type_name: "Consulta médica",
+    status: "open" as const, scheduled_at: null
+  };
 
   it("com unidade: diz o tipo, quem vai entrar em contato e o prazo previsto", async () => {
     vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), scheduling_request: request });
@@ -223,6 +233,71 @@ describe("ResultStep — pedido de agendamento (módulo 17)", () => {
       "A Secretaria de Saúde vai indicar a unidade, que vai entrar em contato para marcar sua consulta. Prazo previsto: até 05/11."
     )).toBeInTheDocument();
     expect(within(block).queryByText(/null|undefined/)).not.toBeInTheDocument();
+  });
+
+  it("aberto com unidade: mantém o parágrafo de quando a unidade marcar", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), scheduling_request: request });
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+
+    const block = (await screen.findByRole("heading", { name: "Pedido de agendamento" })).closest("section")!;
+    expect(within(block).getByText(
+      'Quando a unidade marcar, o horário aparece em "Seus agendamentos", em Minhas triagens.'
+    )).toBeInTheDocument();
+  });
+
+  it("já marcado: diz dia e hora no fuso da cidade, sem prazo nem 'vai entrar em contato'", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({
+      ...summary(null),
+      scheduling_request: { ...request, due_on: "2026-10-07", status: "scheduled", scheduled_at: "2026-10-08T09:00:00-03:00" }
+    });
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+
+    const block = (await screen.findByRole("heading", { name: "Pedido de agendamento" })).closest("section")!;
+    expect(within(block).getByText("Consulta médica")).toBeInTheDocument();
+    expect(within(block).getByText(
+      'Sua consulta já está marcada: qui., 08/10, 09:00. Veja os detalhes em "Seus agendamentos", em Minhas triagens.'
+    )).toBeInTheDocument();
+    expect(block.textContent).not.toMatch(/Prazo previsto/);
+    expect(block.textContent).not.toMatch(/vai entrar em contato/);
+    expect(block.textContent).not.toMatch(/Quando a unidade marcar/);
+    expect(block.textContent).not.toMatch(/null|undefined/);
+  });
+
+  it("já marcado com instante UTC de outro dia: usa o dia da cidade", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({
+      ...summary(null),
+      scheduling_request: { ...request, status: "scheduled", scheduled_at: "2026-10-09T02:30:00Z" }
+    });
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+
+    expect(await screen.findByText(
+      'Sua consulta já está marcada: qui., 08/10, 23:30. Veja os detalhes em "Seus agendamentos", em Minhas triagens.'
+    )).toBeInTheDocument();
+  });
+
+  it("já marcado sem scheduled_at: texto de reserva, sem prazo nem parágrafo final", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({
+      ...summary(null), scheduling_request: { ...request, status: "scheduled", scheduled_at: null }
+    });
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+
+    const block = (await screen.findByRole("heading", { name: "Pedido de agendamento" })).closest("section")!;
+    expect(within(block).getByText(
+      'Sua consulta já foi marcada. Veja o dia e a hora em "Seus agendamentos", em Minhas triagens.'
+    )).toBeInTheDocument();
+    expect(block.textContent).not.toMatch(/Prazo previsto|vai entrar em contato|Quando a unidade marcar|null|undefined/);
+  });
+
+  it("api anterior sem status/scheduled_at: texto de pedido aberto", async () => {
+    mockTriageFetch({ unit_name: "UBS Batel", due_on: "2026-11-05", appointment_type_name: "Consulta médica" });
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+
+    const block = (await screen.findByRole("heading", { name: "Pedido de agendamento" })).closest("section")!;
+    expect(within(block).getByText(
+      "A UBS Batel vai entrar em contato para marcar sua consulta. Prazo previsto: até 05/11."
+    )).toBeInTheDocument();
+    expect(within(block).getByText(/Quando a unidade marcar/)).toBeInTheDocument();
+    expect(block.textContent).not.toMatch(/null|undefined/);
   });
 
   it("prazo no último dia do mês não desloca o dia", async () => {

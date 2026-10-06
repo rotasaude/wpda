@@ -451,11 +451,36 @@ describe("citizenApi — módulo 17 (agenda)", () => {
   it("triage() com o pedido mantém unidade, prazo e tipo; unidade ausente vira null", async () => {
     const request = { unit_name: "UBS Batel", due_on: "2026-11-05", appointment_type_name: "Consulta médica" };
     mockFetch(200, { ...baseTriage, scheduling_request: request });
-    expect((await citizenApi.triage("t1")).scheduling_request).toEqual(request);
+    expect((await citizenApi.triage("t1")).scheduling_request).toEqual({ ...request, status: "open", scheduled_at: null });
     mockFetch(200, { ...baseTriage, scheduling_request: { due_on: "2026-11-05", appointment_type_name: "Consulta médica" } });
     expect((await citizenApi.triage("t1")).scheduling_request).toEqual({
-      unit_name: null, due_on: "2026-11-05", appointment_type_name: "Consulta médica"
+      unit_name: null, due_on: "2026-11-05", appointment_type_name: "Consulta médica", status: "open", scheduled_at: null
     });
+  });
+
+  it("triage(): api anterior sem status/scheduled_at vira 'open' e null", async () => {
+    mockFetch(200, { ...baseTriage, scheduling_request: {
+      unit_name: "UBS Batel", due_on: "2026-11-05", appointment_type_name: "Consulta médica"
+    } });
+    const r = (await citizenApi.triage("t1")).scheduling_request!;
+    expect(r.status).toBe("open");
+    expect(r.scheduled_at).toBeNull();
+  });
+
+  it("triage(): pedido já marcado mantém status e scheduled_at", async () => {
+    const request = {
+      unit_name: "UBS Batel", due_on: "2026-10-07", appointment_type_name: "Consulta médica",
+      status: "scheduled", scheduled_at: "2026-10-08T09:00:00-03:00"
+    };
+    mockFetch(200, { ...baseTriage, scheduling_request: request });
+    expect((await citizenApi.triage("t1")).scheduling_request).toEqual(request);
+  });
+
+  it("triage(): status desconhecido vira 'open'", async () => {
+    mockFetch(200, { ...baseTriage, scheduling_request: {
+      unit_name: null, due_on: "2026-11-05", appointment_type_name: "Consulta médica", status: "closed", scheduled_at: null
+    } });
+    expect((await citizenApi.triage("t1")).scheduling_request!.status).toBe("open");
   });
 
   it("appointments: sem os campos novos (api anterior), viram null e can_request_reschedule false", async () => {
