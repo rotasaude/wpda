@@ -515,4 +515,20 @@ describe("citizenApi — módulo 17 (agenda)", () => {
     await expect(citizenApi.requestReschedule("a1", { reasonCode: "other", preferredPeriod: "morning", note: "" }))
       .rejects.toEqual(new ApiError(409, "not_reschedulable"));
   });
+
+  it("appointments: pedido da triagem sem unidade; tipo e prazo do pedido ausentes viram null", async () => {
+    mockFetch(200, { appointments: [
+      { request: { id: "r1", kind: "triage", target_unit_name: null, status: "open",
+                   appointment_type_name: "Consulta médica", due_on: "2026-11-05" }, appointment: null },
+      { request: { id: "r2", kind: "triage", status: "open" }, appointment: null },
+      { request: { id: "r3", kind: "return", target_unit_name: "UBS Centro", status: "open" }, appointment: null }
+    ] });
+    const [withType, bare, ret] = (await citizenApi.appointments("p1")).appointments.map(i => i.request);
+    expect(withType.target_unit_name).toBeNull();
+    expect(withType.appointment_type_name).toBe("Consulta médica");
+    expect(withType.due_on).toBe("2026-11-05");
+    expect(bare.target_unit_name).toBeNull();
+    expect(ret.appointment_type_name).toBeNull();
+    expect(ret.due_on).toBeNull();
+  });
 });

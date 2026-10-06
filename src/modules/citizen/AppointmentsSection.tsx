@@ -1,9 +1,12 @@
-// "Seus agendamentos" (spec 2026-09-25-citizen-appointments §6): pedidos de
-// retorno/encaminhamento e os horários marcados pela unidade, acima de
-// "Minhas triagens" em HistoryStep. Só aparece quando há algo a mostrar.
+// "Seus agendamentos" (spec 2026-09-25-citizen-appointments §6; módulo 17 §6):
+// pedidos de retorno, encaminhamento e triagem, e os horários marcados pela
+// unidade, acima de "Minhas triagens" em HistoryStep. Só aparece quando há
+// algo a mostrar. Os campos do módulo 17 podem faltar (api anterior): a tela
+// lê com ?? e nunca escreve null.
 import { useEffect, useState } from "react";
 import { citizenApi, type Appointment, type AppointmentItem, type AppointmentRequest } from "../../lib/citizenApi";
-import { cityDateFormat } from "../../lib/format";
+import { cityDateFormat, fmtDayMonth, fmtHourMinute } from "../../lib/format";
+import { formatAddress } from "../../lib/territory";
 import { BigButton, ErrorText, FROZEN_TEXT_NOTICE, Field, messageFor } from "./ui";
 
 function fmt(iso: string): string {
@@ -11,9 +14,27 @@ function fmt(iso: string): string {
     .format(new Date(iso));
 }
 
+// Início e, quando o api manda (módulo 17), o fim: "qui., 08/10, 09:00 às 09:20".
+function when(appointment: Appointment): string {
+  return appointment.ends_at
+    ? `${fmt(appointment.scheduled_at)} às ${fmtHourMinute(appointment.ends_at)}`
+    : fmt(appointment.scheduled_at);
+}
+
+// O horário diz a própria unidade (módulo 17); numa api anterior, vale a do pedido.
+function unitName(appointment: Appointment, request: AppointmentRequest): string {
+  return appointment.unit?.name ?? request.target_unit_name ?? "unidade de saúde";
+}
+
 // Só pedido sem horário nenhum chega aqui: um pedido reaberto sempre traz o
 // último horário (expired/no_show), que já diz "pode marcar outro horário".
 function openRequestText(request: AppointmentRequest): string {
+  if (request.kind === "triage") {
+    const what = request.appointment_type_name ?? "Consulta";
+    return request.target_unit_name
+      ? `Pedido da triagem: ${what} — a ${request.target_unit_name} vai entrar em contato para marcar o horário`
+      : `Pedido da triagem: ${what} — a Secretaria de Saúde vai indicar a unidade e marcar o horário`;
+  }
   return request.kind === "return"
     ? `Retorno pedido na ${request.target_unit_name} — a unidade vai marcar o horário`
     : `Encaminhamento para ${request.target_unit_name} — a unidade vai marcar o horário`;
@@ -25,14 +46,31 @@ function confirmationClosed(appointment: Appointment): boolean {
   return !!appointment.confirmation_deadline_at && Date.now() >= new Date(appointment.confirmation_deadline_at).getTime();
 }
 
-function finalStatusText(appointment: Appointment, unitName: string): string | null {
+function finalStatusText(appointment: Appointment, unit: string): string | null {
   switch (appointment.status) {
     case "cancelled_by_citizen": return "Cancelado por você";
     case "expired": return "Cancelado: sem confirmação no prazo — a unidade pode marcar outro horário";
     case "no_show": return "Você não compareceu — a unidade pode marcar outro horário";
-    case "checked_in": return `Atendido na ${unitName}`;
+    case "checked_in": return `Atendido na ${unit}`;
     default: return null;
   }
+}
+
+// Tipo, profissional e endereço (módulo 17): uma linha por dado presente.
+function AppointmentDetails({ appointment }: { appointment: Appointment }) {
+  const lines = [
+    appointment.appointment_type_name ?? null,
+    appointment.professional_name ? `Com ${appointment.professional_name}` : null,
+    formatAddress(appointment.unit?.address)
+  ].filter((line): line is string => !!line);
+  if (lines.length === 0) return null;
+  return (
+    <>
+      {lines.map(line => (
+        <p key={line} style={{ fontSize: 18, margin: "0 0 4px", color: "var(--ink2, #555)" }}>{line}</p>
+      ))}
+    </>
+  );
 }
 
 function AppointmentRow({ item, onReload, onCheckIn }:
@@ -73,7 +111,7 @@ function AppointmentRow({ item, onReload, onCheckIn }:
     }
   }
 
-  const final = appointment ? finalStatusText(appointment, request.target_unit_name) : null;
+  const final = appointment ? finalStatusText(appointment, unitName(appointment, request)) : null;
 
   // A unidade só dispensa pedido aberto — e um pedido reaberto sempre traz o
   // último horário (expired/no_show). Dispensado vale mais que esse horário:
@@ -103,9 +141,10 @@ function AppointmentRow({ item, onReload, onCheckIn }:
       {appointment && appointment.status === "scheduled" && (
         <>
           <p style={{ fontSize: 18 }}>
-            Agendado: {fmt(appointment.scheduled_at)} — {request.target_unit_name}.
+            Agendado: {when(appointment)} — {unitName(appointment, request)}.
             {appointment.confirmation_deadline_at && ` Confirme até ${fmt(appointment.confirmation_deadline_at)}`}
           </p>
+          <AppointmentDetails appointment={appointment} />
           {confirmationClosed(appointment) && (
             <p style={{ fontSize: 18 }}>O prazo para confirmar terminou. A unidade pode marcar outro horário.</p>
           )}
@@ -121,8 +160,9 @@ function AppointmentRow({ item, onReload, onCheckIn }:
       {appointment && appointment.status === "confirmed" && (
         <>
           <p style={{ fontSize: 18 }}>
-            Confirmado: {fmt(appointment.scheduled_at)} — {request.target_unit_name}
+            Confirmado: {when(appointment)} — {unitName(appointment, request)}
           </p>
+          <AppointmentDetails appointment={appointment} />
           {!cancelling && (
             <div style={{ display: "grid", gap: 8 }}>
               {appointment.check_in_available && (
@@ -145,6 +185,10 @@ function AppointmentRow({ item, onReload, onCheckIn }:
       )}
 
       {final && <p style={{ fontSize: 18 }}>{final}</p>}
+
+      {request.status === "open" && request.due_on && (
+        <p style={{ fontSize: 18 }}>{`Prazo previsto: até ${fmtDayMonth(request.due_on)}`}</p>
+      )}
     </li>
   );
 }

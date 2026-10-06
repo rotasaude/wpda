@@ -185,8 +185,10 @@ export interface StartResult { conversation_id: string; citizen_id: string; resu
 
 export interface AppointmentRequest {
   id: string;
-  kind: "return" | "referral";
-  target_unit_name: string;
+  // "triage" = pedido aberto pela triagem (módulo 17, ADR 0029).
+  kind: "return" | "referral" | "triage";
+  // null só no pedido da triagem que está na fila "sem unidade" da cidade.
+  target_unit_name: string | null;
   status: "open" | "scheduled" | "closed";
   // Ausentes numa api anterior a este deploy: normalizados na borda (ver
   // normalizeAppointment).
@@ -194,6 +196,10 @@ export interface AppointmentRequest {
   reopened_reason?: "expired" | "no_show" | null;
   // Unidade de onde o pedido foi movido (api#29); ausente se nunca mudou.
   moved_from_unit_name?: string | null;
+  // Módulo 17 (contrato §8): tipo e prazo previsto (AAAA-MM-DD).
+  // Ausentes numa api anterior: normalizados para null.
+  appointment_type_name?: string | null;
+  due_on?: string | null;
 }
 
 // Unidade do horário (módulo 17): o endereço tem o formato de reference_units.
@@ -283,8 +289,11 @@ function normalizeAppointment(item: AppointmentItem): AppointmentItem {
   return {
     request: {
       ...item.request,
+      target_unit_name: item.request.target_unit_name ?? null,
       closed_reason: item.request.closed_reason ?? null,
-      reopened_reason: item.request.reopened_reason ?? null
+      reopened_reason: item.request.reopened_reason ?? null,
+      appointment_type_name: item.request.appointment_type_name ?? null,
+      due_on: item.request.due_on ?? null
     },
     appointment: item.appointment
       ? {

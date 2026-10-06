@@ -288,3 +288,84 @@ describe("AppointmentsSection", () => {
     expect(await screen.findByText("Local alterado: este atendimento passou da UBS Fechando para a UBS Destino.")).toBeInTheDocument();
   });
 });
+
+// Módulo 17 (contrato §5): o horário diz tipo, profissional, unidade com
+// endereço e fim; o pedido aberto pela triagem diz quem marca e o prazo.
+describe("AppointmentsSection — módulo 17", () => {
+  beforeEach(() => vi.setSystemTime(new Date("2026-10-06T10:00:00-03:00")));
+
+  const START = "2026-10-08T09:00:00-03:00";
+  const DEADLINE = "2026-10-07T09:00:00-03:00";
+
+  it("horário com tipo, profissional, unidade com endereço e fim", async () => {
+    mockAppointments([{
+      request: { id: "r1", kind: "triage", target_unit_name: "UBS Batel", status: "scheduled", closed_reason: null,
+                 reopened_reason: null, appointment_type_name: "Consulta médica", due_on: "2026-11-05" },
+      appointment: {
+        id: "a1", scheduled_at: START, ends_at: "2026-10-08T09:20:00-03:00", status: "scheduled",
+        confirmation_deadline_at: DEADLINE, check_in_available: false,
+        appointment_type_name: "Consulta médica", professional_name: "Ana Souza",
+        unit: { name: "UBS Batel", address: { street: "Rua Padre Anchieta", number: "1500", complement: null, zip: "80730000" } },
+        can_request_reschedule: false
+      }
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText(`Agendado: ${fmt(START)} às 09:20 — UBS Batel. Confirme até ${fmt(DEADLINE)}`))
+      .toBeInTheDocument();
+    expect(screen.getByText("Consulta médica")).toBeInTheDocument();
+    expect(screen.getByText("Com Ana Souza")).toBeInTheDocument();
+    expect(screen.getByText("Rua Padre Anchieta, 1500 · CEP 80730-000")).toBeInTheDocument();
+    // Pedido já com horário: o prazo previsto não aparece mais.
+    expect(screen.queryByText(/Prazo previsto/)).not.toBeInTheDocument();
+  });
+
+  it("confirmado sem profissional nem endereço: só o que veio, sem 'null'", async () => {
+    mockAppointments([{
+      request: { id: "r2", kind: "return", target_unit_name: "UBS Centro", status: "scheduled", closed_reason: null, reopened_reason: null },
+      appointment: {
+        id: "a2", scheduled_at: START, ends_at: "2026-10-08T09:15:00-03:00", status: "confirmed",
+        confirmation_deadline_at: null, check_in_available: false, appointment_type_name: "Retorno",
+        professional_name: null, unit: { name: "UBS Centro", address: null }, can_request_reschedule: false
+      }
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText(`Confirmado: ${fmt(START)} às 09:15 — UBS Centro`)).toBeInTheDocument();
+    expect(screen.getByText("Retorno")).toBeInTheDocument();
+    expect(screen.queryByText(/^Com /)).not.toBeInTheDocument();
+    expect(screen.queryByText(/null|undefined/)).not.toBeInTheDocument();
+  });
+
+  it("pedido da triagem com unidade: tipo, quem marca e prazo previsto", async () => {
+    mockAppointments([{
+      request: { id: "r3", kind: "triage", target_unit_name: "UBS Batel", status: "open", closed_reason: null,
+                 reopened_reason: null, appointment_type_name: "Consulta médica", due_on: "2026-11-05" },
+      appointment: null
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText(
+      "Pedido da triagem: Consulta médica — a UBS Batel vai entrar em contato para marcar o horário"
+    )).toBeInTheDocument();
+    expect(screen.getByText("Prazo previsto: até 05/11")).toBeInTheDocument();
+  });
+
+  it("pedido da triagem sem unidade (fila 'sem unidade'): a Secretaria indica, sem 'null'", async () => {
+    mockAppointments([{
+      request: { id: "r4", kind: "triage", target_unit_name: null, status: "open", closed_reason: null,
+                 reopened_reason: null, appointment_type_name: "Consulta médica", due_on: "2026-10-31" },
+      appointment: null
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText(
+      "Pedido da triagem: Consulta médica — a Secretaria de Saúde vai indicar a unidade e marcar o horário"
+    )).toBeInTheDocument();
+    expect(screen.getByText("Prazo previsto: até 31/10")).toBeInTheDocument();
+    expect(screen.queryByText(/null|undefined/)).not.toBeInTheDocument();
+  });
+
+  it("api anterior: pedido de retorno aberto sem prazo não mostra 'Prazo previsto'", async () => {
+    mockAppointments([openReturn]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText("Retorno pedido na UBS Centro — a unidade vai marcar o horário")).toBeInTheDocument();
+    expect(screen.queryByText(/Prazo previsto/)).not.toBeInTheDocument();
+  });
+});
