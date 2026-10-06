@@ -71,6 +71,15 @@ export interface Catalog {
 // "Recomendamos também" (contrato §3.6): [] em resultado urgente.
 export interface TriageSuggestion { suggestion_id: string; protocol_name: string; title: string; summary: string | null }
 
+// Pedido de agendamento gerado pela triagem (módulo 17; contrato §5). null =
+// só orientação, resultado urgente ou api anterior. unit_name null = fila
+// "sem unidade" da cidade (o bairro não tem unidade de referência).
+export interface SchedulingRequest {
+  unit_name: string | null;
+  due_on: string | null; // AAAA-MM-DD, prazo previsto
+  appointment_type_name: string | null;
+}
+
 // Campanhas (spec 2026-09-29 §6.2; ADR 0024). Cidadão não tem nome: com mais de
 // uma pessoa no telefone, o aviso diz de quem é pelo CPF mascarado.
 export interface Notice {
@@ -167,6 +176,9 @@ export interface TriageSummary {
   // Sugestões nascidas desta triagem (módulo 15). Ausente numa api anterior:
   // normalizado para [] (ver normalizeTriage).
   suggestions?: TriageSuggestion[];
+  // Pedido gerado por esta triagem (módulo 17). Ausente numa api anterior:
+  // normalizado para null (ver normalizeTriage).
+  scheduling_request?: SchedulingRequest | null;
 }
 
 export interface StartResult { conversation_id: string; citizen_id: string; resumed: boolean; step: Step }
@@ -184,13 +196,28 @@ export interface AppointmentRequest {
   moved_from_unit_name?: string | null;
 }
 
+// Unidade do horário (módulo 17): o endereço tem o formato de reference_units.
+export interface AppointmentUnit { name: string; address: UnitAddress | null }
+
 export interface Appointment {
   id: string;
   scheduled_at: string;
   status: "scheduled" | "confirmed" | "checked_in" | "cancelled_by_citizen" | "expired" | "no_show" | "moved";
   confirmation_deadline_at?: string | null;
   check_in_available?: boolean;
+  // Módulo 17 (contrato §5). Ausentes numa api anterior: normalizados em
+  // normalizeAppointment (null / false).
+  ends_at?: string | null;
+  appointment_type_name?: string | null;
+  professional_name?: string | null;
+  unit?: AppointmentUnit | null;
+  can_request_reschedule?: boolean;
 }
+
+// "Não posso nesse horário" (módulo 17; contrato §2).
+export type RescheduleReasonCode = "work" | "health" | "transport" | "other";
+export type PreferredPeriod = "morning" | "afternoon" | "any";
+export const RESCHEDULE_NOTE_MAX = 200;
 
 export interface AppointmentItem {
   request: AppointmentRequest;
@@ -229,7 +256,14 @@ function normalizeTriage(t: TriageSummary): TriageSummary {
       : (a ?? null),
     check_in_available: t.check_in_available ?? false,
     reference_units: t.reference_units ?? [],
-    suggestions: (t.suggestions ?? []).map(s => ({ ...s, summary: s.summary ?? null }))
+    suggestions: (t.suggestions ?? []).map(s => ({ ...s, summary: s.summary ?? null })),
+    scheduling_request: t.scheduling_request
+      ? {
+          unit_name: t.scheduling_request.unit_name ?? null,
+          due_on: t.scheduling_request.due_on ?? null,
+          appointment_type_name: t.scheduling_request.appointment_type_name ?? null
+        }
+      : null
   };
 }
 
@@ -256,7 +290,14 @@ function normalizeAppointment(item: AppointmentItem): AppointmentItem {
       ? {
           ...item.appointment,
           confirmation_deadline_at: item.appointment.confirmation_deadline_at ?? null,
-          check_in_available: item.appointment.check_in_available ?? false
+          check_in_available: item.appointment.check_in_available ?? false,
+          ends_at: item.appointment.ends_at ?? null,
+          appointment_type_name: item.appointment.appointment_type_name ?? null,
+          professional_name: item.appointment.professional_name ?? null,
+          unit: item.appointment.unit
+            ? { name: item.appointment.unit.name, address: item.appointment.unit.address ?? null }
+            : null,
+          can_request_reschedule: item.appointment.can_request_reschedule === true
         }
       : null
   };
@@ -345,6 +386,18 @@ export const citizenApi = {
     call<{ appointment: Appointment }>("POST", `/appointments/${id}/cancel`, { reason }),
   issueAppointmentCheckInCode: (id: string) =>
     call<{ code: string; expires_at: string }>("POST", `/appointments/${id}/check_in_code`),
+  // "Não posso nesse horário" (contrato §5): cancela o horário e devolve o
+  // pedido à fila. Motivo, período e nota só no corpo (nunca em URL ou
+  // console); nota em branco não vai. Responde { appointment } (contrato §8),
+  // como confirm/cancel; a tela não usa o corpo: relê a lista.
+  requestReschedule: (id: string, r: { reasonCode: RescheduleReasonCode; preferredPeriod: PreferredPeriod; note: string }) => {
+    const note = r.note.trim();
+    return call<{ appointment: Appointment }>("POST", `/appointments/${encodeURIComponent(id)}/reschedule_request`, {
+      reason_code: r.reasonCode,
+      preferred_period: r.preferredPeriod,
+      ...(note ? { note } : {})
+    });
+  },
   // Caixa de avisos (spec §6.2): avisos de todas as pessoas do telefone da
   // sessão, mais novo primeiro. Campos ausentes são normalizados aqui.
   notices: async (): Promise<NoticesResult> => {

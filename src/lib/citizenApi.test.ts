@@ -434,3 +434,85 @@ describe("citizenApi — módulo 15 (perfil, catálogo, sugestões)", () => {
     expect((await citizenApi.triage("t1")).suggestions).toEqual([ { suggestion_id: "s1", protocol_name: "b", title: "B", summary: null } ]);
   });
 });
+
+// Módulo 17 (contrato §5): pedido gerado pela triagem, horário com tipo,
+// profissional, unidade e fim, e "Não posso nesse horário".
+describe("citizenApi — módulo 17 (agenda)", () => {
+  const baseTriage = {
+    id: "t1", status: "completed", tier: "baixa", priority: 9, created_at: "2026-10-06T12:00:00Z",
+    completed_at: "2026-10-06T12:05:00Z", report_url: null, consent_active: true, origin_phone_masked: null
+  };
+
+  it("triage() sem scheduling_request (api anterior) normaliza para null", async () => {
+    mockFetch(200, baseTriage);
+    expect((await citizenApi.triage("t1")).scheduling_request).toBeNull();
+  });
+
+  it("triage() com o pedido mantém unidade, prazo e tipo; unidade ausente vira null", async () => {
+    const request = { unit_name: "UBS Batel", due_on: "2026-11-05", appointment_type_name: "Consulta médica" };
+    mockFetch(200, { ...baseTriage, scheduling_request: request });
+    expect((await citizenApi.triage("t1")).scheduling_request).toEqual(request);
+    mockFetch(200, { ...baseTriage, scheduling_request: { due_on: "2026-11-05", appointment_type_name: "Consulta médica" } });
+    expect((await citizenApi.triage("t1")).scheduling_request).toEqual({
+      unit_name: null, due_on: "2026-11-05", appointment_type_name: "Consulta médica"
+    });
+  });
+
+  it("appointments: sem os campos novos (api anterior), viram null e can_request_reschedule false", async () => {
+    mockFetch(200, { appointments: [{
+      request: { id: "r1", kind: "return", target_unit_name: "UBS Centro", status: "scheduled" },
+      appointment: { id: "a1", scheduled_at: "2026-10-08T12:00:00Z", status: "scheduled" }
+    }] });
+    const a = (await citizenApi.appointments("p1")).appointments[0].appointment!;
+    expect(a.ends_at).toBeNull();
+    expect(a.appointment_type_name).toBeNull();
+    expect(a.professional_name).toBeNull();
+    expect(a.unit).toBeNull();
+    expect(a.can_request_reschedule).toBe(false);
+  });
+
+  it("appointments: com os campos novos, passam; unidade sem endereço fica com address null", async () => {
+    mockFetch(200, { appointments: [{
+      request: { id: "r1", kind: "return", target_unit_name: "UBS Batel", status: "scheduled" },
+      appointment: {
+        id: "a1", scheduled_at: "2026-10-08T12:00:00Z", ends_at: "2026-10-08T12:20:00Z", status: "confirmed",
+        appointment_type_name: "Consulta médica", professional_name: "Ana Souza", unit: { name: "UBS Batel" },
+        can_request_reschedule: true
+      }
+    }] });
+    const a = (await citizenApi.appointments("p1")).appointments[0].appointment!;
+    expect(a.ends_at).toBe("2026-10-08T12:20:00Z");
+    expect(a.appointment_type_name).toBe("Consulta médica");
+    expect(a.professional_name).toBe("Ana Souza");
+    expect(a.unit).toEqual({ name: "UBS Batel", address: null });
+    expect(a.can_request_reschedule).toBe(true);
+  });
+
+  it("requestReschedule manda motivo, período e a nota sem espaços nas pontas, só no corpo", async () => {
+    const fn = mockFetch(200, { appointment: { id: "a1", scheduled_at: "2026-10-08T12:00:00Z", status: "cancelled_by_citizen" } });
+    const consoleSpies = [ "log", "info", "warn", "error", "debug" ].map(m => vi.spyOn(console, m as "log"));
+    await citizenApi.requestReschedule("a1", { reasonCode: "work", preferredPeriod: "afternoon", note: "  Plantão no trabalho  " });
+    const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/citizen/appointments/a1/reschedule_request");
+    expect(url).not.toMatch(/Plant|work|afternoon/);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      reason_code: "work", preferred_period: "afternoon", note: "Plantão no trabalho"
+    });
+    for (const spy of consoleSpies) expect(spy).not.toHaveBeenCalled();
+    consoleSpies.forEach(s => s.mockRestore());
+  });
+
+  it("requestReschedule com nota em branco não manda a chave note", async () => {
+    const fn = mockFetch(200, { appointment: { id: "a1", scheduled_at: "2026-10-08T12:00:00Z", status: "cancelled_by_citizen" } });
+    await citizenApi.requestReschedule("a1", { reasonCode: "health", preferredPeriod: "any", note: "   " });
+    const [, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ reason_code: "health", preferred_period: "any" });
+  });
+
+  it("requestReschedule recusado vira ApiError com o código", async () => {
+    mockFetch(409, { error: "not_reschedulable" });
+    await expect(citizenApi.requestReschedule("a1", { reasonCode: "other", preferredPeriod: "morning", note: "" }))
+      .rejects.toEqual(new ApiError(409, "not_reschedulable"));
+  });
+});

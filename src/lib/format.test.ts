@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cityTimeZone, fmtCalendarDate, fmtDate, fmtDateTime, setCityTimeZone } from "./format";
+import {
+  cityTimeZone, fmtCalendarDate, fmtDate, fmtDateTime, fmtDayMonth, fmtHourMinute, fmtWeekdayDateTime, setCityTimeZone
+} from "./format";
 
 describe("fmtDateTime", () => {
   it("formata ISO em pt-BR (data)", () => {
@@ -59,5 +61,36 @@ describe("fmtCalendarDate", () => {
   });
   it.each([ null, undefined, "", "2026-10-02T00:00:00Z", "02/10/2026", "2026-1-2" ])("%s vira —", (v) => {
     expect(fmtCalendarDate(v)).toBe("—");
+  });
+});
+
+// Módulo 17: prazo previsto do pedido (data de calendário) e horário marcado
+// com início e fim no fuso da cidade.
+describe("datas do módulo 17", () => {
+  afterEach(() => setCityTimeZone(null));
+
+  it("fmtDayMonth: AAAA-MM-DD vira DD/MM, sem deslocar o dia pelo fuso", () => {
+    expect(fmtDayMonth("2026-10-31")).toBe("31/10");
+    expect(fmtDayMonth("2027-01-01")).toBe("01/01");
+  });
+  it("fmtDayMonth não depende do fuso da cidade", () => {
+    setCityTimeZone("America/Manaus");
+    expect(fmtDayMonth("2026-10-31")).toBe("31/10");
+  });
+  it.each([ null, undefined, "", "2026-10-31T00:00:00Z", "31/10/2026" ])("fmtDayMonth(%s) vira —", (v) => {
+    expect(fmtDayMonth(v)).toBe("—");
+  });
+
+  it("fmtWeekdayDateTime: dia da semana, data e hora no fuso da cidade", () => {
+    expect(fmtWeekdayDateTime("2026-10-08T09:00:00-03:00")).toBe("qui., 08/10, 09:00");
+  });
+  it("fmtHourMinute: só a hora, no fuso da cidade", () => {
+    expect(fmtHourMinute("2026-10-08T12:20:00Z")).toBe("09:20");
+    setCityTimeZone("America/Manaus");
+    expect(fmtHourMinute("2026-10-08T12:20:00Z")).toBe("08:20");
+  });
+  it.each([ null, undefined, "xxx" ])("%s vira — em fmtHourMinute e fmtWeekdayDateTime", (v) => {
+    expect(fmtHourMinute(v)).toBe("—");
+    expect(fmtWeekdayDateTime(v)).toBe("—");
   });
 });

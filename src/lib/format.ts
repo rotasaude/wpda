@@ -49,3 +49,20 @@ export function fmtCalendarDate(iso: string | null | undefined): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
   return m ? `${m[3]}/${m[2]}/${m[1]}` : "—";
 }
+
+// Dia e mês ("31/10") de uma data de calendário AAAA-MM-DD (prazo previsto do
+// pedido de agendamento, módulo 17): por texto, nunca por new Date.
+export function fmtDayMonth(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  return m ? `${m[3]}/${m[2]}` : "—";
+}
+
+// Horário marcado ("qui., 08/10, 09:00"), no fuso da cidade.
+export function fmtWeekdayDateTime(iso: string | null | undefined): string {
+  return format(iso, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+// Só a hora ("09:20"), no fuso da cidade: o fim do horário marcado.
+export function fmtHourMinute(iso: string | null | undefined): string {
+  return format(iso, { hour: "2-digit", minute: "2-digit" });
+}

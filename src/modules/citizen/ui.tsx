@@ -145,7 +145,12 @@ const MESSAGES: Record<string, string> = {
   profile_required: "Antes, informe a data de nascimento e o sexo desta pessoa.",
   not_offered: "Esta triagem não está mais disponível para esta pessoa.",
   triage_in_progress: "Já existe uma triagem em andamento para esta pessoa. Continue a que está aberta.",
-  protocol_name_required: "Escolha uma triagem para começar."
+  protocol_name_required: "Escolha uma triagem para começar.",
+  // Módulo 17 (contrato §5).
+  not_reschedulable: "Este horário não pode mais ser trocado por aqui. Fale com a unidade.",
+  invalid_reason_code: "Escolha o motivo.",
+  invalid_period: "Escolha o melhor período.",
+  note_too_long: "Escreva no máximo 200 caracteres."
 };
 
 export function messageFor(error: unknown): string {
