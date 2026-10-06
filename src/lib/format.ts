@@ -57,6 +57,15 @@ export function fmtDayMonth(iso: string | null | undefined): string {
   return m ? `${m[3]}/${m[2]}` : "—";
 }
 
+// Hoje no fuso da cidade, como data de calendário "AAAA-MM-DD": compara por
+// texto com due_on (ordem lexicográfica = ordem de data). As partes são
+// montadas uma a uma, sem depender da ordem que o locale usa.
+export function cityToday(): string {
+  const parts = cityDateFormat({ year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
 // Horário marcado ("qui., 08/10, 09:00"), no fuso da cidade.
 export function fmtWeekdayDateTime(iso: string | null | undefined): string {
   return format(iso, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });

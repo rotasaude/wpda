@@ -368,6 +368,41 @@ describe("AppointmentsSection — módulo 17", () => {
     expect(await screen.findByText("Retorno pedido na UBS Centro — a unidade vai marcar o horário")).toBeInTheDocument();
     expect(screen.queryByText(/Prazo previsto/)).not.toBeInTheDocument();
   });
+
+  // O api preenche due_on = created_at + 30 nos pedidos antigos (migração de
+  // cidade): um prazo já vencido, sem ano, seria lido como "perdi a vez".
+  // Relógio do bloco: 2026-10-06 em São Paulo.
+  it("pedido aberto com prazo já vencido não mostra 'Prazo previsto'", async () => {
+    mockAppointments([{
+      request: { id: "r5", kind: "return", target_unit_name: "UBS Centro", status: "open", closed_reason: null,
+                 reopened_reason: null, appointment_type_name: "Retorno", due_on: "2026-10-05" },
+      appointment: null
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText("Retorno pedido na UBS Centro — a unidade vai marcar o horário")).toBeInTheDocument();
+    expect(screen.queryByText(/Prazo previsto/)).not.toBeInTheDocument();
+  });
+
+  it("prazo igual a hoje ainda aparece", async () => {
+    mockAppointments([{
+      request: { id: "r6", kind: "return", target_unit_name: "UBS Centro", status: "open", closed_reason: null,
+                 reopened_reason: null, appointment_type_name: "Retorno", due_on: "2026-10-06" },
+      appointment: null
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText("Prazo previsto: até 06/10")).toBeInTheDocument();
+  });
+
+  it("pedido reaberto (horário expirado) com prazo futuro mostra 'Prazo previsto'", async () => {
+    mockAppointments([{
+      request: { id: "r7", kind: "return", target_unit_name: "UBS Centro", status: "open", closed_reason: null,
+                 reopened_reason: "expired", appointment_type_name: "Retorno", due_on: "2026-10-20" },
+      appointment: { id: "a7", scheduled_at: "2026-10-02T14:30:00-03:00", status: "expired",
+                     confirmation_deadline_at: null, check_in_available: false }
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText("Prazo previsto: até 20/10")).toBeInTheDocument();
+  });
 });
 
 // Módulo 17 (spec §6; ADR 0029): "Não posso nesse horário" devolve o pedido à

@@ -5,7 +5,7 @@
 // lê com ?? e nunca escreve null.
 import { useEffect, useState } from "react";
 import { citizenApi, type Appointment, type AppointmentItem, type AppointmentRequest } from "../../lib/citizenApi";
-import { cityDateFormat, fmtDayMonth, fmtHourMinute } from "../../lib/format";
+import { cityToday, fmtDayMonth, fmtHourMinute, fmtWeekdayDateTime } from "../../lib/format";
 import { formatAddress } from "../../lib/territory";
 import { RescheduleForm } from "./RescheduleForm";
 import { BigButton, ErrorText, FROZEN_TEXT_NOTICE, Field, messageFor } from "./ui";
@@ -14,16 +14,11 @@ import { BigButton, ErrorText, FROZEN_TEXT_NOTICE, Field, messageFor } from "./u
 // pedido volta a "open" (o "Cancelar" o fecha como citizen_cancelled).
 export const RESCHEDULE_REQUESTED = "Você pediu outro horário. A unidade vai marcar um novo.";
 
-function fmt(iso: string): string {
-  return cityDateFormat({ weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
-    .format(new Date(iso));
-}
-
 // Início e, quando o api manda (módulo 17), o fim: "qui., 08/10, 09:00 às 09:20".
 function when(appointment: Appointment): string {
   return appointment.ends_at
-    ? `${fmt(appointment.scheduled_at)} às ${fmtHourMinute(appointment.ends_at)}`
-    : fmt(appointment.scheduled_at);
+    ? `${fmtWeekdayDateTime(appointment.scheduled_at)} às ${fmtHourMinute(appointment.ends_at)}`
+    : fmtWeekdayDateTime(appointment.scheduled_at);
 }
 
 // O horário diz a própria unidade (módulo 17); numa api anterior, vale a do pedido.
@@ -157,7 +152,7 @@ function AppointmentRow({ item, onReload, onCheckIn }:
         <>
           <p style={{ fontSize: 18 }}>
             Agendado: {when(appointment)} — {unitName(appointment, request)}.
-            {appointment.confirmation_deadline_at && ` Confirme até ${fmt(appointment.confirmation_deadline_at)}`}
+            {appointment.confirmation_deadline_at && ` Confirme até ${fmtWeekdayDateTime(appointment.confirmation_deadline_at)}`}
           </p>
           <AppointmentDetails appointment={appointment} />
           {confirmationClosed(appointment) && (
@@ -208,7 +203,10 @@ function AppointmentRow({ item, onReload, onCheckIn }:
 
       {final && <p style={{ fontSize: 18 }}>{final}</p>}
 
-      {request.status === "open" && request.due_on && (
+      {/* Prazo já vencido some: o api preenche due_on = criação + 30 nos pedidos
+          antigos, e um "até" passado (sem ano) seria lido como "perdi a vez".
+          Comparação por texto AAAA-MM-DD, nunca por new Date. */}
+      {request.status === "open" && request.due_on && request.due_on >= cityToday() && (
         <p style={{ fontSize: 18 }}>{`Prazo previsto: até ${fmtDayMonth(request.due_on)}`}</p>
       )}
     </li>

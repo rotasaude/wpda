@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-  cityTimeZone, fmtCalendarDate, fmtDate, fmtDateTime, fmtDayMonth, fmtHourMinute, fmtWeekdayDateTime, setCityTimeZone
+  cityTimeZone, cityToday, fmtCalendarDate, fmtDate, fmtDateTime, fmtDayMonth, fmtHourMinute, fmtWeekdayDateTime, setCityTimeZone
 } from "./format";
 
 describe("fmtDateTime", () => {
@@ -92,5 +92,27 @@ describe("datas do módulo 17", () => {
   it.each([ null, undefined, "xxx" ])("%s vira — em fmtHourMinute e fmtWeekdayDateTime", (v) => {
     expect(fmtHourMinute(v)).toBe("—");
     expect(fmtWeekdayDateTime(v)).toBe("—");
+  });
+});
+
+// Hoje da cidade "AAAA-MM-DD" (esconde prazo previsto vencido, módulo 17).
+describe("cityToday", () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: [ "Date" ] }));
+  afterEach(() => { vi.useRealTimers(); setCityTimeZone(null); });
+
+  it("o dia de hoje no fuso da cidade", () => {
+    vi.setSystemTime(new Date("2026-10-06T10:00:00-03:00"));
+    expect(cityToday()).toBe("2026-10-06");
+  });
+  it("perto da meia-noite usa o dia de São Paulo, não o de UTC", () => {
+    vi.setSystemTime(new Date("2026-10-31T02:30:00Z"));
+    expect(cityToday()).toBe("2026-10-30");
+  });
+  it("segue o fuso da cidade (Manaus)", () => {
+    // 03h30 UTC: 00h30 de 3/10 em São Paulo, 23h30 de 2/10 em Manaus.
+    vi.setSystemTime(new Date("2026-10-03T03:30:00Z"));
+    expect(cityToday()).toBe("2026-10-03");
+    setCityTimeZone("America/Manaus");
+    expect(cityToday()).toBe("2026-10-02");
   });
 });
