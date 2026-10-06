@@ -7,7 +7,12 @@ import { useEffect, useState } from "react";
 import { citizenApi, type Appointment, type AppointmentItem, type AppointmentRequest } from "../../lib/citizenApi";
 import { cityDateFormat, fmtDayMonth, fmtHourMinute } from "../../lib/format";
 import { formatAddress } from "../../lib/territory";
+import { RescheduleForm } from "./RescheduleForm";
 import { BigButton, ErrorText, FROZEN_TEXT_NOTICE, Field, messageFor } from "./ui";
+
+// "Não posso nesse horário" enviado: o horário vira cancelled_by_citizen e o
+// pedido volta a "open" (o "Cancelar" o fecha como citizen_cancelled).
+export const RESCHEDULE_REQUESTED = "Você pediu outro horário. A unidade vai marcar um novo.";
 
 function fmt(iso: string): string {
   return cityDateFormat({ weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
@@ -46,9 +51,15 @@ function confirmationClosed(appointment: Appointment): boolean {
   return !!appointment.confirmation_deadline_at && Date.now() >= new Date(appointment.confirmation_deadline_at).getTime();
 }
 
-function finalStatusText(appointment: Appointment, unit: string): string | null {
+// Quem decide é o api (can_request_reschedule, falso numa api anterior); o
+// relógio só esconde o botão de uma leitura feita antes do início.
+function canReschedule(appointment: Appointment): boolean {
+  return appointment.can_request_reschedule === true && Date.now() < new Date(appointment.scheduled_at).getTime();
+}
+
+function finalStatusText(appointment: Appointment, request: AppointmentRequest, unit: string): string | null {
   switch (appointment.status) {
-    case "cancelled_by_citizen": return "Cancelado por você";
+    case "cancelled_by_citizen": return request.status === "open" ? RESCHEDULE_REQUESTED : "Cancelado por você";
     case "expired": return "Cancelado: sem confirmação no prazo — a unidade pode marcar outro horário";
     case "no_show": return "Você não compareceu — a unidade pode marcar outro horário";
     case "checked_in": return `Atendido na ${unit}`;
@@ -77,6 +88,7 @@ function AppointmentRow({ item, onReload, onCheckIn }:
   { item: AppointmentItem; onReload: () => void; onCheckIn: (appointmentId: string) => void }) {
   const { request, appointment } = item;
   const [cancelling, setCancelling] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +123,10 @@ function AppointmentRow({ item, onReload, onCheckIn }:
     }
   }
 
-  const final = appointment ? finalStatusText(appointment, unitName(appointment, request)) : null;
+  const final = appointment ? finalStatusText(appointment, request, unitName(appointment, request)) : null;
+  const rescheduleButton = appointment && canReschedule(appointment) && (
+    <BigButton variant="secondary" onClick={() => setRescheduling(true)} disabled={busy}>Não posso nesse horário</BigButton>
+  );
 
   // A unidade só dispensa pedido aberto — e um pedido reaberto sempre traz o
   // último horário (expired/no_show). Dispensado vale mais que esse horário:
@@ -148,9 +163,10 @@ function AppointmentRow({ item, onReload, onCheckIn }:
           {confirmationClosed(appointment) && (
             <p style={{ fontSize: 18 }}>O prazo para confirmar terminou. A unidade pode marcar outro horário.</p>
           )}
-          {!cancelling && (
+          {!cancelling && !rescheduling && (
             <div style={{ display: "grid", gap: 8 }}>
               {!confirmationClosed(appointment) && <BigButton onClick={confirm} disabled={busy}>Confirmar</BigButton>}
+              {rescheduleButton}
               <BigButton variant="secondary" onClick={() => setCancelling(true)} disabled={busy}>Cancelar</BigButton>
             </div>
           )}
@@ -163,11 +179,12 @@ function AppointmentRow({ item, onReload, onCheckIn }:
             Confirmado: {when(appointment)} — {unitName(appointment, request)}
           </p>
           <AppointmentDetails appointment={appointment} />
-          {!cancelling && (
+          {!cancelling && !rescheduling && (
             <div style={{ display: "grid", gap: 8 }}>
               {appointment.check_in_available && (
                 <BigButton onClick={() => onCheckIn(appointment.id)}>Cheguei na unidade</BigButton>
               )}
+              {rescheduleButton}
               <BigButton variant="secondary" onClick={() => setCancelling(true)} disabled={busy}>Cancelar</BigButton>
             </div>
           )}
@@ -182,6 +199,11 @@ function AppointmentRow({ item, onReload, onCheckIn }:
             Cancelar agendamento
           </BigButton>
         </div>
+      )}
+
+      {rescheduling && appointment && (appointment.status === "scheduled" || appointment.status === "confirmed") && (
+        <RescheduleForm appointmentId={appointment.id} onClose={() => setRescheduling(false)}
+          onDone={() => { setRescheduling(false); onReload(); }} />
       )}
 
       {final && <p style={{ fontSize: 18 }}>{final}</p>}

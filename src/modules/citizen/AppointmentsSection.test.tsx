@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AppointmentsSection } from "./AppointmentsSection";
+import { AppointmentsSection, RESCHEDULE_REQUESTED } from "./AppointmentsSection";
 import { FROZEN_TEXT_NOTICE } from "./ui";
 import { citizenApi, ApiError, type AppointmentItem } from "../../lib/citizenApi";
 
@@ -367,5 +367,94 @@ describe("AppointmentsSection — módulo 17", () => {
     render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
     expect(await screen.findByText("Retorno pedido na UBS Centro — a unidade vai marcar o horário")).toBeInTheDocument();
     expect(screen.queryByText(/Prazo previsto/)).not.toBeInTheDocument();
+  });
+});
+
+// Módulo 17 (spec §6; ADR 0029): "Não posso nesse horário" devolve o pedido à
+// fila com o mesmo prazo — não é o "Cancelar", que encerra o pedido.
+describe("AppointmentsSection — 'Não posso nesse horário'", () => {
+  beforeEach(() => vi.setSystemTime(new Date("2026-10-06T10:00:00-03:00")));
+
+  const START = "2026-10-08T09:00:00-03:00";
+
+  function item(over: Partial<NonNullable<AppointmentItem["appointment"]>> = {}): AppointmentItem {
+    return {
+      request: { id: "r30", kind: "triage", target_unit_name: "UBS Batel", status: "scheduled", closed_reason: null,
+                 reopened_reason: null, appointment_type_name: "Consulta médica", due_on: "2026-11-05" },
+      appointment: {
+        id: "a30", scheduled_at: START, ends_at: "2026-10-08T09:20:00-03:00", status: "confirmed",
+        confirmation_deadline_at: null, check_in_available: false, appointment_type_name: "Consulta médica",
+        professional_name: "Ana Souza", unit: { name: "UBS Batel", address: null }, can_request_reschedule: true,
+        ...over
+      }
+    };
+  }
+
+  it("aparece em 'confirmed' e em 'scheduled', ao lado do Cancelar", async () => {
+    mockAppointments([ item(), { ...item({ id: "a31", status: "scheduled", confirmation_deadline_at: "2026-10-07T09:00:00-03:00" }),
+      request: { ...item().request, id: "r31" } } ]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    await screen.findByText(/Confirmado:/);
+    expect(screen.getAllByRole("button", { name: "Não posso nesse horário" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Cancelar" })).toHaveLength(2);
+  });
+
+  it.each([
+    [ "api anterior, sem o campo", { can_request_reschedule: undefined } ],
+    [ "api diz que não pode", { can_request_reschedule: false } ]
+  ])("ausente quando %s", async (_label, over) => {
+    mockAppointments([ item(over) ]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    await screen.findByText(/Confirmado:/);
+    expect(screen.queryByRole("button", { name: "Não posso nesse horário" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeInTheDocument();
+  });
+
+  it("ausente quando o horário já começou, mesmo com can_request_reschedule de uma leitura antiga", async () => {
+    vi.setSystemTime(new Date("2026-10-08T09:05:00-03:00"));
+    mockAppointments([ item() ]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    await screen.findByText(/Confirmado:/);
+    expect(screen.queryByRole("button", { name: "Não posso nesse horário" })).not.toBeInTheDocument();
+  });
+
+  it("os dois formulários nunca aparecem juntos", async () => {
+    mockAppointments([ item() ]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Não posso nesse horário" }));
+    expect(screen.getByRole("button", { name: "Pedir outro horário" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancelar" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Motivo do cancelamento")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Voltar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.getByLabelText("Motivo do cancelamento")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Não posso nesse horário" })).not.toBeInTheDocument();
+  });
+
+  it("pedido enviado: relê a lista e mostra que pediu outro horário, com o prazo mantido", async () => {
+    const rescheduled = { appointment: { id: "a30", scheduled_at: START, status: "cancelled_by_citizen" as const } };
+    const after: AppointmentItem = {
+      request: { ...item().request, status: "open" },
+      appointment: { ...item().appointment!, status: "cancelled_by_citizen", can_request_reschedule: false }
+    };
+    const list = vi.spyOn(citizenApi, "appointments")
+      .mockResolvedValueOnce({ appointments: [ item() ] })
+      .mockResolvedValueOnce({ appointments: [ after ] });
+    const spy = vi.spyOn(citizenApi, "requestReschedule").mockResolvedValue(rescheduled);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Não posso nesse horário" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Trabalho" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Manhã" }));
+    await userEvent.click(screen.getByRole("button", { name: "Pedir outro horário" }));
+
+    expect(spy).toHaveBeenCalledWith("a30", { reasonCode: "work", preferredPeriod: "morning", note: "" });
+    expect(await screen.findByText(RESCHEDULE_REQUESTED)).toBeInTheDocument();
+    expect(RESCHEDULE_REQUESTED).toBe("Você pediu outro horário. A unidade vai marcar um novo.");
+    expect(screen.getByText("Prazo previsto: até 05/11")).toBeInTheDocument();
+    expect(screen.queryByText("Cancelado por você")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pedir outro horário" })).not.toBeInTheDocument();
+    expect(list).toHaveBeenCalledTimes(2);
   });
 });
