@@ -33,3 +33,7 @@ vite.config.js
 *.tsbuildinfo
 !.env.example
 /.claude/
+
+# Playwright
+/test-results/
+/playwright-report/
