@@ -7,30 +7,33 @@ import { ApiError } from "../../lib/citizenApi";
 export function Screen({ title, children, footer }: { title: string; children: ReactNode; footer?: ReactNode }) {
   return (
     <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 16,
-      fontFamily: "system-ui, sans-serif", fontSize: 18, maxWidth: 520, margin: "0 auto" }}>
+      fontSize: 18, maxWidth: 520, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
-        <strong style={{ fontSize: 14, color: "var(--ink3, #666)" }}>Rota Saúde</strong>
+        <strong style={{ fontSize: 14, color: "var(--ink3)" }}>Rota Saúde</strong>
         <h1 style={{ fontSize: 24, margin: "4px 0 0" }}>{title}</h1>
       </header>
       <div style={{ flex: 1 }}>{children}</div>
       {footer && <footer style={{ display: "grid", gap: 12, paddingTop: 16 }}>{footer}</footer>}
-      <p style={{ fontSize: 14, color: "var(--ink3, #666)", textAlign: "center" }}>Em emergência, ligue 192.</p>
+      <p style={{ fontSize: 14, color: "var(--ink3)", textAlign: "center" }}>Em emergência, ligue 192.</p>
     </main>
   );
 }
 
 const variants = {
-  primary: { background: "var(--accent, #2b4bd8)", color: "#fff", border: "none" },
-  secondary: { background: "transparent", color: "var(--ink, #222)", border: "1px solid var(--rule2, #ccc)" },
-  danger: { background: "var(--down, #c0392b)", color: "#fff", border: "none" }
+  primary: { background: "var(--accent)", color: "var(--on-accent)", border: "none" },
+  secondary: { background: "transparent", color: "var(--ink)", border: "2px solid var(--rule2)" },
+  danger: { background: "var(--down)", color: "var(--on-tone)", border: "none" }
 } as const;
+
+// Desabilitado: cor própria em vez de opacidade (contraste legível).
+const disabledLook = { background: "var(--sunken)", color: "var(--ink2)", border: "2px solid var(--rule)", cursor: "default" } as const;
 
 export function BigButton({ variant = "primary", style, ...props }:
   ButtonHTMLAttributes<HTMLButtonElement> & { variant?: keyof typeof variants }) {
   return (
     <button type="button" {...props}
       style={{ minHeight: 56, width: "100%", borderRadius: 12, fontSize: 18, fontWeight: 600,
-        cursor: "pointer", opacity: props.disabled ? 0.6 : 1, ...variants[variant], ...style }} />
+        cursor: "pointer", ...variants[variant], ...(props.disabled ? disabledLook : {}), ...style }} />
   );
 }
 
@@ -44,20 +47,23 @@ export function Field({ label, error, hint, ...props }:
   InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string; hint?: string }) {
   const id = useId();
   const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  // O erro também descreve o campo: o leitor de tela lê dica e erro juntos.
+  const describedBy = [ hint ? hintId : null, error ? errorId : null ].filter(Boolean).join(" ") || undefined;
   return (
     <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
       <label htmlFor={id} style={{ fontWeight: 600 }}>{label}</label>
-      <input id={id} {...props} aria-invalid={Boolean(error)} aria-describedby={hint ? hintId : undefined}
+      <input id={id} {...props} aria-invalid={Boolean(error)} aria-describedby={describedBy}
         style={{ minHeight: 56, fontSize: 20, padding: "0 12px", borderRadius: 12,
-          border: `1px solid ${error ? "var(--down, #c0392b)" : "var(--rule2, #ccc)"}` }} />
-      {hint && <p id={hintId} style={{ margin: 0, fontSize: 15 }}>{hint}</p>}
-      {error && <ErrorText>{error}</ErrorText>}
+          border: `2px solid ${error ? "var(--down)" : "var(--rule2)"}` }} />
+      {hint && <p id={hintId} style={{ margin: 0, fontSize: 15, color: "var(--ink2)" }}>{hint}</p>}
+      {error && <ErrorText id={errorId}>{error}</ErrorText>}
     </div>
   );
 }
 
-export function ErrorText({ children }: { children: ReactNode }) {
-  return <p role="alert" style={{ color: "var(--down, #c0392b)", margin: 0 }}>{children}</p>;
+export function ErrorText({ children, id }: { children: ReactNode; id?: string }) {
+  return <p id={id} role="alert" style={{ color: "var(--down)", margin: 0 }}>{children}</p>;
 }
 
 // Interruptor liga/desliga: o rótulo inteiro é o alvo de toque (48 px ou mais).
@@ -69,14 +75,14 @@ export function Toggle({ label, description, checked, disabled, onChange }:
     <div style={{ display: "grid", gap: 4, marginBottom: 16 }}>
       <label htmlFor={id}
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, minHeight: 48,
-          fontSize: 18, fontWeight: 600, cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.6 : 1 }}>
+          fontSize: 18, fontWeight: 600, cursor: disabled ? "default" : "pointer", color: disabled ? "var(--ink2)" : undefined }}>
         {label}
         <input id={id} type="checkbox" role="switch" checked={checked} disabled={disabled}
           aria-describedby={description ? descriptionId : undefined}
           onChange={e => onChange(e.target.checked)}
           style={{ width: 28, height: 28, flexShrink: 0, margin: 0 }} />
       </label>
-      {description && <p id={descriptionId} style={{ margin: 0, fontSize: 18, color: "var(--ink2, #555)" }}>{description}</p>}
+      {description && <p id={descriptionId} style={{ margin: 0, fontSize: 18, color: "var(--ink2)" }}>{description}</p>}
     </div>
   );
 }
@@ -94,8 +100,8 @@ export function RadioGroup<T extends string | null>({ legend, options, value, on
       {options.map(o => (
         <label key={o.value ?? "none"}
           style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 48, fontSize: 18, padding: "0 12px",
-            borderRadius: 12, border: "1px solid var(--rule2, #ccc)", cursor: disabled ? "default" : "pointer",
-            opacity: disabled ? 0.6 : 1 }}>
+            borderRadius: 12, border: `2px solid ${disabled ? "var(--rule)" : "var(--rule2)"}`,
+            cursor: disabled ? "default" : "pointer", color: disabled ? "var(--ink2)" : undefined }}>
           <input type="radio" name={name} checked={value === o.value} disabled={disabled}
             onChange={() => onChange(o.value)} style={{ width: 24, height: 24, margin: 0, flexShrink: 0 }} />
           {o.label}

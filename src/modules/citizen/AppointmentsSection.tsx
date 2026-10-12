@@ -73,7 +73,7 @@ function AppointmentDetails({ appointment }: { appointment: Appointment }) {
   return (
     <>
       {lines.map(line => (
-        <p key={line} style={{ fontSize: 18, margin: "0 0 4px", color: "var(--ink2, #555)" }}>{line}</p>
+        <p key={line} style={{ fontSize: 18, margin: "0 0 4px", color: "var(--ink2)" }}>{line}</p>
       ))}
     </>
   );
@@ -128,14 +128,14 @@ function AppointmentRow({ item, onReload, onCheckIn }:
   // "pode marcar outro horário" deixou de ser verdade.
   if (request.status === "closed" && request.closed_reason === "dismissed") {
     return (
-      <li style={{ border: "1px solid var(--rule2, #ccc)", borderRadius: 12, padding: 12 }}>
+      <li style={{ border: "1px solid var(--rule2)", borderRadius: 12, padding: 12 }}>
         <p style={{ fontSize: 18 }}>Pedido encerrado pela unidade</p>
       </li>
     );
   }
 
   return (
-    <li style={{ border: "1px solid var(--rule2, #ccc)", borderRadius: 12, padding: 12 }}>
+    <li style={{ border: "1px solid var(--rule2)", borderRadius: 12, padding: 12 }}>
       {error && <ErrorText>{error}</ErrorText>}
 
       {request.moved_from_unit_name && (

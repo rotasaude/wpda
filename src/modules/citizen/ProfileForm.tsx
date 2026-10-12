@@ -36,7 +36,7 @@ function ConsentTermLink() {
       {open && (error ? <ErrorText>{error}</ErrorText>
         : term === null ? <p>Carregando…</p>
         : <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5, fontSize: 18, padding: 12, borderRadius: 12,
-            border: "1px solid var(--line, #eee)" }}>{term}</div>)}
+            border: "1px solid var(--line)" }}>{term}</div>)}
     </div>
   );
 }

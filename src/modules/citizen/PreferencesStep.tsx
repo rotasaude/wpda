@@ -73,7 +73,7 @@ export function PreferencesStep({ onBack, onSaved }: { onBack: () => void; onSav
         const mine = feedback?.citizenId === p.citizen_id ? feedback : null;
         return (
           <section key={p.citizen_id} aria-label={title}
-            style={{ marginBottom: 24, padding: 12, borderRadius: 12, border: "1px solid var(--rule2, #ccc)" }}>
+            style={{ marginBottom: 24, padding: 12, borderRadius: 12, border: "1px solid var(--rule2)" }}>
             <h2 style={{ fontSize: 20, margin: "0 0 8px" }}>{title}</h2>
             {prefs.sms_available &&
               <Toggle label="Receber avisos por SMS" description={SMS_EXPLANATION}

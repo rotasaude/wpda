@@ -239,10 +239,10 @@ function EntryList({ entries, downloading, downloadError, onDownload }:
   );
 }
 
-const notice: CSSProperties = { background: "var(--warnBg, #fff4e0)", padding: 12, borderRadius: 12, margin: 0 };
+const notice: CSSProperties = { background: "var(--warn-bg)", padding: 12, borderRadius: 12, margin: 0 };
 const h2: CSSProperties = { fontSize: 20, margin: "0 0 12px" };
 const h3: CSSProperties = { fontSize: 18, margin: "16px 0 8px" };
 const list: CSSProperties = { margin: 0, paddingLeft: 20, display: "grid", gap: 8 };
-const card: CSSProperties = { border: "1px solid var(--rule2, #ccc)", borderRadius: 12, padding: 12, display: "grid", gap: 4 };
-const muted: CSSProperties = { color: "var(--ink2, #555)" };
+const card: CSSProperties = { border: "1px solid var(--rule2)", borderRadius: 12, padding: 12, display: "grid", gap: 4 };
+const muted: CSSProperties = { color: "var(--ink2)" };
 const link: CSSProperties = { display: "inline-block", minHeight: 48, lineHeight: "48px", fontSize: 18 };

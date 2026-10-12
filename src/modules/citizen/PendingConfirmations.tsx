@@ -35,7 +35,7 @@ export function PendingConfirmations({ people, onOpen }:
 
   return (
     <section role="region" aria-label="Horários para confirmar"
-      style={{ background: "var(--warnBg, #fff4e0)", padding: 12, borderRadius: 12, marginBottom: 16 }}>
+      style={{ background: "var(--warn-bg)", padding: 12, borderRadius: 12, marginBottom: 16 }}>
       <p style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 600 }}>
         {pending.length === 1 ? "Você tem 1 horário para confirmar" : `Você tem ${pending.length} horários para confirmar`}
       </p>

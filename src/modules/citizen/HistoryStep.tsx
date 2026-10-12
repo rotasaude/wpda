@@ -53,7 +53,7 @@ export function HistoryStep({ citizenId, onBack, onValidate, onCheckIn, onAppoin
           <p>CPF {data.citizen.cpf_masked}</p>
           {data.citizen.verification_level === "declared" ? (
             <>
-              <p style={{ background: "var(--warnBg, #fff4e0)", padding: 12, borderRadius: 12 }}>
+              <p style={{ background: "var(--warn-bg)", padding: 12, borderRadius: 12 }}>
                 Cadastro não verificado. Leve um documento com foto ao posto de saúde para ver seu histórico completo.
               </p>
               <BigButton onClick={() => onValidate(citizenId)}>Validar no posto</BigButton>
@@ -64,7 +64,7 @@ export function HistoryStep({ citizenId, onBack, onValidate, onCheckIn, onAppoin
           {data.triages.length === 0 && <p>Nenhuma triagem ainda.</p>}
           <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 12 }}>
             {data.triages.map(t => (
-              <li key={t.id} style={{ border: "1px solid var(--rule2, #ccc)", borderRadius: 12, padding: 12 }}>
+              <li key={t.id} style={{ border: "1px solid var(--rule2)", borderRadius: 12, padding: 12 }}>
                 <strong>{t.tier ? `Prioridade ${t.tier}` : "Em andamento"}</strong>
                 <div style={{ fontSize: 18 }}>{fmtDateTime(t.completed_at ?? t.created_at)}</div>
                 {t.origin_phone_masked && <div>Feita no celular {t.origin_phone_masked}</div>}

@@ -69,7 +69,7 @@ export function RescheduleForm({ appointmentId, onDone, onClose }:
         onChange={e => setNote(e.target.value)} hint={FROZEN_TEXT_NOTICE} disabled={busy} />
       <p aria-live="polite"
         style={{ fontSize: 18, margin: 0,
-          color: length > RESCHEDULE_NOTE_MAX ? "var(--down, #c0392b)" : "var(--ink2, #555)" }}>
+          color: length > RESCHEDULE_NOTE_MAX ? "var(--down)" : "var(--ink2)" }}>
         {`${length}/${RESCHEDULE_NOTE_MAX}`}
       </p>
       {error && <ErrorText>{error}</ErrorText>}

@@ -20,7 +20,7 @@ export function Report({ token, children }: { token: string; children?: ReactNod
   }, [ token ]);
 
   if (state.kind === "loading") {
-    return <Centered><p style={{ color: "var(--ink3, #888)" }}>Carregando…</p></Centered>;
+    return <Centered><p style={{ color: "var(--ink3)" }}>Carregando…</p></Centered>;
   }
   if (state.kind === "invalid") {
     return <Centered><Message title="Link inválido" body="Este link é inválido ou expirou." /></Centered>;
@@ -35,17 +35,17 @@ export function Report({ token, children }: { token: string; children?: ReactNod
     <Centered>
       <article style={{ maxWidth: 520, width: "100%" }}>
         <header style={{ marginBottom: 16 }}>
-          <strong style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 13 }}>Rota Saúde</strong>
+          <strong style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>Rota Saúde</strong>
           <h1 style={{ fontSize: 20, margin: "8px 0 0" }}>Seu resultado</h1>
         </header>
         <div style={{ marginBottom: 12 }}>
           {r.tier && (
             <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 999,
-              background: "var(--accent-soft, #eef)", color: "var(--accent, #2b59ff)", fontSize: 12, marginRight: 8 }}>
+              background: "var(--accent-bg)", color: "var(--accent)", fontSize: 12, marginRight: 8 }}>
               {r.tier}
             </span>
           )}
-          {r.priority && <span style={{ fontSize: 12, color: "var(--ink2, #555)" }}>prioridade: {r.priority}</span>}
+          {r.priority && <span style={{ fontSize: 12, color: "var(--ink2)" }}>prioridade: {r.priority}</span>}
         </div>
         {note.title && (
           <p style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.4, margin: "0 0 8px" }}>
@@ -55,7 +55,7 @@ export function Report({ token, children }: { token: string; children?: ReactNod
         <p style={{ fontSize: 18, lineHeight: 1.5, margin: "0 0 24px" }}>
           {note.body}
         </p>
-        <footer style={{ fontSize: 12, color: "var(--ink3, #888)", borderTop: "1px solid var(--line, #eee)", paddingTop: 12 }}>
+        <footer style={{ fontSize: 12, color: "var(--ink3)", borderTop: "1px solid var(--line)", paddingTop: 12 }}>
           {r.completed_at && <div>Realizado em {fmtDateTime(r.completed_at)}.</div>}
           {r.expires_at && <div>Válido até {fmtDateTime(r.expires_at)}.</div>}
           <p style={{ marginTop: 12 }}>Estas informações são pessoais — não compartilhe este link.</p>
@@ -69,7 +69,7 @@ export function Report({ token, children }: { token: string; children?: ReactNod
 function Centered({ children }: { children: ReactNode }) {
   return (
     <main style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      padding: 24, fontFamily: "system-ui, sans-serif" }}>
+      padding: 24 }}>
       {children}
     </main>
   );
@@ -79,7 +79,7 @@ function Message({ title, body }: { title: string; body: string }) {
   return (
     <div style={{ textAlign: "center", maxWidth: 360 }}>
       <h1 style={{ fontSize: 18, margin: "0 0 8px" }}>{title}</h1>
-      <p style={{ color: "var(--ink3, #888)", fontSize: 14 }}>{body}</p>
+      <p style={{ color: "var(--ink3)", fontSize: 14 }}>{body}</p>
     </div>
   );
 }

@@ -6,7 +6,7 @@ export function BackHomeLink() {
   return (
     <a href={home} style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 56,
       borderRadius: 12, fontSize: 18, fontWeight: 600, textDecoration: "none",
-      color: "var(--ink, #222)", border: "1px solid var(--rule2, #ccc)" }}>
+      color: "var(--ink)", border: "1px solid var(--rule2)" }}>
       Voltar ao início
     </a>
   );

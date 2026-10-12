@@ -18,13 +18,13 @@ export const REMINDER_HINT =
 
 const itemStyle = {
   display: "grid", gap: 4, width: "100%", minHeight: 56, padding: 12, textAlign: "left",
-  borderRadius: 12, border: "1px solid var(--rule2, #ccc)", fontSize: 18, cursor: "pointer",
-  color: "var(--ink, #222)"
+  borderRadius: 12, border: "1px solid var(--rule2)", fontSize: 18, cursor: "pointer",
+  color: "var(--ink)"
 } as const;
 
 const newStyle = {
   alignSelf: "start", padding: "0 8px", borderRadius: 999, fontSize: 18, fontWeight: 600,
-  background: "var(--accent, #2b4bd8)", color: "#fff"
+  background: "var(--accent)", color: "var(--on-accent)"
 } as const;
 
 function ReminderDetail({ notice, onBack }: { notice: ReminderNotice; onBack: () => void }) {
@@ -37,7 +37,7 @@ function ReminderDetail({ notice, onBack }: { notice: ReminderNotice; onBack: ()
       {notice.appointment_type_name && <p style={{ margin: "0 0 4px" }}>{notice.appointment_type_name}</p>}
       {notice.professional_name && <p style={{ margin: "0 0 4px" }}>Com {notice.professional_name}</p>}
       {notice.unit_name && <p style={{ margin: "0 0 4px" }}>{notice.unit_name}</p>}
-      {address && <p style={{ margin: "0 0 4px", color: "var(--ink2, #555)" }}>{address}</p>}
+      {address && <p style={{ margin: "0 0 4px", color: "var(--ink2)" }}>{address}</p>}
       <p style={{ marginTop: 16 }}>{REMINDER_HINT}</p>
     </Screen>
   );
@@ -52,7 +52,7 @@ function ItemContent({ notice }: { notice: Notice }) {
         <span style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
           <strong>{REMINDER_TITLE}</strong>{badge}
         </span>
-        <span style={{ color: "var(--ink2, #555)" }}>{fmtWeekdayDateTime(notice.scheduled_at)}</span>
+        <span style={{ color: "var(--ink2)" }}>{fmtWeekdayDateTime(notice.scheduled_at)}</span>
         {notice.appointment_type_name && <span>{notice.appointment_type_name}</span>}
         {cpf}
       </>
@@ -63,7 +63,7 @@ function ItemContent({ notice }: { notice: Notice }) {
       <span style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
         <strong>{notice.title}</strong>{badge}
       </span>
-      <span style={{ color: "var(--ink2, #555)" }}>{fmtDate(notice.dispatched_at)}</span>
+      <span style={{ color: "var(--ink2)" }}>{fmtDate(notice.dispatched_at)}</span>
       {cpf}
     </>
   );
@@ -106,7 +106,7 @@ export function NoticesStep({ onBack, onPreferences, onRead }:
     return (
       <Screen title={current.title}
         footer={<BigButton variant="secondary" onClick={() => setOpenId(null)}>Voltar aos avisos</BigButton>}>
-        <p style={{ margin: "0 0 4px", color: "var(--ink2, #555)" }}>{fmtDate(current.dispatched_at)}</p>
+        <p style={{ margin: "0 0 4px", color: "var(--ink2)" }}>{fmtDate(current.dispatched_at)}</p>
         {current.cpf_masked && <p style={{ margin: "0 0 4px" }}>Para o CPF {current.cpf_masked}</p>}
         <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5, overflowWrap: "anywhere", marginTop: 16 }}>
           {current.body}
@@ -131,7 +131,7 @@ export function NoticesStep({ onBack, onPreferences, onRead }:
           {notices.map(n => (
             <li key={`${n.kind ?? "campaign"}:${n.id}`}>
               <button type="button" onClick={() => open(n)}
-                style={{ ...itemStyle, background: n.read ? "transparent" : "var(--accent-bg, #eef1ff)" }}>
+                style={{ ...itemStyle, background: n.read ? "transparent" : "var(--accent-bg)" }}>
                 <ItemContent notice={n} />
               </button>
             </li>

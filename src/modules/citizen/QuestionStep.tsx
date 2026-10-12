@@ -65,7 +65,7 @@ export function QuestionStep({ conversationId, step, onStep, onCompleted, onConf
         {!choice && <BigButton onClick={() => send(value)} disabled={busy || value.trim() === ""}>Continuar</BigButton>}
         {step.can_undo && <BigButton variant="secondary" onClick={back} disabled={busy}>Voltar</BigButton>}
       </>}>
-      <p aria-live="polite" style={{ margin: "0 0 8px", color: "var(--ink2, #444)" }}>
+      <p aria-live="polite" style={{ margin: "0 0 8px", color: "var(--ink2)" }}>
         Pergunta {step.index} de {step.total}
       </p>
       <progress value={step.index} max={step.total} style={{ width: "100%", height: 8, marginBottom: 16 }} />

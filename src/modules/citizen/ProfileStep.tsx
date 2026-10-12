@@ -73,7 +73,7 @@ export function ProfileStep({ citizenId, required, onSaved, onBack }:
           <dt style={{ fontWeight: 600 }}>Identidade de gênero</dt>
           <dd style={{ margin: 0 }}>{genderIdentityLabel(profile.gender_identity)}</dd>
         </dl>
-        <p style={{ padding: 12, borderRadius: 12, border: "1px solid var(--line, #eee)" }}>{VERIFIED_PROFILE_TEXT}</p>
+        <p style={{ padding: 12, borderRadius: 12, border: "1px solid var(--line)" }}>{VERIFIED_PROFILE_TEXT}</p>
       </Screen>
     );
   }

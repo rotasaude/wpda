@@ -25,14 +25,14 @@ export function SchedulingRequestNotice({ request }: { request: SchedulingReques
   if (!request) return null;
   return (
     <section aria-labelledby="scheduling-request-title"
-      style={{ margin: "0 0 24px", padding: 12, borderRadius: 12, border: "1px solid var(--line, #eee)" }}>
+      style={{ margin: "0 0 24px", padding: 12, borderRadius: 12, border: "1px solid var(--line)" }}>
       <h2 id="scheduling-request-title" style={{ fontSize: 20, margin: "0 0 8px" }}>Pedido de agendamento</h2>
       {request.appointment_type_name && (
         <p style={{ fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>{request.appointment_type_name}</p>
       )}
       <p style={{ fontSize: 18, margin: 0 }}>{schedulingRequestText(request)}</p>
       {request.status !== "scheduled" && (
-        <p style={{ fontSize: 18, color: "var(--ink2, #555)", margin: "8px 0 0" }}>
+        <p style={{ fontSize: 18, color: "var(--ink2)", margin: "8px 0 0" }}>
           Quando a unidade marcar, o horário aparece em "Seus agendamentos", em Minhas triagens.
         </p>
       )}

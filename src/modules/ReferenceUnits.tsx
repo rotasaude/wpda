@@ -11,7 +11,7 @@ export function ReferenceUnits({ units }: { units: ReferenceUnit[] | null | unde
   const title = units.length === 1 ? "Sua unidade de referência" : "Suas unidades de referência";
   return (
     <section aria-labelledby="reference-units-title"
-      style={{ margin: "0 0 24px", padding: 12, borderRadius: 12, border: "1px solid var(--line, #eee)" }}>
+      style={{ margin: "0 0 24px", padding: 12, borderRadius: 12, border: "1px solid var(--line)" }}>
       <h2 id="reference-units-title" style={{ fontSize: 20, margin: "0 0 8px" }}>{title}</h2>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 12 }}>
         {units.map(u => {
@@ -20,13 +20,13 @@ export function ReferenceUnits({ units }: { units: ReferenceUnit[] | null | unde
           return (
             <li key={u.id}>
               <strong style={{ fontSize: 18 }}>{u.name}</strong>
-              {kind && <span style={{ marginLeft: 8, fontSize: 18, color: "var(--ink2, #555)" }}>{kind}</span>}
-              {address && <div style={{ fontSize: 18, color: "var(--ink2, #555)" }}>{address}</div>}
+              {kind && <span style={{ marginLeft: 8, fontSize: 18, color: "var(--ink2)" }}>{kind}</span>}
+              {address && <div style={{ fontSize: 18, color: "var(--ink2)" }}>{address}</div>}
             </li>
           );
         })}
       </ul>
-      <p style={{ fontSize: 18, color: "var(--ink2, #555)", margin: "8px 0 0" }}>
+      <p style={{ fontSize: 18, color: "var(--ink2)", margin: "8px 0 0" }}>
         Atende o bairro informado. Você pode procurar qualquer unidade de saúde.
       </p>
     </section>

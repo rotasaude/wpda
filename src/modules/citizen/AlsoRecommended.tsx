@@ -38,13 +38,13 @@ export function AlsoRecommended({ suggestions, later, onLater, onStart }: {
 
   return (
     <section aria-labelledby="also-recommended-title"
-      style={{ margin: "0 0 24px", padding: 12, borderRadius: 12, border: "1px solid var(--line, #eee)" }}>
+      style={{ margin: "0 0 24px", padding: 12, borderRadius: 12, border: "1px solid var(--line)" }}>
       <h2 id="also-recommended-title" style={{ fontSize: 20, margin: "0 0 8px" }}>Recomendamos também</h2>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 16 }}>
         {visible.map(s => (
           <li key={s.suggestion_id} style={{ display: "grid", gap: 8 }}>
             <strong style={{ fontSize: 18 }}>{s.title}</strong>
-            {s.summary && <p style={{ margin: 0, fontSize: 18, color: "var(--ink2, #555)" }}>{s.summary}</p>}
+            {s.summary && <p style={{ margin: 0, fontSize: 18, color: "var(--ink2)" }}>{s.summary}</p>}
             <BigButton disabled={busy} onClick={() => void start(s.protocol_name)}>Fazer agora</BigButton>
             <BigButton variant="secondary" disabled={busy} onClick={() => onLater(s.suggestion_id)}>Depois</BigButton>
           </li>

@@ -22,10 +22,10 @@ function Section({ id, title, children }: { id: string; title: string; children:
 function Item({ title, summary, lines = [], action }:
   { title: string; summary: string | null; lines?: string[]; action?: ReactNode }) {
   return (
-    <li style={{ border: "1px solid var(--rule2, #ccc)", borderRadius: 12, padding: 12, display: "grid", gap: 8 }}>
+    <li style={{ border: "1px solid var(--rule2)", borderRadius: 12, padding: 12, display: "grid", gap: 8 }}>
       <strong style={{ fontSize: 18 }}>{title}</strong>
       {summary && <p style={{ margin: 0, fontSize: 18 }}>{summary}</p>}
-      {lines.map(l => <p key={l} style={{ margin: 0, fontSize: 18, color: "var(--ink2, #555)" }}>{l}</p>)}
+      {lines.map(l => <p key={l} style={{ margin: 0, fontSize: 18, color: "var(--ink2)" }}>{l}</p>)}
       {action}
     </li>
   );

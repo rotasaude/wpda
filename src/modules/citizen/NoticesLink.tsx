@@ -34,13 +34,13 @@ export function NoticesLink({ onOpen }: { onOpen: () => void }) {
     <a href={`${import.meta.env.BASE_URL}avisos`} aria-label={label} onClick={open}
       style={{ display: "inline-flex", alignItems: "center", gap: 8, minHeight: 48, padding: "0 12px",
         borderRadius: 12, fontSize: 18, fontWeight: 600, textDecoration: "none",
-        color: "var(--ink, #222)", border: "1px solid var(--rule2, #ccc)" }}>
+        color: "var(--ink)", border: "1px solid var(--rule2)" }}>
       <span>Avisos</span>
       {badge && (
         <span aria-hidden="true"
           style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 32,
             height: 32, padding: "0 8px", borderRadius: 16, fontSize: 18,
-            background: "var(--down, #c0392b)", color: "#fff" }}>
+            background: "var(--down)", color: "var(--on-tone)" }}>
           {badge}
         </span>
       )}
