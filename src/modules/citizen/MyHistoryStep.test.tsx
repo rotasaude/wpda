@@ -206,6 +206,47 @@ describe("MyHistoryStep", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
+  it("sair da tela durante o download: não cria o endereço nem clica", async () => {
+    api();
+    let resolvePdf!: (b: Blob) => void;
+    vi.spyOn(citizenApi, "documentPdf").mockImplementation(() => new Promise<Blob>((r) => { resolvePdf = r; }));
+    const createObjectURL = vi.fn(() => "blob:http://curitiba.localhost/late");
+    class FakeURL extends URL {}
+    Object.assign(FakeURL, { createObjectURL, revokeObjectURL: vi.fn() });
+    vi.stubGlobal("URL", FakeURL);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const { unmount } = renderStep();
+    const docs = await screen.findByRole("region", { name: "Documentos" });
+    await userEvent.click(within(docs).getByRole("button", { name: "Baixar PDF de Receita" }));
+    unmount();
+    resolvePdf(new Blob([ "%PDF-1.7" ], { type: "application/pdf" }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it("sair da tela depois do download: revoga o endereço blob pendente uma vez só", async () => {
+    api();
+    vi.spyOn(citizenApi, "documentPdf").mockResolvedValue(new Blob([ "%PDF-1.7" ], { type: "application/pdf" }));
+    const revokeObjectURL = vi.fn();
+    class FakeURL extends URL {}
+    Object.assign(FakeURL, { createObjectURL: vi.fn(() => "blob:http://curitiba.localhost/pending"), revokeObjectURL });
+    vi.stubGlobal("URL", FakeURL);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const { unmount } = renderStep();
+    const docs = await screen.findByRole("region", { name: "Documentos" });
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: [ "Date", "setTimeout", "clearTimeout" ], shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await user.click(within(docs).getByRole("button", { name: "Baixar PDF de Receita" }));
+    await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    unmount();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:http://curitiba.localhost/pending");
+    vi.advanceTimersByTime(60_000);
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+  });
+
   it("baixando: o nome acessível do botão diz Baixando", async () => {
     api();
     vi.spyOn(citizenApi, "documentPdf").mockImplementation(() => new Promise<Blob>(() => {}));

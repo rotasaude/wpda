@@ -5,7 +5,7 @@
 // tempo. Par só declarado: as próprias triagens e agendamentos e o convite
 // para validar. O que o par vê é do api; a tela nem pede resumo ou
 // documentos para par declarado.
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   citizenApi, ApiError, DOCUMENT_KINDS, type CitizenDocumentRef, type CitizenEntry, type CitizenHistory, type HealthSummary
 } from "../../lib/citizenApi";
@@ -30,6 +30,19 @@ export function MyHistoryStep({ citizenId, onBack, onValidate }:
   const [downloading, setDownloading] = useState<string | null>(null);
   // O erro do download aparece na seção de onde veio o toque.
   const [downloadError, setDownloadError] = useState<{ list: ListKey; message: string } | null>(null);
+  // A tela pode sair enquanto o PDF baixa: sem tela, nada de endereço blob nem clique.
+  const mounted = useRef(true);
+  const pendingUrls = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  useEffect(() => {
+    mounted.current = true;
+    const pending = pendingUrls.current;
+    return () => {
+      mounted.current = false;
+      pending.forEach((timer, url) => { clearTimeout(timer); URL.revokeObjectURL(url); });
+      pending.clear();
+    };
+  }, []);
 
   useEffect(() => {
     // StrictMode monta duas vezes em dev: a resposta da montagem desfeita não escreve.
@@ -58,12 +71,13 @@ export function MyHistoryStep({ citizenId, onBack, onValidate }:
     try {
       const next = await citizenApi.history(citizenId,
         list === "timeline" ? { before: current.next_before } : { before: current.next_before, kinds: DOCUMENT_KINDS });
+      if (!mounted.current) return;
       const merged = { ...current, entries: mergeEntries(current.entries, next.entries), next_before: next.next_before };
       if (list === "timeline") setTimeline(merged); else setDocuments(merged);
     } catch (e) {
-      setError(messageFor(e));
+      if (mounted.current) setError(messageFor(e));
     } finally {
-      setMore(null);
+      if (mounted.current) setMore(null);
     }
   }
 
@@ -72,17 +86,20 @@ export function MyHistoryStep({ citizenId, onBack, onValidate }:
     setDownloading(doc.id); setDownloadError(null);
     try {
       const blob = await citizenApi.documentPdf(doc.id);
+      if (!mounted.current) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = documentFilename(doc);
       a.click();
-      setTimeout(() => URL.revokeObjectURL(url), PDF_URL_TTL_MS);
+      const pending = pendingUrls.current;
+      pending.set(url, setTimeout(() => { pending.delete(url); URL.revokeObjectURL(url); }, PDF_URL_TTL_MS));
     } catch (e) {
+      if (!mounted.current) return;
       // 429 do PDF tem frase própria (pdfMessageFor), não a do SMS.
       setDownloadError({ list, message: e instanceof ApiError && e.code === "not_found" ? DOCUMENT_GONE : pdfMessageFor(e) });
     } finally {
-      setDownloading(null);
+      if (mounted.current) setDownloading(null);
     }
   }
 
