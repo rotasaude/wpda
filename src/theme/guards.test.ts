@@ -24,3 +24,13 @@ describe("guardas de cor e acessibilidade do wpda", () => {
   it("nenhum outline zerado", () => expect(offenders(/outline:\s*"none"/)).toEqual([]));
   it("desabilitado não depende de opacidade", () => expect(offenders(/opacity:\s*(props\.)?disabled/)).toEqual([]));
 });
+
+describe("controles nativos seguem o tema (escuro e alto contraste)", () => {
+  const css = readFileSync(join(src, "theme/global.css"), "utf8");
+  it("botões herdam a cor do texto", () => expect(css).toMatch(/button[^{]*\{[^}]*color:\s*inherit/));
+  it("campos usam fundo e texto do tema", () => expect(css).toMatch(/input[^{]*\{[^}]*background:\s*var\(--panel\)[^}]*color:\s*var\(--ink\)/));
+  it("temas escuros declaram color-scheme dark", () => {
+    expect(css).toMatch(/\[data-theme="govbr-escuro"\][^{]*\{[^}]*color-scheme:\s*dark/);
+    expect(css).toMatch(/\[data-theme="alto-contraste"\][^{]*\{[^}]*color-scheme:\s*dark/);
+  });
+});
