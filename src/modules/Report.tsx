@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { fetchReport, reportNote, type Report as ReportData } from "../lib/report";
 import { fmtDateTime } from "../lib/format";
+import { TONE_GLYPH, tierTone } from "../lib/tier";
 import { CityHeader } from "./citizen/CityHeader";
 import { EmergencyCall } from "./citizen/EmergencyCall";
 
@@ -41,12 +42,18 @@ export function Report({ token, children }: { token: string; children?: ReactNod
           <h1 style={{ fontSize: 20, margin: "8px 0 0" }}>Seu resultado</h1>
         </header>
         <div style={{ marginBottom: 12 }}>
-          {r.tier && (
-            <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 999,
-              background: "var(--accent-bg)", color: "var(--accent)", fontSize: 12, marginRight: 8 }}>
-              {r.tier}
-            </span>
-          )}
+          {r.tier && (() => {
+            // Cor e forma por nível (■ alto · ▲ moderado · ● baixo); o texto
+            // do nível não muda. Nível desconhecido fica neutro.
+            const tone = tierTone(r.tier);
+            return (
+              <span data-glyph={tone ? TONE_GLYPH[tone] : undefined}
+                style={{ display: "inline-block", padding: "2px 10px", borderRadius: 999, marginRight: 8, fontSize: 12, fontWeight: 600,
+                  background: tone ? `var(--${tone}-bg)` : "var(--accent-bg)", color: tone ? `var(--${tone})` : "var(--accent)" }}>
+                {r.tier}
+              </span>
+            );
+          })()}
           {r.priority && <span style={{ fontSize: 12, color: "var(--ink2)" }}>prioridade: {r.priority}</span>}
         </div>
         {note.title && (
