@@ -5,6 +5,8 @@ import { Flow } from "./modules/citizen/Flow";
 import { A11yBar } from "./modules/citizen/A11yBar";
 import { A11yPage } from "./modules/citizen/A11yPage";
 import { useA11yOpen } from "./modules/citizen/a11yStore";
+import { PhoneOnly } from "./modules/citizen/PhoneOnly";
+import { isPhone } from "./lib/device";
 
 // Barra de acessibilidade sempre no topo; a página de acessibilidade é
 // sobreposta e o conteúdo fica hidden (sem desmontar: o fluxo não perde o
@@ -12,7 +14,11 @@ import { useA11yOpen } from "./modules/citizen/a11yStore";
 export function App() {
   const token = tokenFromUrl();
   const a11y = useA11yOpen();
-  const content = token ? <Report token={token}><BackHomeLink /></Report> : <Flow />;
+  // O relatório abre em qualquer tela; o fluxo do cidadão, só no celular
+  // (decisão 9 do ciclo de interface).
+  const content = token
+    ? <Report token={token}><BackHomeLink /></Report>
+    : isPhone() ? <Flow /> : <PhoneOnly />;
   return (
     <>
       <A11yBar />
