@@ -2,6 +2,7 @@
 // httpOnly `citizen_session` vai sozinho. Toda escrita é JSON (a API recusa
 // o resto com 415).
 import { setCityTimeZone } from "./format";
+import { setSessionFeatures } from "./sessionFeatures";
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string) {
@@ -376,14 +377,87 @@ function normalizeAppointment(item: AppointmentItem): AppointmentItem {
   };
 }
 
+// ─── Meu histórico (módulo 20, ADR 0035; contrato §2 e §4; Divergências W1–W3) ───
+// Por pessoa do celular (o par, em citizen_id, como triagens e agendamentos):
+// só o id da pessoa, os tipos e o cursor na URL. Os textos vêm prontos do api, sem nada clínico livre; quem decide o
+// que o par vê (validado ou só declarado) é o api.
+export interface CitizenDocumentRef { id: string; short_code: string | null; verification_url: string | null; downloadable: boolean }
+export interface CitizenEntry {
+  id: string; kind: string; occurred_at: string;
+  unit: { name: string } | null; professional_name: string | null;
+  title: string; summary: string | null; status: string | null;
+  document: CitizenDocumentRef | null;
+}
+export interface CitizenHistory { verified: boolean; partial: boolean; entries: CitizenEntry[]; next_before: string | null }
+
+export interface SummaryProblem { terminology: string; code: string; label: string; since: string | null }
+export interface SummaryMedication { label: string; dosage_summary: string | null; since: string | null }
+export interface SummaryExamRequest { sigtap_code: string; label: string; requested_at: string }
+export interface HealthVitals {
+  blood_pressure?: { systolic: number; diastolic: number; measured_at: string };
+  weight_kg?: { value: number; measured_at: string };
+  capillary_glucose?: { value: number; moment: string | null; measured_at: string };
+}
+export interface HealthSummary {
+  problems: SummaryProblem[]; medications: SummaryMedication[]; exam_requests: SummaryExamRequest[]; vitals: HealthVitals;
+}
+
+export const HISTORY_PAGE_SIZE = 20;
+// A seção "Documentos" lê a mesma rota filtrada (Divergência W3).
+export const DOCUMENT_KINDS = [ "clinical_document" ];
+
+type RawEntry = Partial<Omit<CitizenEntry, "document" | "unit">> & {
+  id: string; unit?: { name?: string } | null; document?: Partial<CitizenDocumentRef> & { id: string } | null;
+};
+
+function normalizeEntry(e: RawEntry): CitizenEntry {
+  return {
+    id: e.id, kind: e.kind ?? "", occurred_at: e.occurred_at ?? "",
+    unit: e.unit?.name ? { name: e.unit.name } : null,
+    professional_name: e.professional_name ?? null,
+    title: e.title ?? "", summary: e.summary ?? null, status: e.status ?? null,
+    document: e.document
+      ? {
+          id: e.document.id, short_code: e.document.short_code ?? null,
+          verification_url: e.document.verification_url ?? null, downloadable: e.document.downloadable === true
+        }
+      : null
+  };
+}
+
+function normalizeSummary(s: Partial<HealthSummary>): HealthSummary {
+  return {
+    problems: (s.problems ?? []).map((p) => ({ ...p, since: p.since ?? null })),
+    medications: (s.medications ?? []).map((m) => ({ ...m, dosage_summary: m.dosage_summary ?? null, since: m.since ?? null })),
+    exam_requests: s.exam_requests ?? [],
+    vitals: s.vitals ?? {}
+  };
+}
+
+// PDF lido com fetch (não por navegação): a tela mostra a recusa em vez de
+// uma página de erro, e o arquivo sai por um endereço blob:.
+async function pdf(path: string): Promise<Blob> {
+  const res = await fetch(`/citizen${path}`, { method: "GET", credentials: "same-origin", headers: { Accept: "application/pdf" } });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) window.dispatchEvent(new Event("citizen:unauthenticated"));
+    throw new ApiError(res.status, (data as { error?: string }).error ?? `http_${res.status}`);
+  }
+  return res.blob();
+}
+
+
 export interface CitizenSession {
   phone_masked: string;
   // Fuso IANA da cidade; ausente em api antigo.
   time_zone?: string;
+  // Módulo 20 (Divergência W2): interruptores ligados da cidade; ausente em api antigo.
+  features?: string[];
 }
 
 function withCityTimeZone(session: CitizenSession): CitizenSession {
   setCityTimeZone(session?.time_zone);
+  setSessionFeatures(session?.features);
   return session;
 }
 
@@ -395,7 +469,7 @@ export const citizenApi = {
   verifyCode: (phone: string, code: string) =>
     call<CitizenSession>("POST", "/session", { phone, code }).then(withCityTimeZone),
   currentSession: () => call<CitizenSession>("GET", "/session").then(withCityTimeZone),
-  signOut: () => call<void>("DELETE", "/session"),
+  signOut: () => { setSessionFeatures(null); return call<void>("DELETE", "/session"); },
   consentTerm: () => call<{ version: string; body: string }>("GET", "/consent_term"),
   people: async () => {
     const data = await call<{ people: Person[] }>("GET", "/people");
@@ -487,5 +561,22 @@ export const citizenApi = {
   },
   // Manda só o que mudou; a resposta é a entrada inteira da pessoa.
   updateContactPreference: (citizenId: string, change: ContactPreferenceChange) =>
-    call<ContactPreference>("PUT", `/contact_preferences/${encodeURIComponent(citizenId)}`, change)
+    call<ContactPreference>("PUT", `/contact_preferences/${encodeURIComponent(citizenId)}`, change),
+  // Meu histórico (módulo 20): linha do tempo da pessoa, mais nova primeiro.
+  history: async (citizenId: string, opts: { before?: string | null; kinds?: string[] } = {}): Promise<CitizenHistory> => {
+    const params = new URLSearchParams({ citizen_id: citizenId });
+    for (const kind of opts.kinds ?? []) params.append("kinds[]", kind);
+    if (opts.before) params.set("before", opts.before);
+    params.set("limit", String(HISTORY_PAGE_SIZE));
+    const d = await call<{ verified?: boolean; partial?: boolean; entries?: RawEntry[]; next_before?: string | null }>(
+      "GET", `/history?${params.toString()}`);
+    return {
+      verified: d.verified === true, partial: d.partial === true,
+      entries: (d.entries ?? []).map(normalizeEntry), next_before: d.next_before ?? null
+    };
+  },
+  // Só par validado com prontuário (403 not_verified; 404 not_available).
+  healthSummary: async (citizenId: string): Promise<HealthSummary> =>
+    normalizeSummary(await call<Partial<HealthSummary>>("GET", `/health_summary?citizen_id=${encodeURIComponent(citizenId)}`)),
+  documentPdf: (documentId: string): Promise<Blob> => pdf(`/documents/${encodeURIComponent(documentId)}/pdf`)
 };
