@@ -258,6 +258,48 @@ describe("MyHistoryStep", () => {
     expect(busy).toHaveTextContent("Baixando…");
   });
 
+  it("erro do download: no cartão do próprio documento, não em outro", async () => {
+    const OTHER = entry({ id: "clinical_document:doc3", kind: "clinical_document", occurred_at: "2026-09-01T10:00:00-03:00",
+      title: "Atestado", status: "issued",
+      document: { id: "doc3", short_code: "A1B2C-3D4E5", verification_url: null, downloadable: true } });
+    api({ documents: history({ entries: [ DOCUMENT, OTHER ] }) });
+    vi.spyOn(citizenApi, "documentPdf").mockRejectedValue(new ApiError(404, "not_found"));
+    renderStep();
+    const docs = await screen.findByRole("region", { name: "Documentos" });
+    const button = within(docs).getByRole("button", { name: "Baixar PDF de Atestado" });
+    await userEvent.click(button);
+    const alert = await within(docs).findByRole("alert");
+    expect(alert).toHaveTextContent(DOCUMENT_GONE);
+    expect(button.closest("li")).toContainElement(alert);
+    const receita = within(docs).getByRole("button", { name: "Baixar PDF de Receita" }).closest("li") as HTMLElement;
+    expect(within(receita).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Linha do tempo" })).queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("carregar mais falha: o erro junto do botão, some na nova tentativa e depois do acerto", async () => {
+    let attempt = 0;
+    let resolveRetry!: (h: CitizenHistory) => void;
+    vi.spyOn(citizenApi, "history").mockImplementation(async (_id, o = {}) => {
+      if (o.kinds?.length) return history({ entries: [] });
+      if (!o.before) return history({ entries: [ APPOINTMENT ], next_before: "c1" });
+      attempt += 1;
+      if (attempt === 1) throw new ApiError(500, "server_error");
+      return new Promise<CitizenHistory>((r) => { resolveRetry = r; });
+    });
+    vi.spyOn(citizenApi, "healthSummary").mockResolvedValue(SUMMARY);
+    renderStep();
+    const timeline = await screen.findByRole("region", { name: "Linha do tempo" });
+    const more = await within(timeline).findByRole("button", { name: "Carregar mais" });
+    await userEvent.click(more);
+    const alert = await within(timeline).findByRole("alert");
+    expect(alert.nextElementSibling).toBe(within(timeline).getByRole("button", { name: "Carregar mais" }));
+    await userEvent.click(within(timeline).getByRole("button", { name: "Carregar mais" }));
+    expect(within(timeline).queryByRole("alert")).not.toBeInTheDocument();
+    resolveRetry(history({ entries: [ TRIAGE ], next_before: null }));
+    expect(await within(timeline).findByText("Triagem respiratória")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("documento sem PDF (downloadable false): só o código, sem botão", async () => {
     api({ documents: history({ entries: [ { ...DOCUMENT, document: { ...DOCUMENT.document!, downloadable: false } } ] }) });
     renderStep();

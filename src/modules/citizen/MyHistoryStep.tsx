@@ -28,8 +28,10 @@ export function MyHistoryStep({ citizenId, onBack, onValidate }:
   const [error, setError] = useState<string | null>(null);
   const [more, setMore] = useState<ListKey | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
-  // O erro do download aparece na seção de onde veio o toque.
-  const [downloadError, setDownloadError] = useState<{ list: ListKey; message: string } | null>(null);
+  // O erro do download aparece no cartão do documento, na seção de onde veio o toque.
+  const [downloadError, setDownloadError] = useState<{ list: ListKey; docId: string; message: string } | null>(null);
+  // O erro do "Carregar mais" aparece junto do próprio botão.
+  const [moreError, setMoreError] = useState<{ list: ListKey; message: string } | null>(null);
   // A tela pode sair enquanto o PDF baixa: sem tela, nada de endereço blob nem clique.
   const mounted = useRef(true);
   const pendingUrls = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -67,7 +69,7 @@ export function MyHistoryStep({ citizenId, onBack, onValidate }:
   async function loadMore(list: ListKey) {
     const current = list === "timeline" ? timeline : documents;
     if (!current?.next_before || more) return;
-    setMore(list);
+    setMore(list); setMoreError(null);
     try {
       const next = await citizenApi.history(citizenId,
         list === "timeline" ? { before: current.next_before } : { before: current.next_before, kinds: DOCUMENT_KINDS });
@@ -75,7 +77,7 @@ export function MyHistoryStep({ citizenId, onBack, onValidate }:
       const merged = { ...current, entries: mergeEntries(current.entries, next.entries), next_before: next.next_before };
       if (list === "timeline") setTimeline(merged); else setDocuments(merged);
     } catch (e) {
-      if (mounted.current) setError(messageFor(e));
+      if (mounted.current) setMoreError({ list, message: messageFor(e) });
     } finally {
       if (mounted.current) setMore(null);
     }
@@ -97,7 +99,8 @@ export function MyHistoryStep({ citizenId, onBack, onValidate }:
     } catch (e) {
       if (!mounted.current) return;
       // 429 do PDF tem frase própria (pdfMessageFor), não a do SMS.
-      setDownloadError({ list, message: e instanceof ApiError && e.code === "not_found" ? DOCUMENT_GONE : pdfMessageFor(e) });
+      setDownloadError({ list, docId: doc.id,
+        message: e instanceof ApiError && e.code === "not_found" ? DOCUMENT_GONE : pdfMessageFor(e) });
     } finally {
       if (mounted.current) setDownloading(null);
     }
@@ -120,21 +123,25 @@ export function MyHistoryStep({ citizenId, onBack, onValidate }:
           {timeline.verified && documents && (
             <section aria-label="Documentos">
               <h2 style={h2}>Documentos</h2>
-              {downloadError?.list === "documents" && <ErrorText>{downloadError.message}</ErrorText>}
               {documents.entries.length === 0 && <p>Nenhum documento ainda.</p>}
-              <EntryList entries={documents.entries} downloading={downloading} onDownload={(doc) => void download(doc, "documents")} />
+              <EntryList entries={documents.entries} downloading={downloading}
+                downloadError={downloadError?.list === "documents" ? downloadError : null}
+                onDownload={(doc) => void download(doc, "documents")} />
               {documents.next_before && (
-                <BigButton variant="secondary" disabled={more !== null} onClick={() => void loadMore("documents")}>Carregar mais</BigButton>
+                <LoadMore busy={more !== null} error={moreError?.list === "documents" ? moreError.message : null}
+                  onClick={() => void loadMore("documents")} />
               )}
             </section>
           )}
           <section aria-label="Linha do tempo">
             <h2 style={h2}>Linha do tempo</h2>
-            {downloadError?.list === "timeline" && <ErrorText>{downloadError.message}</ErrorText>}
             {timeline.entries.length === 0 && <p>Nenhum registro ainda.</p>}
-            <EntryList entries={timeline.entries} downloading={downloading} onDownload={(doc) => void download(doc, "timeline")} />
+            <EntryList entries={timeline.entries} downloading={downloading}
+              downloadError={downloadError?.list === "timeline" ? downloadError : null}
+              onDownload={(doc) => void download(doc, "timeline")} />
             {timeline.next_before && (
-              <BigButton variant="secondary" disabled={more !== null} onClick={() => void loadMore("timeline")}>Carregar mais</BigButton>
+              <LoadMore busy={more !== null} error={moreError?.list === "timeline" ? moreError.message : null}
+                onClick={() => void loadMore("timeline")} />
             )}
           </section>
         </div>
@@ -183,8 +190,18 @@ function SummarySection({ summary }: { summary: HealthSummary }) {
   );
 }
 
-function EntryList({ entries, downloading, onDownload }:
-  { entries: CitizenEntry[]; downloading: string | null; onDownload: (doc: CitizenDocumentRef) => void }) {
+function LoadMore({ busy, error, onClick }: { busy: boolean; error: string | null; onClick: () => void }) {
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      {error && <ErrorText>{error}</ErrorText>}
+      <BigButton variant="secondary" disabled={busy} onClick={onClick}>Carregar mais</BigButton>
+    </div>
+  );
+}
+
+function EntryList({ entries, downloading, downloadError, onDownload }:
+  { entries: CitizenEntry[]; downloading: string | null; downloadError: { docId: string; message: string } | null;
+    onDownload: (doc: CitizenDocumentRef) => void }) {
   return (
     <ul style={{ listStyle: "none", padding: 0, margin: "0 0 12px", display: "grid", gap: 12 }}>
       {entries.map((e) => {
@@ -212,6 +229,7 @@ function EntryList({ entries, downloading, onDownload }:
                     {downloading === e.document.id ? "Baixando…" : "Baixar PDF"}
                   </BigButton>
                 )}
+                {downloadError?.docId === e.document.id && <ErrorText>{downloadError.message}</ErrorText>}
               </div>
             )}
           </li>
