@@ -87,7 +87,7 @@ export function MyHistoryStep({ citizenId, onBack, onValidate }:
     if (downloading) return;
     setDownloading(doc.id); setDownloadError(null);
     try {
-      const blob = await citizenApi.documentPdf(doc.id);
+      const blob = await citizenApi.documentPdf(doc.id, citizenId);
       if (!mounted.current) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

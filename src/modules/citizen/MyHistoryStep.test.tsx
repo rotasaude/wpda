@@ -164,7 +164,7 @@ describe("MyHistoryStep", () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     await user.click(within(docs).getByRole("button", { name: "Baixar PDF de Receita" }));
     await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(1));
-    expect(pdf).toHaveBeenCalledWith("doc2");
+    expect(pdf).toHaveBeenCalledWith("doc2", "p1");
     expect(createObjectURL).toHaveBeenCalledWith(blob);
     expect(seen).toEqual([ { download: "documento-P3H8T-2LQ6R.pdf", href: "blob:http://curitiba.localhost/abc" } ]);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();

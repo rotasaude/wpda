@@ -65,19 +65,19 @@ describe("citizenApi — Meu histórico (módulo 20)", () => {
     const pdf = new Blob([ "%PDF-1.7" ], { type: "application/pdf" });
     const fn = vi.fn(async () => new Response(pdf, { status: 200, headers: { "Content-Type": "application/pdf" } }));
     vi.stubGlobal("fetch", fn);
-    const blob = await citizenApi.documentPdf("doc2");
+    const blob = await citizenApi.documentPdf("doc2", "p1");
     expect(blob.type).toBe("application/pdf");
     const [ url, init ] = fn.mock.calls[0] as unknown as [ string, RequestInit ];
-    expect(url).toBe("/citizen/documents/doc2/pdf");
+    expect(url).toBe("/citizen/documents/doc2/pdf?citizen_id=p1");
     expect(init.credentials).toBe("same-origin");
     expect((init.headers as Record<string, string>).Accept).toBe("application/pdf");
 
     mockJson(404, { error: "not_found" });
-    await expect(citizenApi.documentPdf("doc2")).rejects.toEqual(new ApiError(404, "not_found"));
+    await expect(citizenApi.documentPdf("doc2", "p1")).rejects.toEqual(new ApiError(404, "not_found"));
 
     mockJson(401, { error: "unauthenticated" });
     const spy = vi.spyOn(window, "dispatchEvent");
-    await expect(citizenApi.documentPdf("doc2")).rejects.toEqual(new ApiError(401, "unauthenticated"));
+    await expect(citizenApi.documentPdf("doc2", "p1")).rejects.toEqual(new ApiError(401, "unauthenticated"));
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ type: "citizen:unauthenticated" }));
   });
 

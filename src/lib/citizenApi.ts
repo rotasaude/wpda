@@ -578,5 +578,6 @@ export const citizenApi = {
   // Só par validado com prontuário (403 not_verified; 404 not_available).
   healthSummary: async (citizenId: string): Promise<HealthSummary> =>
     normalizeSummary(await call<Partial<HealthSummary>>("GET", `/health_summary?citizen_id=${encodeURIComponent(citizenId)}`)),
-  documentPdf: (documentId: string): Promise<Blob> => pdf(`/documents/${encodeURIComponent(documentId)}/pdf`)
+  documentPdf: (documentId: string, citizenId: string): Promise<Blob> =>
+    pdf(`/documents/${encodeURIComponent(documentId)}/pdf?citizen_id=${encodeURIComponent(citizenId)}`)
 };
