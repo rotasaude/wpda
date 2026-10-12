@@ -282,7 +282,6 @@ export function Flow() {
         onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })}
         onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })} />;
       break;
-
     case "verify-code":
       view = <VerificationCodeStep citizenId={state.citizenId}
         onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
