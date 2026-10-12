@@ -21,7 +21,7 @@ button, input, select, textarea { font-family: inherit; }
 
 /* Controles nativos seguem o tema: sem isso, o botão "Sair" e os campos
    ficam com as cores padrão do navegador (ilegíveis no escuro). */
-button { color: inherit; }
+button { color: inherit; background: transparent; border: 0; padding: 0; cursor: pointer; }
 input, select, textarea { background: var(--panel); color: var(--ink); }
 :root[data-theme="govbr-escuro"],
 :root[data-theme="alto-contraste"] { color-scheme: dark; }

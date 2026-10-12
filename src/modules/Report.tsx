@@ -23,13 +23,13 @@ export function Report({ token, children }: { token: string; children?: ReactNod
   }, [ token ]);
 
   if (state.kind === "loading") {
-    return <Centered><p style={{ color: "var(--ink3)" }}>Carregando…</p></Centered>;
+    return <Centered><p style={{ color: "var(--ink3)" }}>Carregando…</p><EmergencyCall /></Centered>;
   }
   if (state.kind === "invalid") {
-    return <Centered><Message title="Link inválido" body="Este link é inválido ou expirou." /></Centered>;
+    return <Centered><Message title="Link inválido" body="Este link é inválido ou expirou." /><EmergencyCall /></Centered>;
   }
   if (state.kind === "error") {
-    return <Centered><Message title="Ops" body="Não foi possível carregar. Tente novamente." /></Centered>;
+    return <Centered><Message title="Ops" body="Não foi possível carregar. Tente novamente." /><EmergencyCall /></Centered>;
   }
 
   const r = state.data;

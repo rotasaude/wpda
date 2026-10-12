@@ -28,7 +28,8 @@ const variants = {
 } as const;
 
 // Desabilitado: cor própria em vez de opacidade (contraste legível).
-const disabledLook = { background: "var(--sunken)", color: "var(--ink2)", border: "2px solid var(--rule)", cursor: "default" } as const;
+// Borda tracejada: distingue do secundário mesmo no alto contraste (lá --rule = --rule2).
+const disabledLook = { background: "var(--sunken)", color: "var(--ink2)", border: "2px dashed var(--rule2)", cursor: "default" } as const;
 
 export function BigButton({ variant = "primary", style, ...props }:
   ButtonHTMLAttributes<HTMLButtonElement> & { variant?: keyof typeof variants }) {

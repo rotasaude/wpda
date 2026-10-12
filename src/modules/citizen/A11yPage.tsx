@@ -1,14 +1,18 @@
 // Página de acessibilidade do wpda (eMAG 3.1), sobreposta ao conteúdo.
+import { useEffect, useRef } from "react";
 import { closeA11y } from "./a11yStore";
 import { BigButton } from "./ui";
 import { CityHeader } from "./CityHeader";
 
 export function A11yPage() {
+  // O foco vai para o título ao abrir, para o leitor de tela anunciar a página.
+  const title = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { title.current?.focus(); }, []);
   return (
     <section aria-labelledby="a11y-title" style={{ maxWidth: 520, margin: "0 auto", padding: "0 16px 16px" }}>
       <header style={{ margin: "16px 0" }}>
         <CityHeader />
-        <h1 id="a11y-title" style={{ fontSize: 24, margin: "4px 0 0" }}>Acessibilidade</h1>
+        <h1 id="a11y-title" ref={title} tabIndex={-1} style={{ fontSize: 24, margin: "4px 0 0" }}>Acessibilidade</h1>
       </header>
       <p>Este serviço segue a WCAG 2.2 nível AA e o eMAG 3.1.</p>
       <ul style={{ paddingLeft: 20, lineHeight: 1.6 }}>
