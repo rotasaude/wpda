@@ -145,20 +145,33 @@ describe("MyHistoryStep", () => {
     const blob = new Blob([ "%PDF-1.7" ], { type: "application/pdf" });
     const pdf = vi.spyOn(citizenApi, "documentPdf").mockResolvedValue(blob);
     const createObjectURL = vi.fn(() => "blob:http://curitiba.localhost/abc");
-    // O jsdom não tem createObjectURL/revokeObjectURL: instala os dublês no URL global.
-    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    const revokeObjectURL = vi.fn();
+    // O jsdom não tem createObjectURL/revokeObjectURL: um URL dublê no global, desfeito pelo unstubAllGlobals.
+    class FakeURL extends URL {}
+    Object.assign(FakeURL, { createObjectURL, revokeObjectURL });
+    vi.stubGlobal("URL", FakeURL);
+    // O mock só guarda o que viu: um expect aqui dentro seria engolido pelo try do download.
+    const seen: { download: string; href: string }[] = [];
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
-      expect(this.download).toBe("documento-P3H8T-2LQ6R.pdf");
-      expect(this.href).toBe("blob:http://curitiba.localhost/abc");
+      seen.push({ download: this.download, href: this.href });
     });
     renderStep();
     const docs = await screen.findByRole("region", { name: "Documentos" });
-    await userEvent.click(within(docs).getByRole("button", { name: "Baixar PDF de Receita" }));
+    // Daqui em diante o setTimeout também é falso, para conferir a revogação do blob.
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: [ "Date", "setTimeout", "clearTimeout" ], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-10-11T10:00:00-03:00"));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await user.click(within(docs).getByRole("button", { name: "Baixar PDF de Receita" }));
+    await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(1));
     expect(pdf).toHaveBeenCalledWith("doc2");
     expect(createObjectURL).toHaveBeenCalledWith(blob);
-    expect(click).toHaveBeenCalledTimes(1);
+    expect(seen).toEqual([ { download: "documento-P3H8T-2LQ6R.pdf", href: "blob:http://curitiba.localhost/abc" } ]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(60_000);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:http://curitiba.localhost/abc");
   });
-
 
   it("baixar o PDF com limite estourado (429): a frase do download, não a do SMS", async () => {
     api();
