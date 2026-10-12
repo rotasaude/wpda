@@ -188,7 +188,9 @@ function EntryList({ entries, downloading, onDownload }:
                   <a href={e.document.verification_url} style={link}>{`Conferir o documento ${e.document.short_code}`}</a>
                 )}
                 {e.document.downloadable && (
-                  <BigButton variant="secondary" disabled={downloading !== null} aria-label={`Baixar PDF de ${e.title}`}
+                  <BigButton variant="secondary" disabled={downloading !== null}
+                    aria-busy={downloading === e.document.id}
+                    aria-label={downloading === e.document.id ? `Baixando PDF de ${e.title}` : `Baixar PDF de ${e.title}`}
                     onClick={() => onDownload(e.document as CitizenDocumentRef)}>
                     {downloading === e.document.id ? "Baixando…" : "Baixar PDF"}
                   </BigButton>

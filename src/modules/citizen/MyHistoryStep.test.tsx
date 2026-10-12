@@ -206,6 +206,17 @@ describe("MyHistoryStep", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
+  it("baixando: o nome acessível do botão diz Baixando", async () => {
+    api();
+    vi.spyOn(citizenApi, "documentPdf").mockImplementation(() => new Promise<Blob>(() => {}));
+    renderStep();
+    const docs = await screen.findByRole("region", { name: "Documentos" });
+    await userEvent.click(within(docs).getByRole("button", { name: "Baixar PDF de Receita" }));
+    const busy = await within(docs).findByRole("button", { name: "Baixando PDF de Receita" });
+    expect(busy).toHaveAttribute("aria-busy", "true");
+    expect(busy).toHaveTextContent("Baixando…");
+  });
+
   it("documento sem PDF (downloadable false): só o código, sem botão", async () => {
     api({ documents: history({ entries: [ { ...DOCUMENT, document: { ...DOCUMENT.document!, downloadable: false } } ] }) });
     renderStep();
