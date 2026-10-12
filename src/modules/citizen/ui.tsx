@@ -2,19 +2,21 @@
 // texto de 18 px, ação principal embaixo (uso com uma mão).
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { useId } from "react";
+import { CityHeader } from "./CityHeader";
+import { EmergencyCall } from "./EmergencyCall";
 import { ApiError } from "../../lib/citizenApi";
 
 export function Screen({ title, children, footer }: { title: string; children: ReactNode; footer?: ReactNode }) {
   return (
-    <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 16,
+    <main id="conteudo" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 16,
       fontSize: 18, maxWidth: 520, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
-        <strong style={{ fontSize: 14, color: "var(--ink3)" }}>Rota Saúde</strong>
+        <CityHeader />
         <h1 style={{ fontSize: 24, margin: "4px 0 0" }}>{title}</h1>
       </header>
       <div style={{ flex: 1 }}>{children}</div>
       {footer && <footer style={{ display: "grid", gap: 12, paddingTop: 16 }}>{footer}</footer>}
-      <p style={{ fontSize: 14, color: "var(--ink3)", textAlign: "center" }}>Em emergência, ligue 192.</p>
+      <EmergencyCall />
     </main>
   );
 }

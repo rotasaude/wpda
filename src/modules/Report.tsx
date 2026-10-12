@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { fetchReport, reportNote, type Report as ReportData } from "../lib/report";
 import { fmtDateTime } from "../lib/format";
+import { CityHeader } from "./citizen/CityHeader";
+import { EmergencyCall } from "./citizen/EmergencyCall";
 
 type State =
   | { kind: "loading" }
@@ -35,7 +37,7 @@ export function Report({ token, children }: { token: string; children?: ReactNod
     <Centered>
       <article style={{ maxWidth: 520, width: "100%" }}>
         <header style={{ marginBottom: 16 }}>
-          <strong style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>Rota Saúde</strong>
+          <CityHeader />
           <h1 style={{ fontSize: 20, margin: "8px 0 0" }}>Seu resultado</h1>
         </header>
         <div style={{ marginBottom: 12 }}>
@@ -60,6 +62,7 @@ export function Report({ token, children }: { token: string; children?: ReactNod
           {r.expires_at && <div>Válido até {fmtDateTime(r.expires_at)}.</div>}
           <p style={{ marginTop: 12 }}>Estas informações são pessoais — não compartilhe este link.</p>
         </footer>
+        <EmergencyCall />
         {children && <div style={{ marginTop: 16 }}>{children}</div>}
       </article>
     </Centered>
@@ -68,7 +71,7 @@ export function Report({ token, children }: { token: string; children?: ReactNod
 
 function Centered({ children }: { children: ReactNode }) {
   return (
-    <main style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+    <main id="conteudo" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       padding: 24 }}>
       {children}
     </main>
