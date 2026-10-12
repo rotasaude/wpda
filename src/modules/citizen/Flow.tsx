@@ -14,6 +14,8 @@ import { ProfileStep } from "./ProfileStep";
 import { QuestionStep } from "./QuestionStep";
 import { ResultStep } from "./ResultStep";
 import { HistoryStep } from "./HistoryStep";
+import { MyHistoryStep } from "./MyHistoryStep";
+import { hasSessionFeature, setSessionFeatures } from "../../lib/sessionFeatures";
 import { VerificationCodeStep } from "./VerificationCodeStep";
 import { CounterCodeStep } from "./CounterCodeStep";
 import { NoticesLink } from "./NoticesLink";
@@ -32,6 +34,7 @@ type State =
   | { at: "question"; consentVersion: string; conversationId: string; citizenId: string; step: Step }
   | { at: "result"; consentVersion: string; triageId: string; citizenId: string }
   | { at: "history"; consentVersion: string | null; citizenId: string }
+  | { at: "record"; consentVersion: string | null; citizenId: string }
   | { at: "verify-code"; citizenId: string; consentVersion: string | null }
   | { at: "check-in-code"; triageId: string; citizenId: string; consentVersion: string | null }
   | { at: "appointment-check-in-code"; appointmentId: string; citizenId: string; consentVersion: string | null }
@@ -75,6 +78,8 @@ export function Flow() {
 
   useEffect(() => {
     function onUnauthenticated() {
+      // Sessão caiu: os interruptores dela caem junto (sem isso "Meu histórico" sobraria velho).
+      setSessionFeatures(null);
       const s = stateRef.current;
       if (s.at === "notices") target.current = "avisos";
       else if (s.at === "preferences") target.current = "preferencias";
@@ -267,8 +272,17 @@ export function Flow() {
         onBack={() => setState(state.consentVersion ? { at: "people", consentVersion: state.consentVersion } : { at: "consent" })}
         onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })}
         onCheckIn={triageId => setState({ at: "check-in-code", triageId, citizenId: state.citizenId, consentVersion: state.consentVersion })}
-        onAppointmentCheckIn={appointmentId => setState({ at: "appointment-check-in-code", appointmentId, citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
+        onAppointmentCheckIn={appointmentId => setState({ at: "appointment-check-in-code", appointmentId, citizenId: state.citizenId, consentVersion: state.consentVersion })}
+        onRecord={hasSessionFeature("patient_timeline")
+          ? () => setState({ at: "record", consentVersion: state.consentVersion, citizenId: state.citizenId })
+          : undefined} />;
       break;
+    case "record":
+      view = <MyHistoryStep key={state.citizenId} citizenId={state.citizenId}
+        onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })}
+        onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })} />;
+      break;
+
     case "verify-code":
       view = <VerificationCodeStep citizenId={state.citizenId}
         onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })} />;

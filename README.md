@@ -57,6 +57,15 @@ Conflitos que uma nova tentativa não resolve, como termo trocado no meio da
 triagem, consentimento revogado em outra aba ou conversa expirada, mandam o
 cidadão para a tela que resolve cada caso, em vez de um erro genérico.
 
+**Meu histórico (módulo 20).** Com `patient_timeline` ligado na cidade (vem em
+`features` da sessão), "Minhas triagens" ganha o botão **Meu histórico**. Par
+validado: resumo de saúde (problemas ativos, medicamentos em uso, exames
+pedidos nos últimos 12 meses, últimas medidas), documentos com o código de
+conferência e o **Baixar PDF**, e a linha do tempo. Par só declarado: as
+próprias triagens e agendamentos, com o convite para validar no posto. Fora do
+modo `record`, o aviso de histórico parcial. Nunca texto clínico livre, CID
+sem nome ou número SNCR; o PDF é baixado com o nome `documento-<código>.pdf`.
+
 ### Relatório público (`src/modules/Report.tsx`)
 
 `/wpda/?token=<token>` busca o JSON congelado de `GET /r/:token`, sem login.
