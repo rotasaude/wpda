@@ -150,8 +150,22 @@ const MESSAGES: Record<string, string> = {
   not_reschedulable: "Este horário não pode mais ser trocado por aqui. Fale com a unidade.",
   invalid_reason_code: "Escolha o motivo.",
   invalid_period: "Escolha o melhor período.",
-  note_too_long: "Escreva no máximo 200 caracteres."
+  note_too_long: "Escreva no máximo 200 caracteres.",
+  // Módulo 20 (contrato §4).
+  feature_disabled: "O histórico ainda não está disponível nesta cidade.",
+  not_verified: "Para ver isto, valide seu cadastro na unidade de saúde.",
+  not_available: "O resumo de saúde ainda não está disponível.",
+  invalid_cursor: "A lista mudou. Volte e abra o histórico de novo."
 };
+
+// 429 do PDF (30 downloads a cada 10 min): o código `too_many_requests` é o
+// mesmo do SMS, então a frase própria vale só para quem baixa documento.
+export const PDF_RATE_LIMITED = "Muitos downloads em pouco tempo. Tente de novo em alguns minutos.";
+
+export function pdfMessageFor(error: unknown): string {
+  if (error instanceof ApiError && error.code === "too_many_requests") return PDF_RATE_LIMITED;
+  return messageFor(error);
+}
 
 export function messageFor(error: unknown): string {
   if (error instanceof ApiError) return MESSAGES[error.code] ?? "Algo deu errado. Tente de novo.";
