@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { A11yBar } from "./A11yBar";
@@ -68,5 +68,42 @@ describe("topo, acessibilidade e 192", () => {
     expect(screen.getByRole("heading", { name: "Acessibilidade" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
     expect(screen.getByRole("button", { name: "passo 1" })).toBeVisible();
+  });
+});
+
+describe("moldura — usabilidade (6e)", () => {
+  it("192 é uma faixa fixa no rodapé, com borda (WP-01, A-17, WP-17)", () => {
+    render(<Screen title="T">x</Screen>);
+    const link = screen.getByRole("link", { name: "Emergência? Ligar 192" });
+    const bar = link.closest("[data-emergency-bar]") as HTMLElement;
+    expect(bar.style.position).toBe("fixed");
+    expect(bar.style.bottom).toBe("0px");
+    expect(link.style.border).toBe("2px solid var(--down)");
+  });
+
+  it("o main reserva o espaço da faixa (WP-01)", () => {
+    render(<Screen title="T">x</Screen>);
+    expect(screen.getByRole("main").style.paddingBottom).toBe("calc(96px + env(safe-area-inset-bottom))");
+  });
+
+  it("o h1 recebe o foco ao montar e quando o título muda (WP-02)", () => {
+    const { rerender } = render(<Screen title="Um">x</Screen>);
+    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1, name: "Um" }));
+    screen.getByRole("heading", { level: 1 }).blur();
+    rerender(<Screen title="Dois">x</Screen>);
+    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1, name: "Dois" }));
+  });
+
+  it("focusKey novo devolve o foco com o mesmo título (WP-02)", () => {
+    const { rerender } = render(<Screen title="Igual" focusKey={1}>x</Screen>);
+    screen.getByRole("heading", { level: 1 }).blur();
+    rerender(<Screen title="Igual" focusKey={2}>x</Screen>);
+    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1 }));
+  });
+
+  it("rola ao topo na troca de tela (WP-02)", () => {
+    const scrollTo = vi.spyOn(window, "scrollTo");
+    render(<Screen title="T">x</Screen>);
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
   });
 });

@@ -19,4 +19,8 @@ export function stubDevice({ width = 390, height = 844, coarse = true, dark = fa
   })) as unknown as typeof window.matchMedia;
 }
 
-beforeEach(() => stubDevice());
+beforeEach(() => {
+  stubDevice();
+  // O jsdom não implementa scrollTo e polui a saída; o Screen rola ao topo a cada tela.
+  window.scrollTo = (() => {}) as typeof window.scrollTo;
+});

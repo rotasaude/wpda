@@ -1,18 +1,27 @@
 // Peças de tela do canal web do cidadão: alvos de toque de 48 px ou mais,
 // texto de 18 px, ação principal embaixo (uso com uma mão).
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { CityHeader } from "./CityHeader";
 import { EmergencyCall } from "./EmergencyCall";
 import { ApiError } from "../../lib/citizenApi";
 
-export function Screen({ title, children, footer }: { title: string; children: ReactNode; footer?: ReactNode }) {
+// Cada tela nova (título ou focusKey diferente) rola ao topo e põe o foco no
+// h1: o leitor de tela anuncia a tela, sem recomeçar da barra do topo (WP-02).
+// O main reserva embaixo o espaço da faixa fixa do 192 (WP-01).
+export function Screen({ title, children, footer, focusKey }:
+  { title: string; children: ReactNode; footer?: ReactNode; focusKey?: string | number }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    heading.current?.focus({ preventScroll: true });
+  }, [ title, focusKey ]);
   return (
     <main id="conteudo" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 16,
-      fontSize: 18, maxWidth: 520, margin: "0 auto" }}>
+      paddingBottom: "calc(96px + env(safe-area-inset-bottom))", fontSize: 18, maxWidth: 520, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
         <CityHeader />
-        <h1 style={{ fontSize: 24, margin: "4px 0 0" }}>{title}</h1>
+        <h1 ref={heading} tabIndex={-1} style={{ fontSize: 24, margin: "4px 0 0" }}>{title}</h1>
       </header>
       <div style={{ flex: 1 }}>{children}</div>
       {footer && <footer style={{ display: "grid", gap: 12, paddingTop: 16 }}>{footer}</footer>}
