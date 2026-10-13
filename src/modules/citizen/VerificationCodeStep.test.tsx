@@ -16,6 +16,7 @@ describe("VerificationCodeStep", () => {
     expect(screen.getByText("Mostre este código e um documento com foto ao atendente.")).toBeInTheDocument();
     expect(screen.getByText(/1\d:\d\d|10:00|9:\d\d/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Gerar outro código" }));
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar" }));
     expect(await screen.findByText("654321")).toBeInTheDocument();
     expect(spy).toHaveBeenCalledWith("p1");
   });
@@ -30,11 +31,12 @@ describe("VerificationCodeStep", () => {
     expect(gerar.disabled).toBe(false);
 
     fireEvent.click(gerar);
-    expect(gerar.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+    expect((screen.getByRole("button", { name: "Gerar outro código" }) as HTMLButtonElement).disabled).toBe(true);
 
     resolveNext({ code: "999999", expires_at: new Date(Date.now() + 600_000).toISOString() });
     await screen.findByText("999999");
-    expect(gerar.disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Gerar outro código" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("duas emissões rápidas: a resposta do pedido mais antigo é ignorada se chegar depois", async () => {

@@ -2,7 +2,7 @@
 // vence em minutos, com "Gerar outro código" — usada tanto para "Validar no
 // posto" (VerificationCodeStep) quanto para "Cheguei na unidade".
 import { useEffect, useRef, useState } from "react";
-import { BigButton, ErrorText, Screen, messageFor } from "./ui";
+import { BigButton, ConfirmInline, ErrorText, Screen, messageFor } from "./ui";
 
 function remaining(expiresAt: string): number {
   return Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000));
@@ -49,13 +49,20 @@ export function CounterCodeStep({ title, instruction, issue, onBack }: {
     return () => clearTimeout(t);
   }, [data, left]);
 
+  // Com o código valendo, a ação principal é mostrá-lo: gerar outro o invalida,
+  // então é secundário e pede confirmação. Vencido (ou sem código), é direto (WP-15).
+  const expired = data !== null && left <= 0;
+  const regenerate = expired || (data === null && error !== null)
+    ? <BigButton onClick={runIssue} disabled={busy}>Gerar outro código</BigButton>
+    : data && <ConfirmInline key={data.code} label="Gerar outro código" busy={busy} onConfirm={() => void runIssue()}
+        question="Gerar outro código? O código de agora deixa de valer." />;
   const mm = Math.floor(left / 60);
   const ss = String(left % 60).padStart(2, "0");
 
   return (
     <Screen title={title}
       footer={<>
-        <BigButton onClick={runIssue} disabled={busy}>Gerar outro código</BigButton>
+        {regenerate}
         <BigButton variant="secondary" onClick={onBack}>Voltar</BigButton>
       </>}>
       {error && <ErrorText>{error}</ErrorText>}

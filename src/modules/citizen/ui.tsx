@@ -1,7 +1,7 @@
 // Peças de tela do canal web do cidadão: alvos de toque de 48 px ou mais,
 // texto de 18 px, ação principal embaixo (uso com uma mão).
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
-import { forwardRef, useEffect, useId, useRef } from "react";
+import { forwardRef, useEffect, useId, useRef, useState } from "react";
 import { CityHeader } from "./CityHeader";
 import { EmergencyCall } from "./EmergencyCall";
 import { ApiError } from "../../lib/citizenApi";
@@ -40,12 +40,44 @@ const variants = {
 // Borda tracejada: distingue do secundário mesmo no alto contraste (lá --rule = --rule2).
 const disabledLook = { background: "var(--sunken)", color: "var(--ink2)", border: "2px dashed var(--rule2)", cursor: "default" } as const;
 
-export function BigButton({ variant = "primary", style, ...props }:
-  ButtonHTMLAttributes<HTMLButtonElement> & { variant?: keyof typeof variants }) {
+export const BigButton = forwardRef<HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement> & { variant?: keyof typeof variants }>(
+  function BigButton({ variant = "primary", style, ...props }, ref) {
+    return (
+      <button ref={ref} type="button" {...props}
+        style={{ minHeight: 56, width: "100%", borderRadius: 12, fontSize: 18, fontWeight: 600,
+          cursor: "pointer", ...variants[variant], ...(props.disabled ? disabledLook : {}), ...style }} />
+    );
+  });
+
+// Confirmação na própria tela, em dois toques (WP-15, WP-16), no lugar da
+// caixa nativa do navegador. O foco vai à pergunta; Cancelar o devolve ao botão.
+export function ConfirmInline({ label, question, confirmLabel = "Confirmar", busy, onConfirm, variant = "secondary",
+  confirmVariant = "primary" }: {
+  label: string; question: string; confirmLabel?: string; busy?: boolean; onConfirm: () => void;
+  variant?: keyof typeof variants; confirmVariant?: keyof typeof variants;
+}) {
+  const [ asking, setAsking ] = useState(false);
+  const prompt = useRef<HTMLParagraphElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const wasAsking = useRef(false);
+  const promptId = useId();
+  useEffect(() => {
+    if (asking) prompt.current?.focus();
+    else if (wasAsking.current) trigger.current?.focus();
+    wasAsking.current = asking;
+  }, [ asking ]);
+  if (!asking) {
+    return <BigButton ref={trigger} variant={variant} disabled={busy} onClick={() => setAsking(true)}>{label}</BigButton>;
+  }
   return (
-    <button type="button" {...props}
-      style={{ minHeight: 56, width: "100%", borderRadius: 12, fontSize: 18, fontWeight: 600,
-        cursor: "pointer", ...variants[variant], ...(props.disabled ? disabledLook : {}), ...style }} />
+    <div role="group" aria-labelledby={promptId} style={{ display: "grid", gap: 12 }}>
+      <p id={promptId} ref={prompt} tabIndex={-1} style={{ margin: 0, fontWeight: 600 }}>{question}</p>
+      <BigButton variant={confirmVariant} disabled={busy} onClick={() => { wasAsking.current = false; setAsking(false); onConfirm(); }}>
+        {confirmLabel}
+      </BigButton>
+      <BigButton variant="secondary" onClick={() => setAsking(false)}>Cancelar</BigButton>
+    </div>
   );
 }
 

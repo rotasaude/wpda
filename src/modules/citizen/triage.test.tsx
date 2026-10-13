@@ -73,7 +73,7 @@ describe("HistoryStep", () => {
                   origin_phone_masked: null }]
     });
     render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} onCheckIn={vi.fn()} onAppointmentCheckIn={vi.fn()} />);
-    expect(await screen.findByText(/Cadastro não verificado/)).toBeInTheDocument();
+    expect(await screen.findByText(/Seu cadastro ainda não foi conferido na unidade de saúde\./)).toBeInTheDocument();
     expect(screen.getByText(/Prioridade alta/)).toBeInTheDocument();
   });
 
@@ -99,7 +99,7 @@ describe("HistoryStep", () => {
     expect(await screen.findByText(/Cadastro verificado em/)).toBeInTheDocument();
     expect(screen.getByText("Feita no celular (**) *****-2222")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Validar no posto" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Revogar consentimento" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Apagar minhas respostas desta triagem" })).not.toBeInTheDocument();
   });
 
   it("triagem elegível para check-in mostra 'Cheguei na unidade' e chama onCheckIn(id)", async () => {
@@ -247,7 +247,44 @@ describe("HistoryStep", () => {
       triages: []
     });
     render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} onCheckIn={vi.fn()} onAppointmentCheckIn={vi.fn()} />);
-    await screen.findByText(/Cadastro não verificado/);
+    await screen.findByText(/Seu cadastro ainda não foi conferido/);
     expect(screen.queryByRole("heading", { name: "Seus agendamentos" })).not.toBeInTheDocument();
+  });
+});
+
+describe("HistoryStep — usabilidade (6e, WP-16)", () => {
+  beforeEach(() => { vi.spyOn(citizenApi, "appointments").mockResolvedValue({ appointments: [] }); });
+  const data = (over = {}) => ({
+    citizen: { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared" as const, verified_at: null },
+    triages: [{ id: "t1", status: "completed", tier: "alta", priority: 1, created_at: "2026-09-22T12:00:00Z",
+                completed_at: "2026-09-22T12:05:00Z", report_url: null, consent_active: true,
+                origin_phone_masked: null, check_in_available: true, attendance: null, ...over }]
+  });
+  const view = () => render(<HistoryStep citizenId="p1" onBack={vi.fn()} onValidate={vi.fn()} onCheckIn={vi.fn()} onAppointmentCheckIn={vi.fn()} />);
+
+  it("enquanto carrega, diz que está carregando", () => {
+    vi.spyOn(citizenApi, "triages").mockReturnValue(new Promise(() => {}));
+    view();
+    expect(screen.getByRole("status")).toHaveTextContent("Carregando…");
+  });
+
+  it("apagar as respostas pede confirmação na tela, sem a caixa do navegador", async () => {
+    vi.spyOn(citizenApi, "triages").mockResolvedValue(data());
+    const revoke = vi.spyOn(citizenApi, "revokeConsent").mockResolvedValue(undefined as never);
+    const native = vi.spyOn(window, "confirm");
+    view();
+    await userEvent.click(await screen.findByRole("button", { name: "Apagar minhas respostas desta triagem" }));
+    expect(screen.getByText("As respostas desta triagem serão apagadas. Isso não pode ser desfeito.")).toBeInTheDocument();
+    expect(revoke).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar" }));
+    expect(revoke).toHaveBeenCalledWith("t1");
+    expect(native).not.toHaveBeenCalled();
+  });
+
+  it("um só principal: 'Cheguei na unidade'; 'Validar no posto' é secundário", async () => {
+    vi.spyOn(citizenApi, "triages").mockResolvedValue(data());
+    view();
+    expect(await screen.findByRole("button", { name: "Cheguei na unidade" })).toHaveStyle({ background: "var(--accent)" });
+    expect(screen.getByRole("button", { name: "Validar no posto" }).style.background).toBe("transparent");
   });
 });

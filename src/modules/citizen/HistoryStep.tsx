@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { citizenApi, type AttendanceSummary, type Person, type TriageSummary } from "../../lib/citizenApi";
 import { cityDateFormat, fmtDateTime } from "../../lib/format";
 import { AppointmentsSection } from "./AppointmentsSection";
-import { BigButton, ErrorText, Screen, messageFor } from "./ui";
+import { BigButton, ConfirmInline, ErrorText, Screen, messageFor } from "./ui";
 
 function fmtTime(iso: string): string {
   return cityDateFormat({ hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
@@ -38,14 +38,15 @@ export function HistoryStep({ citizenId, onBack, onValidate, onCheckIn, onAppoin
   }
   useEffect(load, [citizenId]);
 
+  // Revogar o consentimento, em palavras de quem usa e com confirmação na tela (WP-16).
   async function revoke(id: string) {
-    if (!window.confirm("Revogar o consentimento apaga as respostas desta triagem. Continuar?")) return;
     try { await citizenApi.revokeConsent(id); load(); } catch (e) { setError(messageFor(e)); }
   }
 
   return (
     <Screen title="Minhas triagens" footer={<BigButton variant="secondary" onClick={onBack}>Voltar</BigButton>}>
       {error && <ErrorText>{error}</ErrorText>}
+      {!data && !error && <p role="status">Carregando…</p>}
       {data && (
         <>
           <AppointmentsSection citizenId={citizenId} onCheckIn={onAppointmentCheckIn} />
@@ -54,9 +55,10 @@ export function HistoryStep({ citizenId, onBack, onValidate, onCheckIn, onAppoin
           {data.citizen.verification_level === "declared" ? (
             <>
               <p style={{ background: "var(--warn-bg)", padding: 12, borderRadius: 12 }}>
-                Cadastro não verificado. Leve um documento com foto ao posto de saúde para ver seu histórico completo.
+                Seu cadastro ainda não foi conferido na unidade de saúde. Leve um documento com foto ao posto para ver seu histórico completo.
               </p>
-              <BigButton onClick={() => onValidate(citizenId)}>Validar no posto</BigButton>
+              {/* Um só principal por tela: "Cheguei na unidade" (WP-16). */}
+              <BigButton variant="secondary" onClick={() => onValidate(citizenId)}>Validar no posto</BigButton>
             </>
           ) : (
             <p>Cadastro verificado{data.citizen.verified_at ? ` em ${fmtDateTime(data.citizen.verified_at)}` : ""}</p>
@@ -75,10 +77,11 @@ export function HistoryStep({ citizenId, onBack, onValidate, onCheckIn, onAppoin
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 8 }}>
                   {t.report_url && <a href={t.report_url} style={{ display: "inline-block", minHeight: 48, lineHeight: "48px", fontSize: 18 }}>Ver relatório</a>}
                   {t.consent_active && !t.origin_phone_masked && (
-                    <button type="button" onClick={() => revoke(t.id)}
-                      style={{ minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 18 }}>
-                      Revogar consentimento
-                    </button>
+                    <div style={{ flexBasis: "100%" }}>
+                      <ConfirmInline label="Apagar minhas respostas desta triagem" confirmVariant="danger"
+                        question="As respostas desta triagem serão apagadas. Isso não pode ser desfeito."
+                        onConfirm={() => void revoke(t.id)} />
+                    </div>
                   )}
                 </div>
               </li>
