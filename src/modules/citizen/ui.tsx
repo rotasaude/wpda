@@ -1,24 +1,29 @@
 // Peças de tela do canal web do cidadão: alvos de toque de 48 px ou mais,
 // texto de 18 px, ação principal embaixo (uso com uma mão).
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
-import { forwardRef, useEffect, useId, useRef, useState } from "react";
+import { forwardRef, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { CityHeader } from "./CityHeader";
 import { EmergencyCall } from "./EmergencyCall";
 import { ApiError } from "../../lib/citizenApi";
 
 // Cada tela nova (título ou focusKey diferente) rola ao topo e põe o foco no
 // h1: o leitor de tela anuncia a tela, sem recomeçar da barra do topo (WP-02).
-// O main reserva embaixo o espaço da faixa fixa do 192 (WP-01).
+// O main reserva embaixo o espaço da faixa fixa do 192 e desconta a altura do
+// topo (barra de acessibilidade, Avisos/Sair): o rodapé fica à vista acima da
+// faixa sem rolar (WP-01).
 export function Screen({ title, children, footer, focusKey }:
   { title: string; children: ReactNode; footer?: ReactNode; focusKey?: string | number }) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const main = useRef<HTMLElement>(null);
+  const [ top, setTop ] = useState(0);
+  useLayoutEffect(() => { setTop(main.current?.offsetTop ?? 0); }, []);
   useEffect(() => {
     window.scrollTo(0, 0);
     heading.current?.focus({ preventScroll: true });
   }, [ title, focusKey ]);
   return (
-    <main id="conteudo" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", padding: 16,
-      paddingBottom: "calc(96px + env(safe-area-inset-bottom))", fontSize: 18, maxWidth: 520, margin: "0 auto" }}>
+    <main id="conteudo" ref={main} style={{ minHeight: `calc(100dvh - ${top}px)`, display: "flex", flexDirection: "column",
+      padding: 16, paddingBottom: "calc(96px + env(safe-area-inset-bottom))", fontSize: 18, maxWidth: 520, margin: "0 auto" }}>
       <header style={{ marginBottom: 16 }}>
         <CityHeader />
         <h1 ref={heading} tabIndex={-1} style={{ fontSize: 24, margin: "4px 0 0" }}>{title}</h1>

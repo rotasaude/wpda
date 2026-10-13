@@ -86,6 +86,13 @@ describe("moldura — usabilidade (6e)", () => {
     expect(screen.getByRole("main").style.paddingBottom).toBe("calc(96px + env(safe-area-inset-bottom))");
   });
 
+  it("o main desconta a altura do topo: o rodapé fica acima da faixa sem rolar (WP-01)", () => {
+    const spy = vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(113);
+    render(<Screen title="T">x</Screen>);
+    expect(screen.getByRole("main").style.minHeight).toBe("calc(100dvh - 113px)");
+    spy.mockRestore();
+  });
+
   it("o h1 recebe o foco ao montar e quando o título muda (WP-02)", () => {
     const { rerender } = render(<Screen title="Um">x</Screen>);
     expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1, name: "Um" }));
