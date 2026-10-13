@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { A11yBar } from "./A11yBar";
 import { A11yPage } from "./A11yPage";
 import { CityHeader } from "./CityHeader";
 import { EmergencyCall } from "./EmergencyCall";
 import { Screen } from "./ui";
-import { closeA11y, useA11yOpen } from "./a11yStore";
+import { closeA11y, openA11y, useA11yOpen } from "./a11yStore";
 import { getChoice, toggleHighContrast } from "../../theme/theme";
 
 afterEach(() => { closeA11y(); if (getChoice() !== "auto") toggleHighContrast(); });
@@ -105,5 +105,50 @@ describe("moldura — usabilidade (6e)", () => {
     const scrollTo = vi.spyOn(window, "scrollTo");
     render(<Screen title="T">x</Screen>);
     expect(scrollTo).toHaveBeenCalledWith(0, 0);
+  });
+});
+
+describe("acessibilidade — usabilidade (6e)", () => {
+  afterEach(() => window.history.replaceState(null, "", "/"));
+
+  it("alvos de 48 px e fonte de 16 px na barra (WP-18)", () => {
+    render(<A11yBar />);
+    for (const el of [ screen.getByRole("link", { name: "Acessibilidade" }), screen.getByRole("button", { name: "Alto contraste" }) ]) {
+      expect(el.style.minHeight).toBe("48px");
+      expect(parseInt(el.style.fontSize || getComputedStyle(el.parentElement!).fontSize)).toBeGreaterThanOrEqual(16);
+    }
+  });
+
+  it("com a página aberta, 'Ir para o conteúdo' foca o título dela (A-13)", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("link", { name: "Acessibilidade" }));
+    screen.getByRole("heading", { name: "Acessibilidade" }).blur();
+    fireEvent.click(screen.getByRole("link", { name: "Ir para o conteúdo" }));
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Acessibilidade" }));
+  });
+
+  it("abrir empilha uma entrada própria, uma vez só (A-14)", () => {
+    render(<Harness />);
+    const before = window.history.length;
+    act(() => { openA11y(); openA11y(); });
+    expect(window.history.state).toEqual({ a11y: true });
+    expect(window.history.length).toBe(before + 1);
+  });
+
+  it("o 'voltar' do celular fecha a página e mantém o passo (A-14)", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "passo 0" }));
+    fireEvent.click(screen.getByRole("link", { name: "Acessibilidade" }));
+    act(() => { window.history.back(); });
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Acessibilidade" })).toBeNull());
+    expect(screen.getByRole("button", { name: "passo 1" })).toBeVisible();
+  });
+
+  it("'Voltar' da página desfaz a própria entrada no histórico (A-14)", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("link", { name: "Acessibilidade" }));
+    fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
+    expect(screen.queryByRole("heading", { name: "Acessibilidade" })).toBeNull();
+    await waitFor(() => expect(window.history.state?.a11y).toBeFalsy());
   });
 });

@@ -1,4 +1,5 @@
-// Barra compacta de acessibilidade (eMAG), sempre no topo: pular para o
+// Barra compacta de acessibilidade (eMAG), sempre no topo, com alvos de 48 px
+// e texto de 16 px (WP-18): pular para o
 // conteúdo (aparece só com foco), página de acessibilidade e alto contraste.
 import { useEffect, useRef, type MouseEvent } from "react";
 import { toggleHighContrast, useThemeChoice } from "../../theme/theme";
@@ -6,6 +7,9 @@ import { openA11y, useA11yOpen } from "./a11yStore";
 
 function focusMain(e: MouseEvent<HTMLAnchorElement>) {
   e.preventDefault();
+  // Com a página de acessibilidade aberta, o conteúdo é ela (A-13).
+  const a11yTitle = document.getElementById("a11y-title");
+  if (a11yTitle) { a11yTitle.focus(); return; }
   const main = Array.from(document.querySelectorAll("main")).find((m) => !m.closest("[hidden]"));
   if (!main) return;
   if (!main.hasAttribute("tabindex")) main.setAttribute("tabindex", "-1");
@@ -25,13 +29,13 @@ export function A11yBar() {
   }, [ open ]);
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, maxWidth: 520,
-      margin: "0 auto", padding: "4px 16px", fontSize: 14, background: "var(--sunken)", borderBottom: "1px solid var(--rule)" }}>
+      margin: "0 auto", padding: "4px 16px", fontSize: 16, background: "var(--sunken)", borderBottom: "1px solid var(--rule)" }}>
       <a href="#conteudo" className="skip-link" onClick={focusMain}>Ir para o conteúdo</a>
-      <a ref={link} href="#acessibilidade" onClick={(e) => { e.preventDefault(); openA11y(); }} style={{ minHeight: 44, display: "inline-flex", alignItems: "center" }}>
+      <a ref={link} href="#acessibilidade" onClick={(e) => { e.preventDefault(); openA11y(); }} style={{ minHeight: 48, display: "inline-flex", alignItems: "center", fontSize: 16 }}>
         Acessibilidade
       </a>
       <button type="button" aria-pressed={choice === "alto-contraste"} onClick={toggleHighContrast}
-        style={{ minHeight: 44, background: "none", border: "none", color: "var(--accent)", textDecoration: "underline", fontSize: 14, cursor: "pointer" }}>
+        style={{ minHeight: 48, background: "none", border: "none", color: "var(--accent)", textDecoration: "underline", fontSize: 16, cursor: "pointer" }}>
         Alto contraste
       </button>
     </div>
