@@ -70,7 +70,7 @@ describe("PeopleStep — bairro antes de começar", () => {
     setup([]);
     await typeNewCpf();
     await userEvent.type(await screen.findByLabelText("Buscar bairro"), "xyz");
-    expect(screen.getByText("Nenhum bairro encontrado com esse nome.")).toBeInTheDocument();
+    expect(screen.getByText(/^Nenhum bairro encontrado com esse nome\./)).toBeInTheDocument();
   });
 
   it("'Voltar' na pergunta do bairro (CPF novo) volta ao perfil já preenchido (A-20)", async () => {
