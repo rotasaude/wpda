@@ -33,10 +33,12 @@ a { color: var(--accent); }
 
 /* Forma do nível de risco (tierTone), fora do textContent e com texto
    alternativo vazio: o leitor de tela lê só o rótulo. */
+/* A forma simples vem antes: navegador sem o texto alternativo descarta a
+   segunda declaração e fica com a primeira (A-15). */
 [data-glyph]::before { margin-right: 6px; }
-[data-glyph="square"]::before   { content: "■" / ""; }
-[data-glyph="triangle"]::before { content: "▲" / ""; }
-[data-glyph="circle"]::before   { content: "●" / ""; }
+[data-glyph="square"]::before { content: "■"; content: "■" / ""; }
+[data-glyph="triangle"]::before { content: "▲"; content: "▲" / ""; }
+[data-glyph="circle"]::before { content: "●"; content: "●" / ""; }
 
 /* Visualmente escondido até receber foco ("Ir para o conteúdo"). */
 .skip-link { position: absolute; left: -9999px; }

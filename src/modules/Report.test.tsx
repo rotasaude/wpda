@@ -47,8 +47,7 @@ describe("Report", () => {
     stubFetch(json(200, frozen));
     render(<Report token="abc" />);
 
-    expect(await screen.findByText("alta")).toBeInTheDocument();
-    expect(screen.getByText("prioridade: 1")).toBeInTheDocument();
+    expect(await screen.findByText("Seu resultado: prioridade alta")).toBeInTheDocument();
     expect(screen.getByText("Procure a UPA hoje")).toBeInTheDocument();
     expect(screen.getByText("Leve um documento com foto.")).toBeInTheDocument();
     // Datas no fuso da cidade (America/Sao_Paulo, UTC-3).
@@ -122,5 +121,48 @@ describe("Report", () => {
 
     const extra = await screen.findByText("extra");
     expect(extra.closest("article")).not.toBeNull();
+  });
+
+  describe("usabilidade (6e)", () => {
+    it("o nível vira frase grande e o número interno some (WP-04)", async () => {
+      stubFetch(json(200, { ...frozen, priority: 3 }));
+      render(<Report token="abc" />);
+      const phrase = await screen.findByText("Seu resultado: prioridade alta");
+      expect(parseInt(phrase.style.fontSize)).toBeGreaterThanOrEqual(18);
+      expect(phrase.getAttribute("data-glyph")).toBe("square");
+      expect(screen.queryByText(/prioridade: \d/)).toBeNull();
+    });
+
+    it("selo com borda do tom, e neutro com a de destaque (WP-17)", async () => {
+      stubFetch(json(200, frozen));
+      render(<Report token="abc" />);
+      expect((await screen.findByText("Seu resultado: prioridade alta")).style.border).toBe("2px solid var(--down)");
+    });
+
+    it("área logada: sem 'Válido até' nem aviso do link, alinhada ao topo (WP-04, WP-17)", async () => {
+      stubFetch(json(200, frozen));
+      render(<Report token="abc" signedIn />);
+      await screen.findByText("Seu resultado: prioridade alta");
+      expect(screen.getByText("Realizado em 20/09/2026, 12:30.")).toBeInTheDocument();
+      expect(screen.queryByText(/Válido até/)).toBeNull();
+      expect(screen.queryByText(/não compartilhe este link/)).toBeNull();
+      expect(screen.getByRole("main").style.justifyContent).toBe("flex-start");
+    });
+
+    it("o título recebe o foco quando o relatório chega (WP-02)", async () => {
+      stubFetch(json(200, frozen));
+      render(<Report token="abc" signedIn />);
+      await screen.findByText("Seu resultado: prioridade alta");
+      expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1, name: "Seu resultado" }));
+    });
+
+    it("link público mantém os avisos e o centro (WP-04)", async () => {
+      stubFetch(json(200, frozen));
+      render(<Report token="abc" />);
+      await screen.findByText("Seu resultado: prioridade alta");
+      expect(screen.getByText(/Válido até/)).toBeInTheDocument();
+      expect(screen.getByRole("main").style.justifyContent).toBe("center");
+      expect(screen.getByRole("main").style.paddingBottom).toBe("calc(96px + env(safe-area-inset-bottom))");
+    });
   });
 });

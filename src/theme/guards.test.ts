@@ -27,6 +27,11 @@ describe("guardas de cor e acessibilidade do wpda", () => {
 
 describe("controles nativos seguem o tema (escuro e alto contraste)", () => {
   const css = readFileSync(join(src, "theme/global.css"), "utf8");
+  it("glifo do nível tem reserva sem texto alternativo (A-15)", () => {
+    for (const g of [ "■", "▲", "●" ]) {
+      expect(css).toMatch(new RegExp(`content:\\s*"${g}";\\s*content:\\s*"${g}"\\s*/\\s*""`));
+    }
+  });
   it("botões herdam a cor do texto", () => expect(css).toMatch(/button[^{]*\{[^}]*color:\s*inherit/));
   it("campos usam fundo e texto do tema", () => expect(css).toMatch(/input[^{]*\{[^}]*background:\s*var\(--panel\)[^}]*color:\s*var\(--ink\)/));
   it("temas escuros declaram color-scheme dark", () => {

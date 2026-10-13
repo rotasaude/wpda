@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { fetchReport, reportNote, type Report as ReportData } from "../lib/report";
 import { fmtDateTime } from "../lib/format";
 import { TONE_GLYPH, tierTone } from "../lib/tier";
@@ -11,8 +11,17 @@ type State =
   | { kind: "invalid" }
   | { kind: "error" };
 
-export function Report({ token, children }: { token: string; children?: ReactNode }) {
+// signedIn: aberto na área logada (ResultStep). Lá não há link a proteger nem
+// prazo a mostrar, e o relatório se alinha ao topo (WP-04, WP-17).
+export function Report({ token, children, signedIn = false }: { token: string; children?: ReactNode; signedIn?: boolean }) {
   const [ state, setState ] = useState<State>({ kind: "loading" });
+  // Com o relatório pronto, o foco vai ao título, como em toda troca de tela (WP-02).
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (state.kind !== "ok") return;
+    window.scrollTo(0, 0);
+    heading.current?.focus({ preventScroll: true });
+  }, [ state.kind ]);
 
   useEffect(() => {
     let alive = true;
@@ -35,27 +44,27 @@ export function Report({ token, children }: { token: string; children?: ReactNod
   const r = state.data;
   const note = reportNote(r.recommendation);
   return (
-    <Centered>
+    <Centered top={signedIn}>
       <article style={{ maxWidth: 520, width: "100%" }}>
         <header style={{ marginBottom: 16 }}>
           <CityHeader />
-          <h1 style={{ fontSize: 20, margin: "8px 0 0" }}>Seu resultado</h1>
+          <h1 ref={heading} tabIndex={-1} style={{ fontSize: 24, margin: "8px 0 0" }}>Seu resultado</h1>
         </header>
-        <div style={{ marginBottom: 12 }}>
-          {r.tier && (() => {
-            // Cor e forma por nível (■ alto · ▲ moderado · ● baixo); o texto
-            // do nível não muda. Nível desconhecido fica neutro.
-            const tone = tierTone(r.tier);
-            return (
-              <span data-glyph={tone ? TONE_GLYPH[tone] : undefined}
-                style={{ display: "inline-block", padding: "2px 10px", borderRadius: 999, marginRight: 8, fontSize: 12, fontWeight: 600,
-                  background: tone ? `var(--${tone}-bg)` : "var(--accent-bg)", color: tone ? `var(--${tone})` : "var(--accent)" }}>
-                {r.tier}
-              </span>
-            );
-          })()}
-          {r.priority && <span style={{ fontSize: 12, color: "var(--ink2)" }}>prioridade: {r.priority}</span>}
-        </div>
+        {r.tier && (() => {
+          // Cor, forma (■ alto · ▲ moderado · ● baixo) e texto, em frase grande:
+          // é a informação mais importante da tela (WP-04). A borda segura a forma
+          // no alto contraste, onde o fundo some (WP-17). O número interno de
+          // prioridade não aparece para o cidadão.
+          const tone = tierTone(r.tier);
+          const ink = tone ? `var(--${tone})` : "var(--accent)";
+          return (
+            <p data-glyph={tone ? TONE_GLYPH[tone] : undefined}
+              style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.3, margin: "0 0 16px", padding: "8px 12px", borderRadius: 12,
+                border: `2px solid ${ink}`, background: tone ? `var(--${tone}-bg)` : "var(--accent-bg)", color: ink }}>
+              {`Seu resultado: prioridade ${r.tier}`}
+            </p>
+          );
+        })()}
         {note.title && (
           <p style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.4, margin: "0 0 8px" }}>
             {note.title}
@@ -66,8 +75,8 @@ export function Report({ token, children }: { token: string; children?: ReactNod
         </p>
         <footer style={{ fontSize: 12, color: "var(--ink3)", borderTop: "1px solid var(--line)", paddingTop: 12 }}>
           {r.completed_at && <div>Realizado em {fmtDateTime(r.completed_at)}.</div>}
-          {r.expires_at && <div>Válido até {fmtDateTime(r.expires_at)}.</div>}
-          <p style={{ marginTop: 12 }}>Estas informações são pessoais — não compartilhe este link.</p>
+          {!signedIn && r.expires_at && <div>Válido até {fmtDateTime(r.expires_at)}.</div>}
+          {!signedIn && <p style={{ marginTop: 12 }}>Estas informações são pessoais — não compartilhe este link.</p>}
         </footer>
         <EmergencyCall />
         {children && <div style={{ marginTop: 16 }}>{children}</div>}
@@ -76,10 +85,11 @@ export function Report({ token, children }: { token: string; children?: ReactNod
   );
 }
 
-function Centered({ children }: { children: ReactNode }) {
+// O padding de baixo reserva o espaço da faixa fixa do 192.
+function Centered({ children, top = false }: { children: ReactNode; top?: boolean }) {
   return (
-    <main id="conteudo" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      padding: 24 }}>
+    <main id="conteudo" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: top ? "flex-start" : "center", padding: 24, paddingBottom: "calc(96px + env(safe-area-inset-bottom))" }}>
       {children}
     </main>
   );
