@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  BIRTH_DATE_FUTURE, BIRTH_DATE_INVALID, BIRTH_DATE_TOO_OLD, GENDER_IDENTITY_OPTIONS, SEX_OPTIONS, SEX_REQUIRED,
+  BIRTH_DATE_FUTURE, BIRTH_DATE_INVALID, BIRTH_DATE_NONEXISTENT, BIRTH_DATE_TOO_OLD, GENDER_IDENTITY_OPTIONS, SEX_OPTIONS, SEX_REQUIRED,
   ageOn, genderIdentityLabel, maskDate, parseBirthDate, sexLabel, toMaskedDate, todayInCity, validateProfile
 } from "./profile";
 import { setCityTimeZone } from "./format";
@@ -83,11 +83,16 @@ describe("validateProfile", () => {
     expect(validateProfile({ birthDate: "", sex: null, genderIdentity: null }, TODAY))
       .toEqual({ ok: false, errors: { birthDate: BIRTH_DATE_INVALID, sex: SEX_REQUIRED } });
   });
-  it("data incompleta ou que não existe é inválida", () => {
-    for (const d of [ "02/04/19", "31/02/2000" ]) {
+  it("data incompleta pede o formato (WP-10)", () => {
+    expect(validateProfile({ birthDate: "02/04/19", sex: "female", genderIdentity: null }, TODAY))
+      .toEqual({ ok: false, errors: { birthDate: BIRTH_DATE_INVALID } });
+  });
+  it("data completa que não existe diz que não existe (WP-10)", () => {
+    for (const d of [ "31/02/1990", "00/01/2000" ]) {
       expect(validateProfile({ birthDate: d, sex: "female", genderIdentity: null }, TODAY))
-        .toEqual({ ok: false, errors: { birthDate: BIRTH_DATE_INVALID } });
+        .toEqual({ ok: false, errors: { birthDate: BIRTH_DATE_NONEXISTENT } });
     }
+    expect(BIRTH_DATE_NONEXISTENT).toBe("Essa data não existe. Confira o dia e o mês.");
   });
   it("nascido hoje passa; amanhã é futuro", () => {
     expect(validateProfile({ birthDate: "05/10/2026", sex: "female", genderIdentity: null }, TODAY).ok).toBe(true);

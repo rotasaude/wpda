@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PROFILE_PURPOSE, ProfileForm } from "./ProfileForm";
 import { citizenApi } from "../../lib/citizenApi";
-import { BIRTH_DATE_FUTURE, BIRTH_DATE_INVALID, BIRTH_DATE_TOO_OLD, SEX_REQUIRED } from "../../lib/profile";
+import { BIRTH_DATE_FUTURE, BIRTH_DATE_INVALID, BIRTH_DATE_NONEXISTENT, BIRTH_DATE_TOO_OLD, SEX_REQUIRED } from "../../lib/profile";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: [ "Date" ] });
@@ -23,6 +23,7 @@ function setup(props: Partial<Props> = {}) {
 
 const birth = () => screen.getByLabelText("Data de nascimento");
 const submit = () => userEvent.click(screen.getByRole("button", { name: "Continuar" }));
+const openGender = () => userEvent.click(screen.getByRole("button", { name: "Informar identidade de gênero (opcional)" }));
 
 describe("ProfileForm", () => {
   it("sem nada preenchido: aponta os dois campos e não envia", async () => {
@@ -37,6 +38,7 @@ describe("ProfileForm", () => {
     const { onSubmit } = setup();
     await userEvent.type(birth(), "02041963");
     expect(birth()).toHaveValue("02/04/1963");
+    await openGender();
     expect(screen.getByRole("radio", { name: "Prefiro não informar" })).toBeChecked();
     await userEvent.click(screen.getByRole("radio", { name: "Feminino" }));
     await submit();
@@ -47,6 +49,7 @@ describe("ProfileForm", () => {
     const { onSubmit } = setup();
     await userEvent.type(birth(), "02041963");
     await userEvent.click(screen.getByRole("radio", { name: "Feminino" }));
+    await openGender();
     await userEvent.click(screen.getByRole("radio", { name: "Mulher trans" }));
     await submit();
     expect(onSubmit).toHaveBeenCalledWith({ birth_date: "1963-04-02", sex: "female", gender_identity: "trans_woman" });
@@ -61,7 +64,7 @@ describe("ProfileForm", () => {
     await userEvent.clear(birth());
     await userEvent.type(birth(), "31022000");
     await submit();
-    expect(screen.getByText(BIRTH_DATE_INVALID)).toBeInTheDocument();
+    expect(screen.getByText(BIRTH_DATE_NONEXISTENT)).toBeInTheDocument();
     await userEvent.clear(birth());
     await userEvent.type(birth(), "05101895");
     await submit();
@@ -133,5 +136,42 @@ describe("ProfileForm", () => {
     const label = screen.getByRole("radio", { name: "Feminino" }).closest("label") as HTMLElement;
     expect(label.style.minHeight).toBe("48px");
     expect(label.style.fontSize).toBe("18px");
+  });
+
+  describe("usabilidade (6e)", () => {
+    it("erro do sexo ligado ao grupo e às opções (A-18)", async () => {
+      setup();
+      await submit();
+      const group = screen.getByRole("group", { name: "Sexo" });
+      const err = screen.getByText(SEX_REQUIRED);
+      expect(group.getAttribute("aria-describedby")).toBe(err.id);
+      expect(err.id).not.toBe("");
+      expect(screen.getByRole("radio", { name: "Feminino" })).toHaveAttribute("aria-invalid", "true");
+    });
+
+    it("cada erro some quando o campo muda (A-19)", async () => {
+      setup();
+      await submit();
+      await userEvent.type(birth(), "0");
+      expect(screen.queryByText(BIRTH_DATE_INVALID)).toBeNull();
+      expect(screen.getByText(SEX_REQUIRED)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("radio", { name: "Feminino" }));
+      expect(screen.queryByText(SEX_REQUIRED)).toBeNull();
+    });
+
+    it("identidade de gênero recolhida até a pessoa pedir (WP-11)", async () => {
+      setup();
+      const toggle = screen.getByRole("button", { name: "Informar identidade de gênero (opcional)" });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("radio", { name: "Mulher cis" })).toBeNull();
+      await userEvent.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByRole("radio", { name: "Mulher cis" })).toBeInTheDocument();
+    });
+
+    it("com identidade de gênero já informada, o grupo vem aberto (WP-11)", () => {
+      setup({ initial: { birth_date: "1963-04-02", sex: "male", gender_identity: "cis_man" } });
+      expect(screen.getByRole("radio", { name: "Homem cis" })).toBeChecked();
+    });
   });
 });

@@ -49,6 +49,8 @@ export function ProfileForm({ title, who, initial, busy, error, submitLabel, onS
   const [sex, setSex] = useState<Sex | null>(initial?.sex ?? null);
   const [genderIdentity, setGenderIdentity] = useState<GenderIdentity | null>(initial?.gender_identity ?? null);
   const [errors, setErrors] = useState<ProfileErrors>({});
+  // Opcional e longa (8 opções): recolhida até a pessoa pedir (WP-11).
+  const [genderOpen, setGenderOpen] = useState(initial?.gender_identity != null);
 
   function submit() {
     const result = validateProfile({ birthDate, sex, genderIdentity }, todayInCity());
@@ -70,10 +72,16 @@ export function ProfileForm({ title, who, initial, busy, error, submitLabel, onS
       <ConsentTermLink />
       <Field label="Data de nascimento" inputMode="numeric" autoComplete="off" placeholder="dd/mm/aaaa"
         hint="Dia, mês e ano. Exemplo: 02/04/1963." value={birthDate} error={errors.birthDate} disabled={busy}
-        onChange={e => setBirthDate(maskDate(e.target.value))} />
-      <RadioGroup legend="Sexo" options={SEX_OPTIONS} value={sex} onChange={setSex} error={errors.sex} disabled={busy} />
-      <RadioGroup legend="Identidade de gênero (opcional)" options={GENDER_IDENTITY_OPTIONS} value={genderIdentity}
-        onChange={setGenderIdentity} disabled={busy} />
+        onChange={e => { setBirthDate(maskDate(e.target.value)); setErrors(x => ({ ...x, birthDate: undefined })); }} />
+      <RadioGroup legend="Sexo" options={SEX_OPTIONS} value={sex} error={errors.sex} disabled={busy}
+        onChange={v => { setSex(v); setErrors(x => ({ ...x, sex: undefined })); }} />
+      <div style={{ marginBottom: genderOpen ? 0 : 16 }}>
+        <button type="button" aria-expanded={genderOpen} disabled={busy} onClick={() => setGenderOpen(o => !o)} style={linkStyle}>
+          Informar identidade de gênero (opcional)
+        </button>
+      </div>
+      {genderOpen && <RadioGroup legend="Identidade de gênero (opcional)" options={GENDER_IDENTITY_OPTIONS}
+        value={genderIdentity} onChange={setGenderIdentity} disabled={busy} />}
       {error && <ErrorText>{error}</ErrorText>}
     </Screen>
   );

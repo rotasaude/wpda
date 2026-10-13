@@ -34,6 +34,7 @@ export function genderIdentityLabel(g: GenderIdentity | null): string {
 }
 
 export const BIRTH_DATE_INVALID = "Digite a data como dia/mês/ano, por exemplo 02/04/1963.";
+export const BIRTH_DATE_NONEXISTENT = "Essa data não existe. Confira o dia e o mês.";
 export const BIRTH_DATE_FUTURE = "A data de nascimento não pode ser depois de hoje.";
 export const BIRTH_DATE_TOO_OLD = "Confira o ano de nascimento.";
 export const SEX_REQUIRED = "Escolha o sexo.";
@@ -83,7 +84,9 @@ export function validateProfile(d: ProfileDraft, today: string):
   { ok: true; value: ProfileInput } | { ok: false; errors: ProfileErrors } {
   const errors: ProfileErrors = {};
   const iso = parseBirthDate(d.birthDate);
-  if (!iso) errors.birthDate = BIRTH_DATE_INVALID;
+  // Formato completo com data impossível (31/02) não é erro de formato (WP-10).
+  const complete = /^\d{2}\/\d{2}\/\d{4}$/.test(d.birthDate.trim());
+  if (!iso) errors.birthDate = complete ? BIRTH_DATE_NONEXISTENT : BIRTH_DATE_INVALID;
   else if (iso > today) errors.birthDate = BIRTH_DATE_FUTURE;
   else if (ageOn(iso, today) > MAX_AGE) errors.birthDate = BIRTH_DATE_TOO_OLD;
   if (!d.sex) errors.sex = SEX_REQUIRED;

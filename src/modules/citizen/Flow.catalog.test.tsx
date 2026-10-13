@@ -268,6 +268,7 @@ describe("Flow — privacidade do perfil (ADR 0027, invariantes)", () => {
     await userEvent.type(await screen.findByLabelText("CPF de outra pessoa"), "52998224725");
     await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
     await fillProfile();
+    await userEvent.click(screen.getByRole("button", { name: "Informar identidade de gênero (opcional)" }));
     await userEvent.click(screen.getByRole("radio", { name: "Mulher trans" }));
     await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
     expect(await screen.findByText("Data de nascimento inválida. Confira dia, mês e ano.")).toBeInTheDocument();

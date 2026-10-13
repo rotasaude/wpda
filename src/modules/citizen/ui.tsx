@@ -1,7 +1,7 @@
 // Peças de tela do canal web do cidadão: alvos de toque de 48 px ou mais,
 // texto de 18 px, ação principal embaixo (uso com uma mão).
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
-import { useEffect, useId, useRef } from "react";
+import { forwardRef, useEffect, useId, useRef } from "react";
 import { CityHeader } from "./CityHeader";
 import { EmergencyCall } from "./EmergencyCall";
 import { ApiError } from "../../lib/citizenApi";
@@ -55,24 +55,26 @@ export const FROZEN_TEXT_NOTICE =
 
 // `hint` aparece sob o campo antes de qualquer envio e é a descrição dele
 // (aria-describedby), lida junto pelo leitor de tela.
-export function Field({ label, error, hint, ...props }:
-  InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string; hint?: string }) {
-  const id = useId();
-  const hintId = `${id}-hint`;
-  const errorId = `${id}-error`;
-  // O erro também descreve o campo: o leitor de tela lê dica e erro juntos.
-  const describedBy = [ hint ? hintId : null, error ? errorId : null ].filter(Boolean).join(" ") || undefined;
-  return (
-    <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
-      <label htmlFor={id} style={{ fontWeight: 600 }}>{label}</label>
-      <input id={id} {...props} aria-invalid={Boolean(error)} aria-describedby={describedBy}
-        style={{ minHeight: 56, fontSize: 20, padding: "0 12px", borderRadius: 12,
-          border: `2px solid ${error ? "var(--down)" : "var(--rule2)"}` }} />
-      {hint && <p id={hintId} style={{ margin: 0, fontSize: 15, color: "var(--ink2)" }}>{hint}</p>}
-      {error && <ErrorText id={errorId}>{error}</ErrorText>}
-    </div>
-  );
-}
+// `ref` chega ao input: a tela foca o campo depois de um erro dele (WP-07).
+export const Field = forwardRef<HTMLInputElement,
+  InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string; hint?: string }>(
+  function Field({ label, error, hint, ...props }, ref) {
+    const id = useId();
+    const hintId = `${id}-hint`;
+    const errorId = `${id}-error`;
+    // O erro também descreve o campo: o leitor de tela lê dica e erro juntos.
+    const describedBy = [ hint ? hintId : null, error ? errorId : null ].filter(Boolean).join(" ") || undefined;
+    return (
+      <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+        <label htmlFor={id} style={{ fontWeight: 600 }}>{label}</label>
+        <input id={id} ref={ref} {...props} aria-invalid={Boolean(error)} aria-describedby={describedBy}
+          style={{ minHeight: 56, fontSize: 20, padding: "0 12px", borderRadius: 12,
+            border: `2px solid ${error ? "var(--down)" : "var(--rule2)"}` }} />
+        {hint && <p id={hintId} style={{ margin: 0, fontSize: 15, color: "var(--ink2)" }}>{hint}</p>}
+        {error && <ErrorText id={errorId}>{error}</ErrorText>}
+      </div>
+    );
+  });
 
 export function ErrorText({ children, id }: { children: ReactNode; id?: string }) {
   return <p id={id} role="alert" style={{ color: "var(--down)", margin: 0 }}>{children}</p>;
@@ -106,8 +108,11 @@ export function RadioGroup<T extends string | null>({ legend, options, value, on
   onChange: (value: T) => void; error?: string; disabled?: boolean;
 }) {
   const name = useId();
+  // O erro descreve o grupo e marca cada opção (A-18).
+  const errorId = `${name}-error`;
   return (
-    <fieldset style={{ border: "none", padding: 0, margin: "0 0 16px", display: "grid", gap: 8 }}>
+    <fieldset aria-describedby={error ? errorId : undefined}
+      style={{ border: "none", padding: 0, margin: "0 0 16px", display: "grid", gap: 8 }}>
       <legend style={{ fontWeight: 600, padding: 0, marginBottom: 6 }}>{legend}</legend>
       {options.map(o => (
         <label key={o.value ?? "none"}
@@ -115,11 +120,12 @@ export function RadioGroup<T extends string | null>({ legend, options, value, on
             borderRadius: 12, border: `2px solid ${disabled ? "var(--rule)" : "var(--rule2)"}`,
             cursor: disabled ? "default" : "pointer", color: disabled ? "var(--ink2)" : undefined }}>
           <input type="radio" name={name} checked={value === o.value} disabled={disabled}
+            aria-invalid={error ? true : undefined}
             onChange={() => onChange(o.value)} style={{ width: 24, height: 24, margin: 0, flexShrink: 0 }} />
           {o.label}
         </label>
       ))}
-      {error && <ErrorText>{error}</ErrorText>}
+      {error && <ErrorText id={errorId}>{error}</ErrorText>}
     </fieldset>
   );
 }
