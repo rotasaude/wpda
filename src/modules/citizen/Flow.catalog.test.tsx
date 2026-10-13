@@ -8,7 +8,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: [ "Date" ] });
   vi.setSystemTime(new Date("2026-10-05T10:00:00-03:00"));
 });
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); window.history.replaceState(null, "", "/"); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 
 const PROFILE_IN = { birth_date: "1963-04-02", sex: "female" as const, gender_identity: null };
 const avo: Person = {
@@ -281,8 +281,13 @@ describe("Flow — privacidade do perfil (ADR 0027, invariantes)", () => {
 });
 
 describe("Flow — resultado com sugestão", () => {
-  async function reachResult() {
+  async function reachResult(extra: { check_in_available?: boolean } = {}) {
     signedIn([ avo ]);
+    // O relatório pronto: as ações e as sugestões só aparecem com ele (WP-03).
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      tier: "media", priority: "2", recommendation: { title: "Procure a unidade", body: "Esta semana." },
+      completed_at: "2026-10-05T12:05:00Z", expires_at: null
+    }), { status: 200, headers: { "Content-Type": "application/json" } })));
     vi.spyOn(citizenApi, "catalog").mockResolvedValue(CATALOG);
     const start = vi.spyOn(citizenApi, "startTriage")
       .mockResolvedValueOnce({ conversation_id: "c1", citizen_id: "p1", resumed: false, step })
@@ -291,15 +296,15 @@ describe("Flow — resultado com sugestão", () => {
     vi.spyOn(citizenApi, "answer").mockResolvedValue({ status: "completed", triage_id: "t1" });
     vi.spyOn(citizenApi, "triage").mockResolvedValue({
       id: "t1", status: "completed", tier: "media", priority: 2, created_at: "2026-10-05T12:00:00Z",
-      completed_at: "2026-10-05T12:05:00Z", report_url: null, consent_active: true, origin_phone_masked: null,
-      attendance: null, check_in_available: false, reference_units: [],
+      completed_at: "2026-10-05T12:05:00Z", report_url: "http://curitiba.localhost/wpda/?token=abc", consent_active: true,
+      origin_phone_masked: null, attendance: null, check_in_available: false, reference_units: [], ...extra,
       suggestions: [ { suggestion_id: "s1", protocol_name: "saude-mental-aprofundada",
         title: "Saúde mental — aprofundamento", summary: null } ]
     });
     await choosePerson();
     await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: "Começar" }));
     await userEvent.click(await screen.findByRole("button", { name: "Não" }));
-    await screen.findByRole("heading", { name: "Recomendamos também" });
+    await screen.findByRole("heading", { name: "Recomendamos também" }, { timeout: 3000 });
     return { start };
   }
 
@@ -314,6 +319,14 @@ describe("Flow — resultado com sugestão", () => {
     await reachResult();
     await userEvent.click(screen.getByRole("button", { name: "Fazer outra triagem" }));
     expect(await screen.findByRole("heading", { name: "Qual triagem fazer?" })).toBeInTheDocument();
+  });
+
+  it("'Cheguei na unidade' do resultado abre o código de chegada da triagem (WP-05)", async () => {
+    const issue = vi.spyOn(citizenApi, "issueCheckInCode").mockResolvedValue({ code: "123456", expires_at: "2099-01-01T00:00:00Z" });
+    await reachResult({ check_in_available: true });
+    await userEvent.click(screen.getByRole("button", { name: "Cheguei na unidade" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Cheguei na unidade" })).toBeInTheDocument();
+    expect(issue).toHaveBeenCalledWith("t1");
   });
 
   it("início tardio de uma sugestão não puxa o cidadão que já saiu do resultado", async () => {

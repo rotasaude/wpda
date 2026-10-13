@@ -15,6 +15,8 @@ function summary(report_url: string | null): TriageSummary {
   };
 }
 
+const READY = "http://curitiba.localhost/wpda/?token=abc";
+
 function stubReport() {
   const fn = vi.fn(async () => new Response(JSON.stringify({
     tier: "alta", priority: "1",
@@ -33,7 +35,7 @@ describe("ResultStep", () => {
       .mockResolvedValue(summary("http://curitiba.localhost/wpda/?token=abc"));
     const fetchMock = stubReport();
 
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
 
     expect(screen.getByText("Preparando seu resultado…")).toBeInTheDocument();
     expect(await screen.findByText("Procure atendimento hoje", undefined, { timeout: 3000 })).toBeInTheDocument();
@@ -42,13 +44,14 @@ describe("ResultStep", () => {
   });
 
   it("oferece nova triagem e o histórico", async () => {
-    vi.spyOn(citizenApi, "triage").mockResolvedValue(summary(null));
+    vi.spyOn(citizenApi, "triage").mockResolvedValue(summary(READY));
+    stubReport();
     const onAgain = vi.fn();
     const onHistory = vi.fn();
 
-    render(<ResultStep triageId="t1" onAgain={onAgain} onHistory={onHistory} onStartSuggestion={vi.fn()} />);
-    await userEvent.click(screen.getByText("Fazer outra triagem"));
-    await userEvent.click(screen.getByText("Minhas triagens"));
+    render(<ResultStep triageId="t1" onAgain={onAgain} onHistory={onHistory} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
+    await userEvent.click(await screen.findByText("Fazer outra triagem"));
+    await userEvent.click(screen.getByText("Ver minhas triagens e horários"));
 
     expect(onAgain).toHaveBeenCalled();
     expect(onHistory).toHaveBeenCalled();
@@ -70,7 +73,7 @@ describe("ResultStep — unidade de referência", () => {
 
   it("enquanto o relatório não fica pronto, mostra a unidade vinda da triagem", async () => {
     vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), reference_units: [ units[0] ] });
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
     expect(await screen.findByRole("heading", { name: "Sua unidade de referência" })).toBeInTheDocument();
     expect(screen.getByText("UBS Batel")).toBeInTheDocument();
   });
@@ -80,7 +83,7 @@ describe("ResultStep — unidade de referência", () => {
       ...summary("http://curitiba.localhost/wpda/?token=abc"), reference_units: units
     });
     stubReport();
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
 
     expect(await screen.findByText("Procure atendimento hoje")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { name: "Suas unidades de referência" })).toHaveLength(1);
@@ -93,19 +96,19 @@ describe("ResultStep — unidade de referência", () => {
       ...summary("http://curitiba.localhost/wpda/?token=abc"), reference_units: units
     });
     stubReport();
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
 
     const card = (await screen.findByText("Procure atendimento hoje")).closest("article")!;
     expect(card).not.toBeNull();
     expect(within(card).getByRole("heading", { name: "Suas unidades de referência" })).toBeInTheDocument();
     expect(within(card).getByRole("button", { name: "Fazer outra triagem" })).toBeInTheDocument();
-    expect(within(card).getByRole("button", { name: "Minhas triagens" })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Ver minhas triagens e horários" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Fazer outra triagem" })).toHaveLength(1);
   });
 
   it("triagem sem unidade de referência: bloco ausente", async () => {
     const triage = vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), reference_units: [] });
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
     expect(screen.getByText("Preparando seu resultado…")).toBeInTheDocument();
     await waitFor(() => expect(triage).toHaveBeenCalled());
     await act(async () => { await Promise.resolve(); });
@@ -120,10 +123,11 @@ describe("ResultStep — Recomendamos também (módulo 15)", () => {
     { suggestion_id: "s2", protocol_name: "saude-do-idoso", title: "Saúde do idoso", summary: null }
   ];
 
-  it("mostra as sugestões enquanto o relatório é preparado; 'Fazer agora' chama com o nome do protocolo", async () => {
-    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), suggestions });
+  it("mostra as sugestões com o resultado pronto; 'Fazer agora' chama com o nome do protocolo", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(READY), suggestions });
+    stubReport();
     const onStartSuggestion = vi.fn<(name: string) => Promise<string | null>>().mockResolvedValue(null);
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={onStartSuggestion} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={onStartSuggestion} onCheckIn={vi.fn()} />);
 
     const block = (await screen.findByRole("heading", { name: "Recomendamos também" })).closest("section")!;
     expect(within(block).getByText("Mais perguntas sobre humor e sono.")).toBeInTheDocument();
@@ -135,7 +139,7 @@ describe("ResultStep — Recomendamos também (módulo 15)", () => {
 
   it("lista vazia (resultado urgente ou nada sugerido): bloco ausente", async () => {
     const triage = vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), suggestions: [] });
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
     await waitFor(() => expect(triage).toHaveBeenCalled());
     await act(async () => { await Promise.resolve(); });
     expect(screen.queryByText("Recomendamos também")).not.toBeInTheDocument();
@@ -144,46 +148,37 @@ describe("ResultStep — Recomendamos também (módulo 15)", () => {
 
   it("api anterior sem o campo: bloco ausente", async () => {
     const triage = vi.spyOn(citizenApi, "triage").mockResolvedValue(summary(null));
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
     await waitFor(() => expect(triage).toHaveBeenCalled());
     await act(async () => { await Promise.resolve(); });
     expect(screen.queryByText("Recomendamos também")).not.toBeInTheDocument();
   });
 
   it("'Depois' esconde a sugestão; sem nenhuma, fica só a nota de onde encontrá-las", async () => {
-    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), suggestions: [ suggestions[0] ] });
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(READY), suggestions: [ suggestions[0] ] });
+    stubReport();
     const onStartSuggestion = vi.fn();
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={onStartSuggestion} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={onStartSuggestion} onCheckIn={vi.fn()} />);
     await userEvent.click(await screen.findByRole("button", { name: "Depois" }));
     expect(screen.queryByRole("heading", { name: "Recomendamos também" })).not.toBeInTheDocument();
     expect(screen.getByText(LATER_NOTE)).toBeInTheDocument();
     expect(onStartSuggestion).not.toHaveBeenCalled();
   });
 
-  it("'Depois' continua valendo quando o relatório fica pronto", async () => {
-    vi.spyOn(citizenApi, "triage")
-      .mockResolvedValueOnce({ ...summary(null), suggestions: [ suggestions[0] ] })
-      .mockResolvedValue({ ...summary("http://curitiba.localhost/wpda/?token=abc"), suggestions: [ suggestions[0] ] });
-    stubReport();
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
-    await userEvent.click(await screen.findByRole("button", { name: "Depois" }));
-    expect(await screen.findByText("Procure atendimento hoje", undefined, { timeout: 3000 })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Fazer agora" })).not.toBeInTheDocument();
-    expect(screen.getByText(LATER_NOTE)).toBeInTheDocument();
-  });
-
   it("recusa ao começar aparece no bloco", async () => {
-    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), suggestions: [ suggestions[0] ] });
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(READY), suggestions: [ suggestions[0] ] });
+    stubReport();
     const onStartSuggestion = vi.fn().mockResolvedValue("Esta triagem não está mais disponível para esta pessoa.");
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={onStartSuggestion} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={onStartSuggestion} onCheckIn={vi.fn()} />);
     await userEvent.click(await screen.findByRole("button", { name: "Fazer agora" }));
     expect(await screen.findByText("Esta triagem não está mais disponível para esta pessoa.")).toBeInTheDocument();
   });
 
   it("toque duplo em 'Fazer agora' chama uma vez só", async () => {
-    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), suggestions: [ suggestions[0] ] });
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(READY), suggestions: [ suggestions[0] ] });
+    stubReport();
     const onStartSuggestion = vi.fn().mockReturnValue(new Promise(() => {}));
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={onStartSuggestion} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={onStartSuggestion} onCheckIn={vi.fn()} />);
     const btn = await screen.findByRole("button", { name: "Fazer agora" });
     await userEvent.click(btn);
     await userEvent.click(btn);
@@ -215,7 +210,7 @@ describe("ResultStep — pedido de agendamento (módulo 17)", () => {
 
   it("com unidade: diz o tipo, quem vai entrar em contato e o prazo previsto", async () => {
     vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), scheduling_request: request });
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
 
     const block = (await screen.findByRole("heading", { name: "Pedido de agendamento" })).closest("section")!;
     expect(within(block).getByText("Consulta médica")).toBeInTheDocument();
@@ -226,7 +221,7 @@ describe("ResultStep — pedido de agendamento (módulo 17)", () => {
 
   it("sem unidade de referência (fila 'sem unidade'): texto próprio, sem 'null'", async () => {
     vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), scheduling_request: { ...request, unit_name: null } });
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
 
     const block = (await screen.findByRole("heading", { name: "Pedido de agendamento" })).closest("section")!;
     expect(within(block).getByText(
@@ -237,7 +232,7 @@ describe("ResultStep — pedido de agendamento (módulo 17)", () => {
 
   it("aberto com unidade: mantém o parágrafo de quando a unidade marcar", async () => {
     vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), scheduling_request: request });
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
 
     const block = (await screen.findByRole("heading", { name: "Pedido de agendamento" })).closest("section")!;
     expect(within(block).getByText(
@@ -250,7 +245,7 @@ describe("ResultStep — pedido de agendamento (módulo 17)", () => {
       ...summary(null),
       scheduling_request: { ...request, due_on: "2026-10-07", status: "scheduled", scheduled_at: "2026-10-08T09:00:00-03:00" }
     });
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
 
     const block = (await screen.findByRole("heading", { name: "Pedido de agendamento" })).closest("section")!;
     expect(within(block).getByText("Consulta médica")).toBeInTheDocument();
@@ -268,7 +263,7 @@ describe("ResultStep — pedido de agendamento (módulo 17)", () => {
       ...summary(null),
       scheduling_request: { ...request, status: "scheduled", scheduled_at: "2026-10-09T02:30:00Z" }
     });
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
 
     expect(await screen.findByText(
       'Sua consulta já está marcada: qui., 08/10, 23:30. Veja os detalhes em "Seus agendamentos", em Minhas triagens.'
@@ -279,7 +274,7 @@ describe("ResultStep — pedido de agendamento (módulo 17)", () => {
     vi.spyOn(citizenApi, "triage").mockResolvedValue({
       ...summary(null), scheduling_request: { ...request, status: "scheduled", scheduled_at: null }
     });
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
 
     const block = (await screen.findByRole("heading", { name: "Pedido de agendamento" })).closest("section")!;
     expect(within(block).getByText(
@@ -290,7 +285,7 @@ describe("ResultStep — pedido de agendamento (módulo 17)", () => {
 
   it("api anterior sem status/scheduled_at: texto de pedido aberto", async () => {
     mockTriageFetch({ unit_name: "UBS Batel", due_on: "2026-11-05", appointment_type_name: "Consulta médica" });
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
 
     const block = (await screen.findByRole("heading", { name: "Pedido de agendamento" })).closest("section")!;
     expect(within(block).getByText(
@@ -302,7 +297,7 @@ describe("ResultStep — pedido de agendamento (módulo 17)", () => {
 
   it("prazo no último dia do mês não desloca o dia", async () => {
     vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), scheduling_request: { ...request, due_on: "2026-10-31" } });
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
     expect(await screen.findByText(/Prazo previsto: até 31\/10\./)).toBeInTheDocument();
   });
 
@@ -311,7 +306,7 @@ describe("ResultStep — pedido de agendamento (módulo 17)", () => {
     [ "api anterior, sem o campo", {} ]
   ])("sem pedido (%s): bloco ausente", async (_label, extra) => {
     const triage = vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), ...extra });
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
     await waitFor(() => expect(triage).toHaveBeenCalled());
     await act(async () => { await Promise.resolve(); });
     expect(screen.queryByRole("heading", { name: "Pedido de agendamento" })).not.toBeInTheDocument();
@@ -323,10 +318,74 @@ describe("ResultStep — pedido de agendamento (módulo 17)", () => {
       ...summary("http://curitiba.localhost/wpda/?token=abc"), scheduling_request: request
     });
     stubReport();
-    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} />);
+    render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
 
     const card = (await screen.findByText("Procure atendimento hoje")).closest("article")!;
     expect(within(card).getByRole("heading", { name: "Pedido de agendamento" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { name: "Pedido de agendamento" })).toHaveLength(1);
+  });
+});
+
+describe("ResultStep — usabilidade (6e)", () => {
+  function renderStep(over: Partial<Parameters<typeof ResultStep>[0]> = {}) {
+    const props = { triageId: "t1", onAgain: vi.fn(), onHistory: vi.fn(), onStartSuggestion: vi.fn(), onCheckIn: vi.fn(), ...over };
+    render(<ResultStep {...props} />);
+    return props;
+  }
+  const suggestion = { suggestion_id: "s1", protocol_name: "p", title: "Outra", summary: null };
+
+  it("na espera: indicador com role=status, sem ações nem sugestões (WP-03)", async () => {
+    const triage = vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(null), suggestions: [ suggestion ] });
+    renderStep();
+    await waitFor(() => expect(triage).toHaveBeenCalled());
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByRole("status")).toHaveTextContent("Preparando seu resultado…");
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fazer outra triagem" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Fazer agora" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Ver minhas triagens e horários" })).toBeInTheDocument();
+  });
+
+  describe("desistência", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("depois de 15 tentativas oferece ver de novo, que reinicia a consulta (WP-03)", async () => {
+      const triage = vi.spyOn(citizenApi, "triage").mockResolvedValue(summary(null));
+      stubReport();
+      renderStep();
+      for (let i = 0; i < 16; i++) await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(triage).toHaveBeenCalledTimes(15);
+      const again = screen.getByRole("button", { name: "Ver meu resultado de novo" });
+      triage.mockResolvedValue(summary(READY));
+      await act(async () => { again.click(); await vi.advanceTimersByTimeAsync(0); });
+      expect(triage).toHaveBeenCalledTimes(16);
+      expect(screen.queryByRole("button", { name: "Ver meu resultado de novo" })).toBeNull();
+      await act(async () => { await vi.advanceTimersByTimeAsync(10); });
+      expect(screen.getByText("Procure atendimento hoje")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Fazer outra triagem" })).toBeInTheDocument();
+    });
+  });
+
+  it("com check-in disponível, 'E agora?' traz 'Cheguei na unidade' como principal (WP-05)", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue({ ...summary(READY), check_in_available: true });
+    stubReport();
+    const props = renderStep();
+    const block = (await screen.findByRole("heading", { level: 2, name: "E agora?" })).closest("section")!;
+    const checkIn = within(block).getByRole("button", { name: "Cheguei na unidade" });
+    expect(checkIn.style.background).toBe("var(--accent)");
+    expect(screen.getByRole("button", { name: "Fazer outra triagem" }).style.background).toBe("transparent");
+    await userEvent.click(checkIn);
+    expect(props.onCheckIn).toHaveBeenCalledWith("t1");
+  });
+
+  it("sem check-in, 'E agora?' fala dos horários e a nova triagem segue principal (WP-05)", async () => {
+    vi.spyOn(citizenApi, "triage").mockResolvedValue(summary(READY));
+    stubReport();
+    renderStep();
+    const block = (await screen.findByRole("heading", { level: 2, name: "E agora?" })).closest("section")!;
+    expect(within(block).getByText(/Seus horários marcados/)).toBeInTheDocument();
+    expect(within(block).queryByRole("button")).toBeNull();
+    expect(screen.getByRole("button", { name: "Fazer outra triagem" }).style.background).toBe("var(--accent)");
   });
 });

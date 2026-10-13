@@ -265,7 +265,8 @@ export function Flow() {
       view = <ResultStep triageId={state.triageId}
         onAgain={() => setState({ at: "catalog", consentVersion: state.consentVersion, citizenId: state.citizenId, notice: null })}
         onHistory={() => setState({ at: "history", consentVersion: state.consentVersion, citizenId: state.citizenId })}
-        onStartSuggestion={name => startTriage(state.consentVersion, state.citizenId, name)} />;
+        onStartSuggestion={name => startTriage(state.consentVersion, state.citizenId, name)}
+        onCheckIn={triageId => setState({ at: "check-in-code", triageId, citizenId: state.citizenId, consentVersion: state.consentVersion })} />;
       break;
     case "history":
       view = <HistoryStep citizenId={state.citizenId}
