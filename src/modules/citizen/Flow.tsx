@@ -42,7 +42,7 @@ type State =
   | { at: "preferences"; consentVersion: string | null }
   | { at: "declined" };
 
-// Quem estava fazendo a triagem, para voltar ao catálogo dela depois de um F5
+// A pessoa escolhida por último, para voltar ao catálogo dela depois de um F5
 // (WP-06). Só o id (UUID): nada de resposta, CPF ou dado clínico. Some em
 // "Sair", na sessão vencida e quando a triagem termina.
 export const RESUME_KEY = "wpda:resume-citizen";
@@ -105,9 +105,11 @@ export function Flow() {
     return () => window.removeEventListener("citizen:unauthenticated", onUnauthenticated);
   }, []);
 
+  // Guarda a pessoa de toda tela ligada a ela; "Para quem é?" e o resultado
+  // esquecem. Assim um F5 nunca reabre o catálogo de quem já foi trocado.
   useEffect(() => {
-    if (state.at === "question") remember(state.citizenId);
-    else if (state.at === "result") forget();
+    if (state.at === "catalog" || state.at === "question" || state.at === "profile") remember(state.citizenId);
+    else if (state.at === "people" || state.at === "result") forget();
   }, [state]);
 
   // URL em dia fora do login (no login, a URL pedida fica para o F5).

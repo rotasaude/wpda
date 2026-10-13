@@ -27,6 +27,9 @@ describe("guardas de cor e acessibilidade do wpda", () => {
 
 describe("controles nativos seguem o tema (escuro e alto contraste)", () => {
   const css = readFileSync(join(src, "theme/global.css"), "utf8");
+  it("rolar até o campo focado desconta a faixa do 192 (WP-01, revisão)", () => {
+    expect(css).toMatch(/html\s*\{[^}]*scroll-padding-bottom:\s*calc\(96px \+ env\(safe-area-inset-bottom\)\)/);
+  });
   it("glifo do nível tem reserva sem texto alternativo (A-15)", () => {
     for (const g of [ "■", "▲", "●" ]) {
       expect(css).toMatch(new RegExp(`content:\\s*"${g}";\\s*content:\\s*"${g}"\\s*/\\s*""`));

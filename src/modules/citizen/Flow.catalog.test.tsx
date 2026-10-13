@@ -384,6 +384,23 @@ describe("Flow — usabilidade (6e)", () => {
     expect(citizenApi.catalog).toHaveBeenLastCalledWith("p1");
   });
 
+  it("trocar de pessoa depois de sair da triagem não retoma a pessoa antiga (WP-06, revisão)", async () => {
+    const filho: Person = { ...avo, id: "p2", cpf_masked: "***.111.222-**" };
+    signedIn([ avo, filho ]);
+    vi.spyOn(citizenApi, "catalog").mockResolvedValue(CATALOG);
+    vi.spyOn(citizenApi, "startTriage").mockResolvedValue({ conversation_id: "c1", citizen_id: "p1", resumed: false, step });
+    await choosePerson();
+    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: /^Começar/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Escolher outra triagem" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Voltar" }));
+    await userEvent.click(await screen.findByRole("button", { name: "CPF ***.111.222-**" }));
+    await screen.findByRole("heading", { name: "Qual triagem fazer?" });
+    expect(sessionStorage.getItem("wpda:resume-citizen")).toBe("p2");
+    await userEvent.click(screen.getByRole("button", { name: "Voltar" }));
+    await screen.findByRole("heading", { name: "Para quem é esta triagem?" });
+    expect(sessionStorage.getItem("wpda:resume-citizen")).toBeNull();
+  });
+
   it("sem triagem guardada, o termo leva a 'Para quem é' (WP-06)", async () => {
     signedIn([ avo ]);
     render(<Flow />);
