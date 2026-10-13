@@ -20,6 +20,12 @@ export function maskCpf(input: string): string {
   return d.length > 9 ? `${head}-${d.slice(9)}` : head;
 }
 
+// Mesmo formato de `cpf_masked` do api: só os seis do meio à vista (WP-11).
+export function hideCpf(cpf: string): string {
+  const d = onlyDigits(cpf);
+  return d.length === 11 ? `***.${d.slice(3, 6)}.${d.slice(6, 9)}-**` : "***";
+}
+
 export function isValidCpf(input: string): boolean {
   const d = onlyDigits(input);
   if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;

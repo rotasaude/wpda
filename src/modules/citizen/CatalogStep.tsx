@@ -80,8 +80,9 @@ export function CatalogStep({ citizenId, notice, onStart, onProfileRequired, onP
     }
   }
 
-  const startButton = (protocolName: string, label = "Começar") =>
-    <BigButton disabled={busy} onClick={() => void start(protocolName)}>{label}</BigButton>;
+  // O nome acessível diz qual triagem (WP-13); o texto visível fica curto.
+  const startButton = (protocolName: string, title: string, label = "Começar") =>
+    <BigButton disabled={busy} aria-label={`${label}: ${title}`} onClick={() => void start(protocolName)}>{label}</BigButton>;
 
   const c = catalog;
   const nothingToStart = c !== null && c.in_progress === null && c.suggested.length === 0 && c.available.length === 0;
@@ -97,7 +98,7 @@ export function CatalogStep({ citizenId, notice, onStart, onProfileRequired, onP
       {c === null && !error && <p>Carregando…</p>}
       {c?.in_progress && (
         <Section id="catalog-in-progress" title="Em andamento">
-          <Item title={c.in_progress.title} summary={null} action={startButton(c.in_progress.protocol_name, "Continuar")} />
+          <Item title={c.in_progress.title} summary={null} action={startButton(c.in_progress.protocol_name, c.in_progress.title, "Continuar")} />
         </Section>
       )}
       {c && c.suggested.length > 0 && (
@@ -107,14 +108,14 @@ export function CatalogStep({ citizenId, notice, onStart, onProfileRequired, onP
               lines={[ s.source_title
                 ? `Sugerida pelo resultado da triagem ${s.source_title} de ${fmtCalendarDate(s.suggested_on)}`
                 : `Sugerida pelo resultado de uma triagem de ${fmtCalendarDate(s.suggested_on)}` ]}
-              action={startButton(s.protocol_name)} />
+              action={startButton(s.protocol_name, s.title)} />
           ))}
         </Section>
       )}
       {c && c.available.length > 0 && (
         <Section id="catalog-available" title="Disponíveis">
           {c.available.map(a => (
-            <Item key={a.protocol_name} title={a.title} summary={a.summary} action={startButton(a.protocol_name)} />
+            <Item key={a.protocol_name} title={a.title} summary={a.summary} action={startButton(a.protocol_name, a.title)} />
           ))}
         </Section>
       )}

@@ -34,7 +34,7 @@ function setup(people: Person[], list: typeof LIST | Error | { once: typeof LIST
 
 // CPF novo: o perfil vem antes do bairro (plano wpda do módulo 15, Divergência 4).
 async function typeNewCpf() {
-  await userEvent.type(await screen.findByLabelText("CPF de outra pessoa"), "52998224725");
+  await userEvent.type(await screen.findByLabelText(/CPF/), "52998224725");
   await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
   await userEvent.type(await screen.findByLabelText("Data de nascimento"), "02041963");
   await userEvent.click(screen.getByRole("radio", { name: "Feminino" }));
@@ -73,12 +73,21 @@ describe("PeopleStep — bairro antes de começar", () => {
     expect(screen.getByText("Nenhum bairro encontrado com esse nome.")).toBeInTheDocument();
   });
 
-  it("'Voltar' na pergunta volta para a lista de pessoas", async () => {
+  it("'Voltar' na pergunta do bairro (CPF novo) volta ao perfil já preenchido (A-20)", async () => {
     const { onChoose } = setup([]);
     await typeNewCpf();
     await userEvent.click(await screen.findByRole("button", { name: "Voltar" }));
-    expect(await screen.findByText("Para quem é esta triagem?")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sobre esta pessoa" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Data de nascimento")).toHaveValue("02/04/1963");
+    expect(screen.getByRole("radio", { name: "Feminino" })).toBeChecked();
     expect(onChoose).not.toHaveBeenCalled();
+  });
+
+  it("'Voltar' na pergunta do bairro (pessoa existente) volta à lista", async () => {
+    setup([ semBairro ]);
+    await userEvent.click(await screen.findByRole("button", { name: "CPF ***.982.247-**" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Voltar" }));
+    expect(await screen.findByText("Para quem é esta triagem?")).toBeInTheDocument();
   });
 
   it("pessoa existente sem bairro: pergunta uma vez antes de começar", async () => {
@@ -283,18 +292,19 @@ describe("PeopleStep — Trocar bairro", () => {
 describe("PeopleStep — perfil de pessoa nova (módulo 15)", () => {
   it("CPF novo: pede data de nascimento e sexo antes do bairro, com o CPF digitado", async () => {
     const { onChoose } = setup([]);
-    await userEvent.type(await screen.findByLabelText("CPF de outra pessoa"), "52998224725");
+    await userEvent.type(await screen.findByLabelText(/CPF/), "52998224725");
     await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
 
     expect(await screen.findByRole("heading", { name: "Sobre esta pessoa" })).toBeInTheDocument();
-    expect(screen.getByText("CPF 529.982.247-25")).toBeInTheDocument();
+    expect(screen.getByText("CPF ***.982.247-**")).toBeInTheDocument();
+    expect(screen.queryByText(/529\.982\.247-25/)).toBeNull();
     expect(screen.queryByRole("heading", { name: "Em que bairro esta pessoa mora?" })).not.toBeInTheDocument();
     expect(onChoose).not.toHaveBeenCalled();
   });
 
   it("CPF novo: perfil inválido não avança", async () => {
     const { onChoose } = setup([]);
-    await userEvent.type(await screen.findByLabelText("CPF de outra pessoa"), "52998224725");
+    await userEvent.type(await screen.findByLabelText(/CPF/), "52998224725");
     await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
     await userEvent.type(await screen.findByLabelText("Data de nascimento"), "06102026");
     await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
@@ -306,7 +316,7 @@ describe("PeopleStep — perfil de pessoa nova (módulo 15)", () => {
 
   it("CPF novo: 'Voltar' no perfil volta à lista sem chamar nada", async () => {
     const { onChoose } = setup([]);
-    await userEvent.type(await screen.findByLabelText("CPF de outra pessoa"), "52998224725");
+    await userEvent.type(await screen.findByLabelText(/CPF/), "52998224725");
     await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
     await userEvent.click(await screen.findByRole("button", { name: "Voltar" }));
 
@@ -318,5 +328,38 @@ describe("PeopleStep — perfil de pessoa nova (módulo 15)", () => {
     const { onChoose } = setup([], []);
     await typeNewCpf();
     await waitFor(() => expect(onChoose).toHaveBeenCalledWith({ cpf: "529.982.247-25", profile: PROFILE }));
+  });
+});
+
+describe("PeopleStep — usabilidade (6e)", () => {
+  it("primeira vez: rótulo do próprio CPF e dica (WP-08)", async () => {
+    setup([]);
+    const field = await screen.findByLabelText("Digite o seu CPF (ou o da pessoa que vai ser atendida)");
+    expect(field.getAttribute("aria-describedby")).toBeTruthy();
+    expect(screen.getByText("11 números, está no documento")).toBeInTheDocument();
+  });
+
+  it("com pessoas, continua 'CPF de outra pessoa' (WP-08)", async () => {
+    setup([ semBairro ]);
+    expect(await screen.findByLabelText("CPF de outra pessoa")).toBeInTheDocument();
+  });
+
+  it("CPF inválido marca o campo e foca nele (WP-07)", async () => {
+    setup([]);
+    const field = await screen.findByLabelText(/CPF/);
+    await userEvent.type(field, "11111111111");
+    await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
+    expect(field).toHaveAttribute("aria-invalid", "true");
+    expect(field.getAttribute("aria-describedby")).toContain(screen.getByText("CPF inválido. Confira os números.").id);
+    expect(document.activeElement).toBe(field);
+  });
+
+  it("cada pessoa mostra nascimento e bairro; links curtos com nome completo (WP-09)", async () => {
+    setup([ { ...comBairro, profile: { birth_date: "1958-05-10", sex: "female", gender_identity: null, profile_source: "declared" } } ]);
+    const btn = await screen.findByRole("button", { name: "CPF ***.982.247-**" });
+    expect(btn).toHaveAccessibleDescription("Nascido(a) em 10/05/1958 · Batel");
+    expect(btn).toHaveTextContent("Nascido(a) em 10/05/1958 · Batel");
+    expect(screen.getByRole("button", { name: "Trocar bairro de ***.982.247-**" })).toHaveTextContent(/^Trocar bairro$/);
+    expect(screen.getByRole("button", { name: "Ver triagens de ***.982.247-**" })).toHaveTextContent(/^Ver triagens$/);
   });
 });

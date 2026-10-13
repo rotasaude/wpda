@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ApiError, citizenApi, type Neighborhood, type Person, type ProfileInput } from "../../lib/citizenApi";
-import { isValidCpf, maskCpf } from "../../lib/masks";
+import { hideCpf, isValidCpf, maskCpf } from "../../lib/masks";
+import { fmtCalendarDate } from "../../lib/format";
 import { NeighborhoodPicker } from "./NeighborhoodPicker";
 import { ProfileForm } from "./ProfileForm";
 import { BigButton, ErrorText, Field, INVALID_NEIGHBORHOOD_MESSAGE, Screen, messageFor } from "./ui";
@@ -15,11 +16,24 @@ export type ChooseOutcome = "done" | "invalid_neighborhood";
 
 type Mode =
   | { at: "list" }
-  | { at: "profile-for-new"; cpf: string }
+  // profile: o que já foi digitado, quando volta do bairro (A-20).
+  | { at: "profile-for-new"; cpf: string; profile?: ProfileInput }
   | { at: "pick-for-start"; who: Who; notice: string | null }
   | { at: "pick-for-change"; person: Person; notice: string | null };
 
 const linkStyle = { minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 18 } as const;
+
+// O que distingue as pessoas do mesmo celular sem nome (WP-09): o que o
+// /citizen/people já traz. O apelido seria API (card).
+export function personLine(p: Person): string {
+  const parts = [
+    p.profile?.birth_date ? `Nascido(a) em ${fmtCalendarDate(p.profile.birth_date)}` : null,
+    p.neighborhood?.name ?? null
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+export const FIRST_CPF_LABEL = "Digite o seu CPF (ou o da pessoa que vai ser atendida)";
 
 export function PeopleStep({ onChoose, onHistory }:
   { onChoose: (c: PersonChoice) => Promise<ChooseOutcome>; onHistory: (citizenId: string) => void }) {
@@ -29,6 +43,9 @@ export function PeopleStep({ onChoose, onHistory }:
   const [mode, setMode] = useState<Mode>({ at: "list" });
   const [cpf, setCpf] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [cpfError, setCpfError] = useState<string | null>(null);
+  const cpfInput = useRef<HTMLInputElement>(null);
+  const lineId = useId();
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
   // Guarda síncrona: setBusy só vale no próximo render, e dois toques cabem antes dele.
@@ -93,8 +110,12 @@ export function PeopleStep({ onChoose, onHistory }:
   // CPF novo: perfil primeiro, depois o bairro (o 422 de bairro continua
   // tratado em begin(), sem perder o perfil digitado).
   function submitNew() {
-    if (!isValidCpf(cpf)) return setError("CPF inválido. Confira os números.");
-    setError(null);
+    if (!isValidCpf(cpf)) {
+      setCpfError("CPF inválido. Confira os números.");
+      cpfInput.current?.focus();
+      return;
+    }
+    setCpfError(null);
     setMode({ at: "profile-for-new", cpf });
   }
 
@@ -128,7 +149,8 @@ export function PeopleStep({ onChoose, onHistory }:
 
   if (mode.at === "profile-for-new") {
     const newCpf = mode.cpf;
-    return <ProfileForm title="Sobre esta pessoa" who={`CPF ${newCpf}`} busy={busy} submitLabel="Continuar"
+    return <ProfileForm title="Sobre esta pessoa" who={`CPF ${hideCpf(newCpf)}`} initial={mode.profile} busy={busy}
+      submitLabel="Continuar"
       onSubmit={profile => void ask({ cpf: newCpf, profile }, false)}
       onBack={() => setMode({ at: "list" })} />;
   }
@@ -144,7 +166,8 @@ export function PeopleStep({ onChoose, onHistory }:
     const who = mode.who;
     return <NeighborhoodPicker title="Em que bairro esta pessoa mora?" neighborhoods={neighborhoods}
       notice={mode.notice} busy={busy}
-      onPick={id => { if (!inFlight.current) void begin(who, id); }} onBack={() => setMode({ at: "list" })} />;
+      onPick={id => { if (!inFlight.current) void begin(who, id); }}
+      onBack={() => setMode("cpf" in who ? { at: "profile-for-new", cpf: who.cpf, profile: who.profile } : { at: "list" })} />;
   }
 
   const cityHasNeighborhoods = neighborhoods.length > 0;
@@ -154,25 +177,34 @@ export function PeopleStep({ onChoose, onHistory }:
       {people && people.length > 0 && <PendingConfirmations people={people} onOpen={onHistory} />}
       {saved && <p role="status">{saved}</p>}
       <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
-        {people?.map(p => (
+        {people?.map(p => {
+          const line = personLine(p);
+          return (
           <div key={p.id} style={{ display: "grid", gap: 8 }}>
-            <BigButton variant="secondary" disabled={busy} onClick={() => void ask({ citizenId: p.id }, Boolean(p.neighborhood))}>
+            <BigButton variant="secondary" disabled={busy} aria-label={`CPF ${p.cpf_masked}`}
+              aria-describedby={line ? `${lineId}-${p.id}` : undefined}
+              onClick={() => void ask({ citizenId: p.id }, Boolean(p.neighborhood))}>
               CPF {p.cpf_masked}
+              {line && <span id={`${lineId}-${p.id}`} style={{ display: "block", fontSize: 16, fontWeight: 400 }}>{line}</span>}
             </BigButton>
             {(cityHasNeighborhoods || p.neighborhood) &&
               <p style={{ margin: 0 }}>{p.neighborhood ? `Bairro: ${p.neighborhood.name}` : "Bairro não informado"}</p>}
             {cityHasNeighborhoods &&
-              <button type="button" disabled={busy} style={linkStyle}
+              <button type="button" disabled={busy} style={linkStyle} aria-label={`Trocar bairro de ${p.cpf_masked}`}
                 onClick={() => { setSaved(null); setMode({ at: "pick-for-change", person: p, notice: null }); }}>
-                Trocar bairro de {p.cpf_masked}
+                Trocar bairro
               </button>}
-            <button type="button" onClick={() => onHistory(p.id)} style={linkStyle}>
-              Ver triagens de {p.cpf_masked}
+            <button type="button" onClick={() => onHistory(p.id)} style={linkStyle} aria-label={`Ver triagens de ${p.cpf_masked}`}>
+              Ver triagens
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
-      <Field label="CPF de outra pessoa" inputMode="numeric" value={cpf}
+      {/* Primeira vez: é o próprio CPF (WP-08). */}
+      <Field ref={cpfInput} label={people?.length === 0 ? FIRST_CPF_LABEL : "CPF de outra pessoa"}
+        hint={people?.length === 0 ? "11 números, está no documento" : undefined}
+        inputMode="numeric" value={cpf} error={cpfError ?? undefined}
         onChange={e => setCpf(maskCpf(e.target.value))} />
       {error && <ErrorText>{error}</ErrorText>}
       <BigButton disabled={busy} onClick={submitNew}>Continuar com este CPF</BigButton>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, within, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Flow } from "./Flow";
 import { citizenApi, ApiError, type Catalog, type Person, type Step } from "../../lib/citizenApi";
@@ -46,7 +46,7 @@ async function choosePerson() {
 async function typeNewCpfAndProfile() {
   render(<Flow />);
   await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
-  await userEvent.type(await screen.findByLabelText("CPF de outra pessoa"), "52998224725");
+  await userEvent.type(await screen.findByLabelText(/CPF/), "52998224725");
   await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
   await fillProfile();
   await userEvent.click(screen.getByRole("button", { name: "Continuar" }));
@@ -67,7 +67,7 @@ describe("Flow — catálogo e início por protocolo", () => {
       .mockResolvedValue({ conversation_id: "c1", citizen_id: "p1", resumed: false, step });
     await choosePerson();
 
-    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: /^Começar/ }));
 
     expect(await screen.findByText("Você caiu nos últimos 12 meses?")).toBeInTheDocument();
     expect(catalog).toHaveBeenCalledWith("p1");
@@ -167,7 +167,7 @@ describe("Flow — catálogo e início por protocolo", () => {
     await choosePerson();
 
     await userEvent.click(within(await screen.findByRole("region", { name: "Em andamento" }))
-      .getByRole("button", { name: "Continuar" }));
+      .getByRole("button", { name: /^Continuar/ }));
 
     expect(await screen.findByText("Você caiu nos últimos 12 meses?")).toBeInTheDocument();
     expect(start).toHaveBeenCalledWith({ citizenId: "p1", protocolName: "triage-respiratoria", consentVersion: "1" });
@@ -223,7 +223,7 @@ describe("Flow — recusas ao começar", () => {
     vi.spyOn(citizenApi, "startTriage").mockRejectedValue(new ApiError(409, code));
     await choosePerson();
 
-    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: /^Começar/ }));
 
     expect(await screen.findByText(message)).toBeInTheDocument();
     await waitFor(() => expect(catalog).toHaveBeenCalledTimes(2));
@@ -236,7 +236,7 @@ describe("Flow — recusas ao começar", () => {
     vi.spyOn(citizenApi, "startTriage").mockRejectedValue(new ApiError(409, "profile_required"));
     await choosePerson();
 
-    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: /^Começar/ }));
 
     expect(await screen.findByRole("heading", { name: "Sobre esta pessoa" })).toBeInTheDocument();
   });
@@ -247,7 +247,7 @@ describe("Flow — recusas ao começar", () => {
     vi.spyOn(citizenApi, "startTriage").mockRejectedValue(new ApiError(409, code));
     await choosePerson();
 
-    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: /^Começar/ }));
 
     expect(await screen.findByRole("button", { name: "Concordo" })).toBeInTheDocument();
   });
@@ -265,7 +265,7 @@ describe("Flow — privacidade do perfil (ADR 0027, invariantes)", () => {
 
     render(<Flow />);
     await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
-    await userEvent.type(await screen.findByLabelText("CPF de outra pessoa"), "52998224725");
+    await userEvent.type(await screen.findByLabelText(/CPF/), "52998224725");
     await userEvent.click(screen.getByRole("button", { name: "Continuar com este CPF" }));
     await fillProfile();
     await userEvent.click(screen.getByRole("button", { name: "Informar identidade de gênero (opcional)" }));
@@ -303,7 +303,7 @@ describe("Flow — resultado com sugestão", () => {
         title: "Saúde mental — aprofundamento", summary: null } ]
     });
     await choosePerson();
-    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: /^Começar/ }));
     await userEvent.click(await screen.findByRole("button", { name: "Não" }));
     await screen.findByRole("heading", { name: "Recomendamos também" }, { timeout: 3000 });
     return { start };
@@ -343,5 +343,73 @@ describe("Flow — resultado com sugestão", () => {
     await new Promise(r => setTimeout(r, 20));
     expect(screen.getByRole("heading", { name: "Qual triagem fazer?" })).toBeInTheDocument();
     expect(screen.queryByText("Como está o seu humor?")).not.toBeInTheDocument();
+  });
+});
+
+describe("Flow — usabilidade (6e)", () => {
+  afterEach(() => { try { sessionStorage.clear(); } catch { /* */ } });
+
+  async function reachQuestion() {
+    signedIn([ avo ]);
+    vi.spyOn(citizenApi, "catalog").mockResolvedValue(CATALOG);
+    vi.spyOn(citizenApi, "startTriage").mockResolvedValue({ conversation_id: "c1", citizen_id: "p1", resumed: false, step });
+    await choosePerson();
+    await userEvent.click(within(await findItem("Saúde do idoso")).getByRole("button", { name: /^Começar/ }));
+    await screen.findByText("Você caiu nos últimos 12 meses?");
+  }
+
+  it("'Escolher outra triagem' na pergunta 1 volta ao catálogo da mesma pessoa (WP-12)", async () => {
+    await reachQuestion();
+    await userEvent.click(screen.getByRole("button", { name: "Escolher outra triagem" }));
+    expect(await screen.findByRole("heading", { name: "Qual triagem fazer?" })).toBeInTheDocument();
+  });
+
+  it("pergunta seguinte com o mesmo texto devolve o foco ao título (WP-02)", async () => {
+    await reachQuestion();
+    vi.spyOn(citizenApi, "answer").mockResolvedValue({ status: "in_progress", step: { ...step, step_id: "q2", index: 2, can_undo: true } });
+    const h1 = screen.getByRole("heading", { level: 1, name: "Você caiu nos últimos 12 meses?" });
+    await userEvent.click(screen.getByRole("button", { name: "Sim" }));
+    await screen.findByText("Pergunta 2 de 3");
+    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1, name: "Você caiu nos últimos 12 meses?" }));
+    expect(h1.isConnected).toBe(true);
+  });
+
+  it("depois de recarregar, o termo leva direto ao catálogo de quem fazia a triagem (WP-06)", async () => {
+    await reachQuestion();
+    expect(sessionStorage.getItem("wpda:resume-citizen")).toBe("p1");
+    cleanup(); // F5: o Flow recomeça do zero, com a sessão ainda válida
+    render(<Flow />);
+    await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
+    expect(await screen.findByRole("heading", { name: "Qual triagem fazer?" })).toBeInTheDocument();
+    expect(citizenApi.catalog).toHaveBeenLastCalledWith("p1");
+  });
+
+  it("sem triagem guardada, o termo leva a 'Para quem é' (WP-06)", async () => {
+    signedIn([ avo ]);
+    render(<Flow />);
+    await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
+    expect(await screen.findByRole("heading", { name: "Para quem é esta triagem?" })).toBeInTheDocument();
+  });
+
+  it("'Sair' esquece a triagem guardada (WP-06)", async () => {
+    await reachQuestion();
+    vi.spyOn(citizenApi, "signOut").mockResolvedValue(undefined as never);
+    await userEvent.click(screen.getByRole("button", { name: "Sair" }));
+    await screen.findByLabelText("Seu celular");
+    expect(sessionStorage.getItem("wpda:resume-citizen")).toBeNull();
+  });
+
+  it("sessão vencida esquece a triagem guardada (WP-06)", async () => {
+    await reachQuestion();
+    window.dispatchEvent(new Event("citizen:unauthenticated"));
+    await screen.findByLabelText("Seu celular");
+    expect(sessionStorage.getItem("wpda:resume-citizen")).toBeNull();
+  });
+
+  it("sessionStorage que lança erro não quebra o fluxo (WP-06)", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("cheio"); });
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("bloqueado"); });
+    await reachQuestion();
+    expect(screen.getByText("Você caiu nos últimos 12 meses?")).toBeInTheDocument();
   });
 });

@@ -67,9 +67,9 @@ describe("CatalogStep", () => {
   it("'Começar' numa disponível e numa sugerida chama onStart com o nome do protocolo", async () => {
     const { onStart } = setup(FULL);
     await region("Disponíveis");
-    await userEvent.click(within(item("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+    await userEvent.click(within(item("Saúde do idoso")).getByRole("button", { name: /^Começar/ }));
     expect(onStart).toHaveBeenLastCalledWith("saude-do-idoso");
-    await userEvent.click(within(item("Saúde mental — aprofundamento")).getByRole("button", { name: "Começar" }));
+    await userEvent.click(within(item("Saúde mental — aprofundamento")).getByRole("button", { name: /^Começar/ }));
     expect(onStart).toHaveBeenLastCalledWith("saude-mental-aprofundada");
   });
 
@@ -77,7 +77,7 @@ describe("CatalogStep", () => {
     const { onStart } = setup({ ...FULL,
       in_progress: { conversation_id: "c1", protocol_name: "triage-respiratoria", title: "Sintomas respiratórios" } });
     const inProgress = await region("Em andamento");
-    await userEvent.click(within(inProgress).getByRole("button", { name: "Continuar" }));
+    await userEvent.click(within(inProgress).getByRole("button", { name: /^Continuar/ }));
     expect(onStart).toHaveBeenCalledWith("triage-respiratoria");
     const headings = screen.getAllByRole("heading", { level: 2 }).map(h => h.textContent);
     expect(headings[0]).toBe("Em andamento");
@@ -87,7 +87,7 @@ describe("CatalogStep", () => {
     const { onStart } = setup(FULL);
     onStart.mockReturnValue(new Promise<string | null>(() => {}));
     await region("Disponíveis");
-    const btn = within(item("Saúde do idoso")).getByRole("button", { name: "Começar" });
+    const btn = within(item("Saúde do idoso")).getByRole("button", { name: /^Começar/ });
     await userEvent.click(btn);
     await userEvent.click(btn);
     expect(onStart).toHaveBeenCalledTimes(1);
@@ -97,7 +97,7 @@ describe("CatalogStep", () => {
   it("recusa ao começar: mostra o aviso e relê o catálogo", async () => {
     const { load } = setup(FULL, "Esta triagem não está mais disponível para esta pessoa.");
     await region("Disponíveis");
-    await userEvent.click(within(item("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+    await userEvent.click(within(item("Saúde do idoso")).getByRole("button", { name: /^Começar/ }));
     expect(await screen.findByText("Esta triagem não está mais disponível para esta pessoa.")).toBeInTheDocument();
     await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
   });
@@ -163,8 +163,18 @@ describe("CatalogStep", () => {
     const { onStart } = setup(FULL);
     onStart.mockReturnValue(new Promise(() => {}));
     await region("Disponíveis");
-    await userEvent.click(within(item("Saúde do idoso")).getByRole("button", { name: "Começar" }));
+    await userEvent.click(within(item("Saúde do idoso")).getByRole("button", { name: /^Começar/ }));
     for (const name of [ "Meu perfil", "Minhas triagens", "Voltar" ])
       expect(screen.getByRole("button", { name })).toBeDisabled();
+  });
+});
+
+describe("CatalogStep — nomes acessíveis (WP-13)", () => {
+  it("cada botão diz qual triagem começa ou continua", async () => {
+    setup({ ...FULL,
+      in_progress: { conversation_id: "c1", protocol_name: "triage-respiratoria", title: "Sintomas respiratórios" } });
+    await region("Disponíveis");
+    expect(screen.getByRole("button", { name: "Começar: Saúde do idoso" })).toHaveTextContent(/^Começar$/);
+    expect(screen.getByRole("button", { name: "Continuar: Sintomas respiratórios" })).toHaveTextContent(/^Continuar$/);
   });
 });

@@ -29,7 +29,7 @@ async function reachQuestionStep() {
   render(<Flow />);
   await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
   await userEvent.click(await screen.findByRole("button", { name: "CPF ***.982.247-**" }));
-  await userEvent.click(await screen.findByRole("button", { name: "Começar" }));
+  await userEvent.click(await screen.findByRole("button", { name: /^Começar/ }));
   expect(await screen.findByText("Você está com tosse?")).toBeInTheDocument();
 }
 
@@ -118,7 +118,7 @@ describe("Flow", () => {
 
     render(<ForcedRerenderHarness />);
     await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
-    await userEvent.click(await screen.findByText("Ver triagens de ***.982.247-**"));
+    await userEvent.click(await screen.findByRole("button", { name: "Ver triagens de ***.982.247-**" }));
     await userEvent.click(await screen.findByRole("button", { name: "Cheguei na unidade" }));
 
     expect(await screen.findByText("123456")).toBeInTheDocument();
@@ -152,7 +152,7 @@ describe("Flow", () => {
 
     render(<Flow />);
     await userEvent.click(await screen.findByRole("button", { name: "Concordo" }));
-    await userEvent.click(await screen.findByText("Ver triagens de ***.982.247-**"));
+    await userEvent.click(await screen.findByRole("button", { name: "Ver triagens de ***.982.247-**" }));
     await userEvent.click(await screen.findByRole("button", { name: "Cheguei na unidade" }));
 
     expect(await screen.findByText(message)).toBeInTheDocument();

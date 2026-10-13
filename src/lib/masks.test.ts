@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { maskPhone, isMobilePhone, maskCpf, isValidCpf } from "./masks";
+import { maskPhone, isMobilePhone, maskCpf, isValidCpf, hideCpf } from "./masks";
 
 describe("maskPhone", () => {
   it("formata enquanto digita", () => {
@@ -31,4 +31,12 @@ describe("isValidCpf", () => {
     expect(isValidCpf("529.982.247-24")).toBe(false);
     expect(isValidCpf("111.111.111-11")).toBe(false);
   });
+});
+
+describe("hideCpf (WP-11)", () => {
+  it("mostra só os seis do meio, como cpf_masked", () => {
+    expect(hideCpf("673.959.363-96")).toBe("***.959.363-**");
+    expect(hideCpf("67395936396")).toBe("***.959.363-**");
+  });
+  it("incompleto não vaza nada", () => expect(hideCpf("673.95")).toBe("***"));
 });

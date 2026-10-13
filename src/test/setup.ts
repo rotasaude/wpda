@@ -2,7 +2,8 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 
-afterEach(() => cleanup());
+// sessionStorage guarda a retomada da triagem (WP-06): cada teste começa limpo.
+afterEach(() => { cleanup(); sessionStorage.clear(); });
 
 // Ambiente padrão dos testes: um celular em modo claro (o wpda bloqueia o
 // fluxo fora do celular e o tema segue prefers-color-scheme). Testes de

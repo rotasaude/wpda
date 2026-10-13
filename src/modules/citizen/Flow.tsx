@@ -42,6 +42,21 @@ type State =
   | { at: "preferences"; consentVersion: string | null }
   | { at: "declined" };
 
+// Quem estava fazendo a triagem, para voltar ao catálogo dela depois de um F5
+// (WP-06). Só o id (UUID): nada de resposta, CPF ou dado clínico. Some em
+// "Sair", na sessão vencida e quando a triagem termina.
+export const RESUME_KEY = "wpda:resume-citizen";
+
+function remember(citizenId: string) {
+  try { sessionStorage.setItem(RESUME_KEY, citizenId); } catch { /* sem armazenamento: só não retoma */ }
+}
+function forget() {
+  try { sessionStorage.removeItem(RESUME_KEY); } catch { /* idem */ }
+}
+function remembered(): string | null {
+  try { return sessionStorage.getItem(RESUME_KEY); } catch { return null; }
+}
+
 export function Flow() {
   const [state, setState] = useState<State>({ at: "boot" });
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +95,7 @@ export function Flow() {
     function onUnauthenticated() {
       // Sessão caiu: os interruptores dela caem junto (sem isso "Meu histórico" sobraria velho).
       setSessionFeatures(null);
+      forget();
       const s = stateRef.current;
       if (s.at === "notices") target.current = "avisos";
       else if (s.at === "preferences") target.current = "preferencias";
@@ -88,6 +104,11 @@ export function Flow() {
     window.addEventListener("citizen:unauthenticated", onUnauthenticated);
     return () => window.removeEventListener("citizen:unauthenticated", onUnauthenticated);
   }, []);
+
+  useEffect(() => {
+    if (state.at === "question") remember(state.citizenId);
+    else if (state.at === "result") forget();
+  }, [state]);
 
   // URL em dia fora do login (no login, a URL pedida fica para o F5).
   useEffect(() => {
@@ -177,6 +198,7 @@ export function Flow() {
 
   async function signOut() {
     target.current = null;
+    forget();
     window.history.replaceState(null, "", pathFor(null, import.meta.env.BASE_URL));
     // Um 401 no logout (sessão já vencida) dispara citizen:unauthenticated, que
     // guardaria o destino de novo: limpa depois do pedido também. O erro é
@@ -229,7 +251,10 @@ export function Flow() {
         onChangePhone={() => setState({ at: "phone" })} />;
       break;
     case "consent":
-      view = <ConsentStep onAccept={v => setState({ at: "people", consentVersion: v })}
+      view = <ConsentStep onAccept={v => {
+          const citizenId = remembered();
+          setState(citizenId ? { at: "catalog", consentVersion: v, citizenId, notice: null } : { at: "people", consentVersion: v });
+        }}
         onDecline={() => setState({ at: "declined" })} />;
       break;
     case "people":
@@ -259,7 +284,8 @@ export function Flow() {
       view = <QuestionStep conversationId={state.conversationId} step={state.step}
         onStep={step => setState({ ...state, step })}
         onCompleted={triageId => setState({ at: "result", consentVersion: state.consentVersion, triageId, citizenId: state.citizenId })}
-        onConflict={code => onConflict(code, state.consentVersion)} />;
+        onConflict={code => onConflict(code, state.consentVersion)}
+        onLeave={() => setState({ at: "catalog", consentVersion: state.consentVersion, citizenId: state.citizenId, notice: null })} />;
       break;
     case "result":
       view = <ResultStep triageId={state.triageId}

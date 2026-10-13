@@ -10,9 +10,11 @@ import { BigButton, ErrorText, Field, Screen, messageFor } from "./ui";
 // meio do caminho. Quem decide para onde mandar o cidadão é o Flow.
 const STALE_TRIAGE_CODES = new Set(["no_consent", "not_in_progress", "consent_outdated"]);
 
-export function QuestionStep({ conversationId, step, onStep, onCompleted, onConflict }: {
+// onLeave: na primeira pergunta (sem Voltar) a saída é escolher outra triagem;
+// esta segue "Em andamento" no catálogo (WP-12).
+export function QuestionStep({ conversationId, step, onStep, onCompleted, onConflict, onLeave }: {
   conversationId: string; step: Step; onStep: (s: Step) => void; onCompleted: (triageId: string) => void;
-  onConflict?: (code: string) => void;
+  onConflict?: (code: string) => void; onLeave?: () => void;
 }) {
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -60,10 +62,12 @@ export function QuestionStep({ conversationId, step, onStep, onCompleted, onConf
   const choice = step.answer_type === "boolean" || step.answer_type === "enum";
 
   return (
-    <Screen title={step.prompt}
+    <Screen title={step.prompt} focusKey={step.index}
       footer={<>
         {!choice && <BigButton onClick={() => send(value)} disabled={busy || value.trim() === ""}>Continuar</BigButton>}
         {step.can_undo && <BigButton variant="secondary" onClick={back} disabled={busy}>Voltar</BigButton>}
+        {!step.can_undo && onLeave &&
+          <BigButton variant="secondary" onClick={onLeave} disabled={busy}>Escolher outra triagem</BigButton>}
       </>}>
       <p aria-live="polite" style={{ margin: "0 0 8px", color: "var(--ink2)" }}>
         Pergunta {step.index} de {step.total}
