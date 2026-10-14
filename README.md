@@ -66,6 +66,17 @@ próprias triagens e agendamentos, com o convite para validar no posto. Fora do
 modo `record`, o aviso de histórico parcial. Nunca texto clínico livre, CID
 sem nome ou número SNCR; o PDF é baixado com o nome `documento-<código>.pdf`.
 
+**Meus exames (módulo 21a).** Com `exam_tracking` ligado na cidade (vem em
+`features` da sessão), "Minhas triagens" ganha o botão **Meus exames**. Par
+validado: cada exame com a situação, a data e o local marcados e o laudo pela
+política do exame — `immediate` mostra ao registrar, `after_acknowledgement` só
+depois da ciência do profissional, `never_citizen` diz "Retire o resultado na
+sua unidade de saúde." — com o **Baixar resultado (PDF)** (`exame-<id>.pdf`)
+quando o api oferece. Par só declarado: o convite para validar no posto. Quem
+decide o laudo é o api (`result`); a tela nunca o deduz da situação e nunca
+mostra motivo de negação, a marca de crítico ou valores. Em "Meu histórico",
+a entrada **Exame** baixa o PDF pela mesma rota do exame.
+
 ### Relatório público (`src/modules/Report.tsx`)
 
 `/wpda/?token=<token>` busca o JSON congelado de `GET /r/:token`, sem login.

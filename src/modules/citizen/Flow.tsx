@@ -15,6 +15,7 @@ import { QuestionStep } from "./QuestionStep";
 import { ResultStep } from "./ResultStep";
 import { HistoryStep } from "./HistoryStep";
 import { MyHistoryStep } from "./MyHistoryStep";
+import { MyExamsStep } from "./MyExamsStep";
 import { hasSessionFeature, setSessionFeatures } from "../../lib/sessionFeatures";
 import { VerificationCodeStep } from "./VerificationCodeStep";
 import { CounterCodeStep } from "./CounterCodeStep";
@@ -35,6 +36,7 @@ type State =
   | { at: "result"; consentVersion: string; triageId: string; citizenId: string }
   | { at: "history"; consentVersion: string | null; citizenId: string }
   | { at: "record"; consentVersion: string | null; citizenId: string }
+  | { at: "exams"; consentVersion: string | null; citizenId: string }
   | { at: "verify-code"; citizenId: string; consentVersion: string | null }
   | { at: "check-in-code"; triageId: string; citizenId: string; consentVersion: string | null }
   | { at: "appointment-check-in-code"; appointmentId: string; citizenId: string; consentVersion: string | null }
@@ -304,10 +306,18 @@ export function Flow() {
         onAppointmentCheckIn={appointmentId => setState({ at: "appointment-check-in-code", appointmentId, citizenId: state.citizenId, consentVersion: state.consentVersion })}
         onRecord={hasSessionFeature("patient_timeline")
           ? () => setState({ at: "record", consentVersion: state.consentVersion, citizenId: state.citizenId })
+          : undefined}
+        onExams={hasSessionFeature("exam_tracking")
+          ? () => setState({ at: "exams", consentVersion: state.consentVersion, citizenId: state.citizenId })
           : undefined} />;
       break;
     case "record":
       view = <MyHistoryStep key={state.citizenId} citizenId={state.citizenId}
+        onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })}
+        onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })} />;
+      break;
+    case "exams":
+      view = <MyExamsStep key={state.citizenId} citizenId={state.citizenId}
         onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })}
         onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })} />;
       break;
