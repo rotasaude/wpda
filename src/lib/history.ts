@@ -101,8 +101,10 @@ export function documentFilename(doc: CitizenDocumentRef): string {
 }
 
 // Situação da entrada: o rótulo pronto do api (exame, módulo 21a) vence a
-// tradução do código da origem. Código desconhecido sem rótulo: nada.
+// tradução do código da origem. Código desconhecido sem rótulo: nada. No
+// exame, só o rótulo do api (A40): o código dele não passa pela tradução.
 export function entryStatusText(entry: CitizenEntry): string | null {
+  if (entry.kind === EXAM_KIND) return entry.status_label || null;
   return entry.status_label || citizenStatusLabel(entry.status);
 }
 
