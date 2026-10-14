@@ -22,8 +22,8 @@ const IMMEDIATE = exam({ id: "ex-imm", label: "Hemograma completo", status_label
   result: { available: true, pickup_at_unit: false, released_on: "2026-10-08", pdf_available: true } });
 const AFTER_ACK = exam({ id: "ex-ack", label: "Hemoglobina glicada", status_label: "Coletado",
   scheduled_at: "2026-10-05T07:30:00-03:00", scheduled_place: "Laboratório Simulado — Rua XV, 100" });
-const NEVER = exam({ id: "ex-unit", label: "Sorologia para HIV", status_label: "Resultado pronto",
-  result: { available: false, pickup_at_unit: true, released_on: "2026-10-08", pdf_available: false } });
+const NEVER = exam({ id: "ex-unit", label: "Sorologia para HIV", status_label: "Retire o resultado na sua unidade",
+  result: { available: false, pickup_at_unit: true, released_on: null, pdf_available: false } });
 const DENIED = exam({ id: "ex-den", label: "Ressonância magnética", status_label: "Não autorizado — procure a sua unidade" });
 
 const page = (over: Partial<CitizenExams> = {}): CitizenExams =>
@@ -52,6 +52,7 @@ describe("MyExamsStep", () => {
     expect(within(imm).getByText("Pedido em 01/10/2026")).toBeInTheDocument();
     expect(within(imm).getByText("Marcado para 05/10/2026, 07:30 — Laboratório Simulado — Rua XV, 100")).toBeInTheDocument();
     expect(within(imm).getByText("Resultado disponível — liberado em 08/10/2026")).toBeInTheDocument();
+    expect(within(imm).queryByText("Resultado disponível", { exact: true })).not.toBeInTheDocument();
     expect(within(imm).getByRole("button", { name: "Baixar resultado de Hemograma completo" })).toBeInTheDocument();
 
     const ack = screen.getByRole("listitem", { name: "Hemoglobina glicada" });
@@ -61,11 +62,22 @@ describe("MyExamsStep", () => {
 
     const never = screen.getByRole("listitem", { name: "Sorologia para HIV" });
     expect(within(never).getByText(PICKUP_AT_UNIT)).toBeInTheDocument();
+    expect(within(never).queryByText("Retire o resultado na sua unidade", { exact: true })).not.toBeInTheDocument();
     expect(within(never).queryByRole("button")).not.toBeInTheDocument();
 
     const denied = screen.getByRole("listitem", { name: "Ressonância magnética" });
     expect(within(denied).getByText("Não autorizado — procure a sua unidade")).toBeInTheDocument();
     expect(screen.queryByRole("note", { name: "cadastro não validado" })).not.toBeInTheDocument();
+  });
+
+  it("exame sem rótulo: usa \"Exame\" no título, no item e no botão", async () => {
+    const unnamed = exam({ id: "ex-n", label: "", status_label: "Resultado disponível",
+      result: { available: true, pickup_at_unit: false, released_on: "2026-10-08", pdf_available: true } });
+    vi.spyOn(citizenApi, "exams").mockResolvedValue(page({ exams: [ unnamed ] }));
+    renderStep();
+    const item = await screen.findByRole("listitem", { name: "Exame" });
+    expect(within(item).getByText("Exame")).toBeInTheDocument();
+    expect(within(item).getByRole("button", { name: "Baixar resultado de Exame" })).toBeInTheDocument();
   });
 
   it("nada de crítico, motivo ou valor: só os campos do contrato aparecem", async () => {

@@ -136,10 +136,11 @@ function ExamCard({ exam, downloading, error, onDownload }:
   const schedule = examScheduleText(exam);
   const result = examResultView(exam.result);
   const busy = downloading === exam.id;
+  const label = exam.label || "Exame";
   return (
-    <li aria-label={exam.label} style={card}>
-      <strong>{exam.label}</strong>
-      {exam.status_label && <div>{exam.status_label}</div>}
+    <li aria-label={label} style={card}>
+      <strong>{label}</strong>
+      {exam.status_label && result.kind === "none" && <div>{exam.status_label}</div>}
       {requested && <div style={muted}>{requested}</div>}
       {schedule && <div>{schedule}</div>}
       {result.kind === "pickup" && <p style={infoNote}>{result.text}</p>}
@@ -148,7 +149,7 @@ function ExamCard({ exam, downloading, error, onDownload }:
           <div>{result.text}</div>
           {result.downloadable && (
             <BigButton variant="secondary" disabled={downloading !== null} aria-busy={busy}
-              aria-label={busy ? `Baixando resultado de ${exam.label}` : `Baixar resultado de ${exam.label}`}
+              aria-label={busy ? `Baixando resultado de ${label}` : `Baixar resultado de ${label}`}
               onClick={onDownload}>
               {busy ? "Baixando…" : "Baixar resultado (PDF)"}
             </BigButton>

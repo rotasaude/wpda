@@ -14,9 +14,9 @@ const EXAMS = { verified: true, next_before: null, exams: [
   { id: "ex-ack", label: "Hemoglobina glicada", status_label: "Coletado",
     requested_at: "2026-10-01T09:00:00-03:00", scheduled_at: "2026-10-05T07:30:00-03:00",
     scheduled_place: "Laboratório Simulado — Rua XV, 100", result: null },
-  { id: "ex-unit", label: "Sorologia para HIV", status_label: "Resultado pronto",
+  { id: "ex-unit", label: "Sorologia para HIV", status_label: "Retire o resultado na sua unidade",
     requested_at: "2026-10-01T09:00:00-03:00", scheduled_at: null, scheduled_place: null,
-    result: { available: false, pickup_at_unit: true, released_on: "2026-10-08", pdf_available: false } }
+    result: { available: false, pickup_at_unit: true, released_on: null, pdf_available: false } }
 ] };
 
 // Só o caminho /citizen/...: os módulos do Vite (/wpda/src/modules/citizen/…) passam direto.
@@ -58,6 +58,7 @@ test("as três políticas do laudo, sem rolagem lateral", async ({ page }) => {
 
   const imm = page.getByRole("listitem", { name: "Hemograma completo" });
   await expect(imm.getByText("Resultado disponível — liberado em 08/10/2026", { exact: true })).toBeVisible();
+  await expect(imm.getByText("Resultado disponível", { exact: true })).toHaveCount(0);
   await expect(imm.getByRole("button", { name: "Baixar resultado de Hemograma completo" })).toBeVisible();
 
   const ack = page.getByRole("listitem", { name: "Hemoglobina glicada" });
@@ -66,6 +67,7 @@ test("as três políticas do laudo, sem rolagem lateral", async ({ page }) => {
 
   const unit = page.getByRole("listitem", { name: "Sorologia para HIV" });
   await expect(unit.getByText("Retire o resultado na sua unidade de saúde.", { exact: true })).toBeVisible();
+  await expect(unit.getByText("Retire o resultado na sua unidade", { exact: true })).toHaveCount(0);
   await expect(unit.getByRole("button")).toHaveCount(0);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
