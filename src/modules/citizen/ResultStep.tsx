@@ -36,7 +36,9 @@ export function ResultStep({ triageId, onAgain, onHistory, onStartSuggestion, on
   useEffect(() => {
     let alive = true;
     let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     async function poll() {
+      if (!alive) return;
       tries += 1;
       try {
         const t = await citizenApi.triage(triageId);
@@ -50,10 +52,11 @@ export function ResultStep({ triageId, onAgain, onHistory, onStartSuggestion, on
         if (found) { if (alive) setToken(found); return; }
       } catch { /* tenta de novo */ }
       if (tries >= TRIES) { if (alive) setGaveUp(true); return; }
-      if (alive) setTimeout(poll, 1000);
+      if (alive) timer = setTimeout(poll, 1000);
     }
     poll();
-    return () => { alive = false; };
+    // A consulta já agendada não pode sair depois de desmontar (ou de trocar de rodada).
+    return () => { alive = false; clearTimeout(timer); };
   }, [triageId, attempt]);
 
   const history = <BigButton variant="secondary" onClick={onHistory}>{HISTORY_LABEL}</BigButton>;

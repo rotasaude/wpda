@@ -365,6 +365,18 @@ describe("ResultStep — usabilidade (6e)", () => {
       expect(screen.getByText("Procure atendimento hoje")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Fazer outra triagem" })).toBeInTheDocument();
     });
+
+    // A consulta agendada antes de desmontar não pode disparar depois: vazava
+    // para o spy do teste seguinte (16 chamadas em vez de 15 com o host lento).
+    it("desmontada, não consulta de novo", async () => {
+      const triage = vi.spyOn(citizenApi, "triage").mockResolvedValue(summary(null));
+      const { unmount } = render(<ResultStep triageId="t1" onAgain={vi.fn()} onHistory={vi.fn()} onStartSuggestion={vi.fn()} onCheckIn={vi.fn()} />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(triage).toHaveBeenCalledTimes(1);
+      unmount();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(triage).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("com check-in disponível, 'E agora?' traz 'Cheguei na unidade' como principal (WP-05)", async () => {
