@@ -15,11 +15,11 @@ afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(
 
 const EXAM: CitizenEntry = {
   id: "exam:ex1", kind: "exam", occurred_at: "2026-10-08T10:00:00-03:00", unit: { name: "UBS Centro" },
-  professional_name: null, title: "Hemograma completo", summary: null, status: "scheduled",
+  professional_name: null, title: "Hemograma completo", summary: "Resultado disponível", status: "scheduled",
   status_label: "Resultado disponível",
   document: { id: "ex1", short_code: null, verification_url: null, downloadable: true }
 };
-const EXAM_NO_PDF: CitizenEntry = { ...EXAM, id: "exam:ex2", title: "Hemoglobina glicada", status_label: "Coletado", document: null };
+const EXAM_NO_PDF: CitizenEntry = { ...EXAM, id: "exam:ex2", title: "Hemoglobina glicada", summary: "Coletado", status_label: "Coletado", document: null };
 const DOC: CitizenEntry = {
   id: "clinical_document:doc2", kind: "clinical_document", occurred_at: "2026-09-10T14:40:00-03:00", unit: null,
   professional_name: null, title: "Receita", summary: null, status: "issued",
@@ -49,8 +49,9 @@ describe("MyHistoryStep — exames (módulo 21a)", () => {
 
     const timeline = await screen.findByRole("region", { name: "Linha do tempo" });
     expect(within(timeline).getAllByText("Exame")).toHaveLength(2);
-    expect(within(timeline).getByText("Resultado disponível")).toBeInTheDocument();
-    expect(within(timeline).getByText("Coletado")).toBeInTheDocument();
+    // O api manda summary = status_label: o texto aparece uma só vez por exame.
+    expect(within(timeline).getAllByText("Resultado disponível")).toHaveLength(1);
+    expect(within(timeline).getAllByText("Coletado")).toHaveLength(1);
     // status_label vence o código: "scheduled" não vira "marcado".
     expect(within(timeline).queryByText("marcado")).not.toBeInTheDocument();
     // Só o documento tem código de conferência; o exame não.

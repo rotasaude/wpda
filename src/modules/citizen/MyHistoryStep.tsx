@@ -217,7 +217,7 @@ function EntryList({ entries, downloading, downloadError, onDownload }:
             <strong>{citizenKindLabel(e.kind)}</strong>
             <div>{fmtDateTime(e.occurred_at)}</div>
             <div>{e.title}</div>
-            {e.summary && <div style={muted}>{e.summary}</div>}
+            {e.summary && e.summary !== status && <div style={muted}>{e.summary}</div>}
             {place && <div style={muted}>{place}</div>}
             {status && <div>{status}</div>}
             {e.document && (
