@@ -7,12 +7,13 @@
 // documentos para par declarado.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
-  citizenApi, ApiError, DOCUMENT_KINDS, type CitizenDocumentRef, type CitizenEntry, type CitizenHistory, type HealthSummary
+  citizenApi, ApiError, DOCUMENT_KINDS, type CitizenEntry, type CitizenHistory, type HealthSummary
 } from "../../lib/citizenApi";
 import {
-  DOCUMENT_GONE, NOT_VERIFIED_INVITE, PARTIAL_NOTICE, SUMMARY_EMPTY, citizenKindLabel, citizenStatusLabel, documentFilename,
-  entryPlace, mergeEntries, sinceText, vitalsLines
+  DOCUMENT_GONE, NOT_VERIFIED_INVITE, PARTIAL_NOTICE, SUMMARY_EMPTY, citizenKindLabel, entryFilename,
+  entryPlace, entryStatusText, mergeEntries, sinceText, vitalsLines
 } from "../../lib/history";
+import { EXAM_KIND, EXAM_PDF_GONE } from "../../lib/exams";
 import { fmtDate, fmtDateTime } from "../../lib/format";
 import { BigButton, ErrorText, Screen, messageFor, pdfMessageFor } from "./ui";
 
@@ -83,24 +84,28 @@ export function MyHistoryStep({ citizenId, onBack, onValidate }:
     }
   }
 
-  async function download(doc: CitizenDocumentRef, list: ListKey) {
-    if (downloading) return;
+  async function download(entry: CitizenEntry, list: ListKey) {
+    const doc = entry.document;
+    if (!doc || downloading) return;
+    const isExam = entry.kind === EXAM_KIND;
     setDownloading(doc.id); setDownloadError(null);
     try {
-      const blob = await citizenApi.documentPdf(doc.id, citizenId);
+      // Exame (módulo 21a): a rota do exame aplica a política do laudo.
+      const blob = isExam ? await citizenApi.examPdf(doc.id, citizenId) : await citizenApi.documentPdf(doc.id, citizenId);
       if (!mounted.current) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = documentFilename(doc);
+      a.download = entryFilename(entry);
       a.click();
       const pending = pendingUrls.current;
       pending.set(url, setTimeout(() => { pending.delete(url); URL.revokeObjectURL(url); }, PDF_URL_TTL_MS));
     } catch (e) {
       if (!mounted.current) return;
       // 429 do PDF tem frase própria (pdfMessageFor), não a do SMS.
+      const gone = isExam ? EXAM_PDF_GONE : DOCUMENT_GONE;
       setDownloadError({ list, docId: doc.id,
-        message: e instanceof ApiError && e.code === "not_found" ? DOCUMENT_GONE : pdfMessageFor(e) });
+        message: e instanceof ApiError && e.code === "not_found" ? gone : pdfMessageFor(e) });
     } finally {
       if (mounted.current) setDownloading(null);
     }
@@ -126,7 +131,7 @@ export function MyHistoryStep({ citizenId, onBack, onValidate }:
               {documents.entries.length === 0 && <p>Nenhum documento ainda.</p>}
               <EntryList entries={documents.entries} downloading={downloading}
                 downloadError={downloadError?.list === "documents" ? downloadError : null}
-                onDownload={(doc) => void download(doc, "documents")} />
+                onDownload={(entry) => void download(entry, "documents")} />
               {documents.next_before && (
                 <LoadMore busy={more !== null} error={moreError?.list === "documents" ? moreError.message : null}
                   onClick={() => void loadMore("documents")} />
@@ -138,7 +143,7 @@ export function MyHistoryStep({ citizenId, onBack, onValidate }:
             {timeline.entries.length === 0 && <p>Nenhum registro ainda.</p>}
             <EntryList entries={timeline.entries} downloading={downloading}
               downloadError={downloadError?.list === "timeline" ? downloadError : null}
-              onDownload={(doc) => void download(doc, "timeline")} />
+              onDownload={(entry) => void download(entry, "timeline")} />
             {timeline.next_before && (
               <LoadMore busy={more !== null} error={moreError?.list === "timeline" ? moreError.message : null}
                 onClick={() => void loadMore("timeline")} />
@@ -201,12 +206,12 @@ function LoadMore({ busy, error, onClick }: { busy: boolean; error: string | nul
 
 function EntryList({ entries, downloading, downloadError, onDownload }:
   { entries: CitizenEntry[]; downloading: string | null; downloadError: { docId: string; message: string } | null;
-    onDownload: (doc: CitizenDocumentRef) => void }) {
+    onDownload: (entry: CitizenEntry) => void }) {
   return (
     <ul style={{ listStyle: "none", padding: 0, margin: "0 0 12px", display: "grid", gap: 12 }}>
       {entries.map((e) => {
         const place = entryPlace(e);
-        const status = citizenStatusLabel(e.status);
+        const status = entryStatusText(e);
         return (
           <li key={e.id} style={card}>
             <strong>{citizenKindLabel(e.kind)}</strong>
@@ -225,7 +230,7 @@ function EntryList({ entries, downloading, downloadError, onDownload }:
                   <BigButton variant="secondary" disabled={downloading !== null}
                     aria-busy={downloading === e.document.id}
                     aria-label={downloading === e.document.id ? `Baixando PDF de ${e.title}` : `Baixar PDF de ${e.title}`}
-                    onClick={() => onDownload(e.document as CitizenDocumentRef)}>
+                    onClick={() => onDownload(e)}>
                     {downloading === e.document.id ? "Baixando…" : "Baixar PDF"}
                   </BigButton>
                 )}

@@ -3,6 +3,7 @@
 // rótulo do tipo, a junção das páginas, as linhas do resumo e o nome do PDF.
 import type { CitizenDocumentRef, CitizenEntry, HealthVitals } from "./citizenApi";
 import { fmtCalendarDate, fmtDate } from "./format";
+import { EXAM_KIND, examFilename } from "./exams";
 
 export const PARTIAL_NOTICE =
   "Este histórico mostra só o que passou pelo Rota Saúde. Consultas e exames registrados em outros sistemas da prefeitura não aparecem aqui.";
@@ -24,7 +25,9 @@ const KIND_LABEL: Record<string, string> = {
   consultation: "Consulta",
   clinical_document: "Documento",
   controlled_notification: "Receita de controle especial",
-  campaign: "Campanha"
+  campaign: "Campanha",
+  // Módulo 21a (contrato §10).
+  exam: "Exame"
 };
 
 // O cidadão não vê código de máquina: tipo novo do api vira "Registro".
@@ -95,4 +98,16 @@ export function vitalsLines(v: HealthVitals): string[] {
 export function documentFilename(doc: CitizenDocumentRef): string {
   const raw = (doc.short_code ?? doc.id).replace(/[^A-Za-z0-9-]/g, "");
   return `documento-${raw || "pdf"}.pdf`;
+}
+
+// Situação da entrada: o rótulo pronto do api (exame, módulo 21a) vence a
+// tradução do código da origem. Código desconhecido sem rótulo: nada.
+export function entryStatusText(entry: CitizenEntry): string | null {
+  return entry.status_label || citizenStatusLabel(entry.status);
+}
+
+// O PDF do exame tem nome próprio (o id é o do exame, sem código de conferência).
+export function entryFilename(entry: CitizenEntry): string {
+  if (entry.kind === EXAM_KIND && entry.document) return examFilename(entry.document.id);
+  return entry.document ? documentFilename(entry.document) : "documento-pdf.pdf";
 }
