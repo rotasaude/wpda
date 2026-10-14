@@ -386,6 +386,9 @@ export interface CitizenEntry {
   id: string; kind: string; occurred_at: string;
   unit: { name: string } | null; professional_name: string | null;
   title: string; summary: string | null; status: string | null;
+  // Módulo 21a (contrato §10, Divergência E5): situação já em palavras do
+  // cidadão (entrada `exam`). Presente só quando o api manda; vence o `status`.
+  status_label?: string | null;
   document: CitizenDocumentRef | null;
 }
 export interface CitizenHistory { verified: boolean; partial: boolean; entries: CitizenEntry[]; next_before: string | null }
@@ -416,6 +419,7 @@ function normalizeEntry(e: RawEntry): CitizenEntry {
     unit: e.unit?.name ? { name: e.unit.name } : null,
     professional_name: e.professional_name ?? null,
     title: e.title ?? "", summary: e.summary ?? null, status: e.status ?? null,
+    ...(e.status_label ? { status_label: e.status_label } : {}),
     document: e.document
       ? {
           id: e.document.id, short_code: e.document.short_code ?? null,
@@ -431,6 +435,33 @@ function normalizeSummary(s: Partial<HealthSummary>): HealthSummary {
     medications: (s.medications ?? []).map((m) => ({ ...m, dosage_summary: m.dosage_summary ?? null, since: m.since ?? null })),
     exam_requests: s.exam_requests ?? [],
     vitals: s.vitals ?? {}
+  };
+}
+
+// ─── Meus exames (módulo 21a, ADR 0036; contrato §9; Divergências E1–E4) ───
+// Por pessoa do celular (citizen_id, como o histórico). Só o que o contrato
+// traz: nunca motivo de negação, marca de crítico ou valores do resultado —
+// campo a mais que o api mande é descartado aqui. A política do laudo é do
+// api: `result` diz o que a pessoa pode ver.
+export interface CitizenExamResult { available: boolean; pickup_at_unit: boolean; released_on: string | null; pdf_available: boolean }
+export interface CitizenExam {
+  id: string; label: string; status_label: string; requested_at: string;
+  scheduled_at: string | null; scheduled_place: string | null; result: CitizenExamResult | null;
+}
+export interface CitizenExams { verified: boolean; exams: CitizenExam[]; next_before: string | null }
+export const EXAMS_PAGE_SIZE = 20;
+
+type RawExam = Partial<Omit<CitizenExam, "result">> & { id: string; result?: Partial<CitizenExamResult> | null };
+
+function normalizeExam(e: RawExam): CitizenExam {
+  const r = e.result;
+  return {
+    id: e.id, label: e.label ?? "", status_label: e.status_label ?? "", requested_at: e.requested_at ?? "",
+    scheduled_at: e.scheduled_at ?? null, scheduled_place: e.scheduled_place ?? null,
+    result: r
+      ? { available: r.available === true, pickup_at_unit: r.pickup_at_unit === true,
+          released_on: r.released_on ?? null, pdf_available: r.pdf_available === true }
+      : null
   };
 }
 
@@ -579,5 +610,17 @@ export const citizenApi = {
   healthSummary: async (citizenId: string): Promise<HealthSummary> =>
     normalizeSummary(await call<Partial<HealthSummary>>("GET", `/health_summary?citizen_id=${encodeURIComponent(citizenId)}`)),
   documentPdf: (documentId: string, citizenId: string): Promise<Blob> =>
-    pdf(`/documents/${encodeURIComponent(documentId)}/pdf?citizen_id=${encodeURIComponent(citizenId)}`)
+    pdf(`/documents/${encodeURIComponent(documentId)}/pdf?citizen_id=${encodeURIComponent(citizenId)}`),
+  // Meus exames (módulo 21a): mais novo primeiro; par declarado = verified false.
+  exams: async (citizenId: string, opts: { before?: string | null } = {}): Promise<CitizenExams> => {
+    const params = new URLSearchParams({ citizen_id: citizenId });
+    if (opts.before) params.set("before", opts.before);
+    params.set("limit", String(EXAMS_PAGE_SIZE));
+    const d = await call<{ verified?: boolean; exams?: RawExam[]; next_before?: string | null }>(
+      "GET", `/exams?${params.toString()}`);
+    return { verified: d.verified === true, exams: (d.exams ?? []).map(normalizeExam), next_before: d.next_before ?? null };
+  },
+  // PDF do laudo, só quando a política permite (senão 404 not_found).
+  examPdf: (examId: string, citizenId: string): Promise<Blob> =>
+    pdf(`/exams/${encodeURIComponent(examId)}/pdf?citizen_id=${encodeURIComponent(citizenId)}`)
 };
