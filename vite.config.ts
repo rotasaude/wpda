@@ -19,7 +19,8 @@ export default defineConfig({
     proxy: {
       "/up": proxy(TARGET),
       "/r":  proxy(TARGET),
-      "/citizen": proxy(TARGET)
+      "/citizen": proxy(TARGET),
+      "/city_identity": proxy(TARGET)
     }
   }
 });

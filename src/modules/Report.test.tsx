@@ -32,8 +32,7 @@ describe("Report", () => {
     render(<Report token="a b/c" />);
 
     await screen.findByText("Seu resultado");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect((fetchMock.mock.calls[0] as unknown[])[0]).toBe("/r/a%20b%2Fc");
+    expect(fetchMock.mock.calls.map((c) => (c as unknown[])[0])).toContain("/r/a%20b%2Fc");
   });
 
   it("mostra carregando enquanto a resposta não chega", () => {

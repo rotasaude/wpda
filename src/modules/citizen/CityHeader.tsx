@@ -1,10 +1,18 @@
-// Topo por cidade (decisão 6 do ciclo): brasão e nome da prefeitura quando o
-// api expuser (rotasaude/api#73); até lá, "Rota Saúde" com um ícone neutro.
-export function CityHeader({ name, coatOfArmsUrl }: { name?: string; coatOfArmsUrl?: string }) {
+import { useState } from "react";
+import { useCityIdentity } from "../../lib/useCityIdentity";
+
+// Topo por cidade (decisão 6 do ciclo): brasão e "Prefeitura de <nome>" vindos
+// do api (rotasaude/api#73); em falha/ausência, "Rota Saúde" com ícone neutro.
+export function CityHeader() {
+  const identity = useCityIdentity();
+  const [ failedUrl, setFailedUrl ] = useState<string | null>(null);
+  const url = identity?.coat_of_arms_url ?? null;
+  const showCoat = url !== null && url !== failedUrl;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      {coatOfArmsUrl
-        ? <img src={coatOfArmsUrl} alt="" width={32} height={32} style={{ objectFit: "contain" }} />
+      {showCoat
+        ? <img src={url} alt={`Brasão de ${identity!.name}`} width={32} height={32} style={{ objectFit: "contain" }}
+            onError={() => setFailedUrl(url)} />
         : (
           <span aria-hidden="true" style={{ width: 32, height: 32, borderRadius: 6, display: "inline-flex", alignItems: "center",
             justifyContent: "center", background: "var(--accent-bg)", color: "var(--accent)" }}>
@@ -13,7 +21,7 @@ export function CityHeader({ name, coatOfArmsUrl }: { name?: string; coatOfArmsU
             </svg>
           </span>
         )}
-      <strong style={{ fontSize: 14, color: "var(--ink2)" }}>{name ?? "Rota Saúde"}</strong>
+      <strong style={{ fontSize: 14, color: "var(--ink2)" }}>{identity ? `Prefeitura de ${identity.name}` : "Rota Saúde"}</strong>
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { useState } from "react";
 import { A11yBar } from "./A11yBar";
 import { A11yPage } from "./A11yPage";
-import { CityHeader } from "./CityHeader";
 import { EmergencyCall } from "./EmergencyCall";
 import { Screen } from "./ui";
 import { closeA11y, openA11y, useA11yOpen } from "./a11yStore";
@@ -38,11 +37,6 @@ describe("topo, acessibilidade e 192", () => {
     expect(screen.getByText("Rota Saúde")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Emergência? Ligar 192" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "Seu celular" })).toBeInTheDocument();
-  });
-
-  it("CityHeader mostra o nome quando houver", () => {
-    render(<CityHeader name="Curitiba" />);
-    expect(screen.getByText("Curitiba")).toBeInTheDocument();
   });
 
   it("Alto contraste tem aria-pressed", () => {

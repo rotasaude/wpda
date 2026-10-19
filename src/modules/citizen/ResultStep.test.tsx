@@ -40,7 +40,7 @@ describe("ResultStep", () => {
     expect(screen.getByText("Preparando seu resultado…")).toBeInTheDocument();
     expect(await screen.findByText("Procure atendimento hoje", undefined, { timeout: 3000 })).toBeInTheDocument();
     expect(triage).toHaveBeenCalledWith("t1");
-    expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toBe("/r/abc");
+    expect(fetchMock.mock.calls.map((c) => String((c as unknown[])[0]))).toContain("/r/abc");
   });
 
   it("oferece nova triagem e o histórico", async () => {
