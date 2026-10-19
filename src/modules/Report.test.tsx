@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { Report } from "./Report";
 import { GENERIC_NOTE } from "../lib/report";
+import { resetCityIdentityForTests } from "../lib/cityIdentity";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -27,12 +28,15 @@ const frozen = {
 };
 
 describe("Report", () => {
+  beforeEach(() => resetCityIdentityForTests());
+
   it("busca GET /r/:token com o token codificado", async () => {
     const fetchMock = stubFetch(json(200, frozen));
     render(<Report token="a b/c" />);
 
     await screen.findByText("Seu resultado");
-    expect(fetchMock.mock.calls.map((c) => (c as unknown[])[0])).toContain("/r/a%20b%2Fc");
+    const reportCalls = fetchMock.mock.calls.map((c) => String((c as unknown[])[0])).filter((u) => u.includes("/r/"));
+    expect(reportCalls).toEqual(["/r/a%20b%2Fc"]);
   });
 
   it("mostra carregando enquanto a resposta não chega", () => {
