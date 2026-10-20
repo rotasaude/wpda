@@ -156,6 +156,23 @@ todo PR.
 
 O `Dockerfile` gera a SPA e a serve com nginx sob `/wpda/` (`nginx.conf`).
 
+### Desktop em dev e staging
+
+Fora do celular, o fluxo do cidadão mostra "Abra no celular" (decisão 9 do
+ciclo de interface). Dev e staging liberam o desktop, com a faixa "Modo desktop
+— ambiente de teste" no topo (rotasaude/wpda#2):
+
+- **dev:** liberado pelo dev server do Vite, sem configurar nada.
+- **staging:** suba o container com `WPDA_ALLOW_DESKTOP=1`. Na subida,
+  `docker/40-wpda-runtime-config.sh` escreve `/wpda/runtime-config.js`.
+- **produção:** não defina a variável. Sem ela, ou com qualquer valor diferente
+  de `1`, o bloqueio vale. A imagem é a mesma de staging.
+
+O bloqueio é de usabilidade, não de segurança: roda no navegador.
+
+Para provar o bloqueio de produção no e2e, rode contra a imagem sem a variável:
+`WPDA_URL=http://localhost:<porta> WPDA_DESKTOP_ALLOWED=0 npm run e2e`.
+
 ## Princípios
 
 - **Uma cidade por host.** Sessão e dados do cidadão ficam no banco da cidade.

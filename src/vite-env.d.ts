@@ -7,3 +7,8 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+// Escrito por /wpda/runtime-config.js antes do app (rotasaude/wpda#2).
+interface Window {
+  __WPDA_RUNTIME__?: { allowDesktop?: boolean };
+}

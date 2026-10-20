@@ -7,6 +7,8 @@ import { A11yPage } from "./modules/citizen/A11yPage";
 import { useA11yOpen } from "./modules/citizen/a11yStore";
 import { PhoneOnly } from "./modules/citizen/PhoneOnly";
 import { isPhone } from "./lib/device";
+import { desktopAllowed } from "./lib/desktopAllowed";
+import { TestEnvBanner } from "./modules/citizen/TestEnvBanner";
 
 // Barra de acessibilidade sempre no topo; a página de acessibilidade é
 // sobreposta e o conteúdo fica hidden (sem desmontar: o fluxo não perde o
@@ -15,12 +17,14 @@ export function App() {
   const token = tokenFromUrl();
   const a11y = useA11yOpen();
   // O relatório abre em qualquer tela; o fluxo do cidadão, só no celular
-  // (decisão 9 do ciclo de interface).
+  // (decisão 9 do ciclo de interface), exceto em dev e staging (wpda#2).
+  const testEnv = desktopAllowed();
   const content = token
     ? <Report token={token}><BackHomeLink /></Report>
-    : isPhone() ? <Flow /> : <PhoneOnly />;
+    : isPhone() || testEnv ? <Flow /> : <PhoneOnly />;
   return (
     <>
+      {testEnv && <TestEnvBanner />}
       <A11yBar />
       {a11y && <A11yPage />}
       <div hidden={a11y}>{content}</div>
