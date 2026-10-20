@@ -35,6 +35,10 @@ describe("index.html carrega o runtime-config antes do app", () => {
     expect(config).toBeLessThan(html.indexOf("/src/main.tsx"));
   });
 
+  it("declara um ícone vazio: o navegador não pede /favicon.ico fora de /wpda/", () => {
+    expect(html).toContain('<link rel="icon" href="data:,">');
+  });
+
   it("o arquivo padrão do build bloqueia (dist servido sem o entrypoint)", () => {
     expect(readFileSync(join(root, "public/runtime-config.js"), "utf8")).toBe("window.__WPDA_RUNTIME__ = { allowDesktop: false };\n");
   });
