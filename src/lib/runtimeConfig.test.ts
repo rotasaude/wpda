@@ -29,8 +29,8 @@ describe("runtime-config.js gerado pelo container", () => {
 
 describe("index.html carrega o runtime-config antes do app", () => {
   const html = readFileSync(join(root, "index.html"), "utf8");
-  it("script clássico em /wpda/runtime-config.js antes de main.tsx", () => {
-    const config = html.indexOf('<script src="/wpda/runtime-config.js"></script>');
+  it("script clássico em /runtime-config.js (o Vite prefixa o base no dev e no build) antes de main.tsx", () => {
+    const config = html.indexOf('<script src="/runtime-config.js"></script>');
     expect(config).toBeGreaterThan(-1);
     expect(config).toBeLessThan(html.indexOf("/src/main.tsx"));
   });
