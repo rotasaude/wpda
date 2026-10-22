@@ -17,6 +17,7 @@ describe("tipos para o cidadão", () => {
     expect(citizenKindLabel("screening")).toBe("Acolhimento");
     expect(citizenKindLabel("controlled_notification")).toBe("Receita de controle especial");
     expect(citizenKindLabel("clinical_document")).toBe("Documento");
+    expect(citizenKindLabel("procedure")).toBe("Procedimento");
     expect(citizenKindLabel("vaccination")).toBe("Registro");
     expect(citizenKindLabel("")).toBe("Registro");
   });

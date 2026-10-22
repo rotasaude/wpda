@@ -24,6 +24,7 @@ const KIND_LABEL: Record<string, string> = {
   appointment: "Agendamento",
   consultation: "Consulta",
   clinical_document: "Documento",
+  procedure: "Procedimento",
   controlled_notification: "Receita de controle especial",
   campaign: "Campanha",
   // Módulo 21a (contrato §10).

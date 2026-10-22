@@ -308,6 +308,17 @@ describe("MyHistoryStep", () => {
     expect(within(docs).queryByRole("button", { name: /Baixar PDF/ })).not.toBeInTheDocument();
   });
 
+  it("procedimento: rótulo Procedimento e a data do realizado", async () => {
+    api({ timeline: history({ entries: [ entry({ id: "procedure:p1", kind: "procedure", occurred_at: "2026-10-21T09:00:00-03:00",
+      unit: { name: "UBS Centro" }, title: "Curativo", summary: "Realizado em 21/10/2026" }) ] }) });
+    renderStep();
+    const timeline = await screen.findByRole("region", { name: "Linha do tempo" });
+    expect(within(timeline).getByText("Procedimento")).toBeInTheDocument();
+    expect(within(timeline).getByText("Realizado em 21/10/2026")).toBeInTheDocument();
+    expect(within(timeline).getByText(/UBS Centro/)).toBeInTheDocument();
+    expect(within(timeline).queryByText("Registro")).not.toBeInTheDocument();
+  });
+
   it("tipo desconhecido vira Registro", async () => {
     api({ timeline: history({ entries: [ entry({ id: "vaccination:v1", kind: "vaccination", title: "Vacina contra a gripe" }) ] }) });
     renderStep();
