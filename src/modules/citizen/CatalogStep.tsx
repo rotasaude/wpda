@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, citizenApi, type Catalog } from "../../lib/citizenApi";
 import { fmtCalendarDate } from "../../lib/format";
 import { ReferenceUnits } from "../ReferenceUnits";
+import { lastDoneText } from "../../lib/care";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
 export const EMPTY_CATALOG_MESSAGE =
@@ -86,6 +87,10 @@ export function CatalogStep({ citizenId, notice, onStart, onProfileRequired, onP
 
   const c = catalog;
   const nothingToStart = c !== null && c.in_progress === null && c.suggested.length === 0 && c.available.length === 0;
+  // Módulo 23 (F-23.8): oferta com o intervalo de repetição vencido vem antes,
+  // com a última vez; o resto segue em "Disponíveis". Sem `overdue`, como hoje.
+  const due = c ? c.available.filter(a => a.overdue === true) : [];
+  const rest = c ? c.available.filter(a => a.overdue !== true) : [];
 
   return (
     <Screen title="Qual triagem fazer?" footer={<>
@@ -101,6 +106,15 @@ export function CatalogStep({ citizenId, notice, onStart, onProfileRequired, onP
           <Item title={c.in_progress.title} summary={null} action={startButton(c.in_progress.protocol_name, c.in_progress.title, "Continuar")} />
         </Section>
       )}
+      {due.length > 0 && (
+        <Section id="catalog-overdue" title="Está na hora de refazer">
+          {due.map(a => {
+            const last = lastDoneText(a);
+            return <Item key={a.protocol_name} title={a.title} summary={a.summary} lines={last ? [ last ] : []}
+              action={startButton(a.protocol_name, a.title)} />;
+          })}
+        </Section>
+      )}
       {c && c.suggested.length > 0 && (
         <Section id="catalog-suggested" title="Sugeridas para você">
           {c.suggested.map(s => (
@@ -112,9 +126,9 @@ export function CatalogStep({ citizenId, notice, onStart, onProfileRequired, onP
           ))}
         </Section>
       )}
-      {c && c.available.length > 0 && (
+      {rest.length > 0 && (
         <Section id="catalog-available" title="Disponíveis">
-          {c.available.map(a => (
+          {rest.map(a => (
             <Item key={a.protocol_name} title={a.title} summary={a.summary} action={startButton(a.protocol_name, a.title)} />
           ))}
         </Section>
