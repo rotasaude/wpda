@@ -3,12 +3,13 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CatalogStep } from "./CatalogStep";
 import { citizenApi, type Catalog } from "../../lib/citizenApi";
+import { setSessionFeatures } from "../../lib/sessionFeatures";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: [ "Date" ] });
   vi.setSystemTime(new Date("2026-10-22T10:00:00-03:00"));
 });
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); setSessionFeatures(null); });
 
 const IDOSO = { protocol_name: "saude-do-idoso", title: "Saúde do idoso", summary: "Avaliação anual de quedas, memória e medicamentos.",
   overdue: true, last_done_at: "2025-10-02" };
@@ -34,6 +35,13 @@ describe("CatalogStep — triagem periódica vencida (módulo 23)", () => {
     expect(within(available).getByText("Sintomas respiratórios")).toBeInTheDocument();
     await userEvent.click(within(item).getByRole("button", { name: "Começar: Saúde do idoso" }));
     expect(onStart).toHaveBeenCalledWith("saude-do-idoso");
+  });
+
+  it("L9: sem care_lines na sessão, a vencida continua em 'Está na hora de refazer'", async () => {
+    setSessionFeatures([]);
+    setup(catalog([ IDOSO, RESP ]));
+    const overdue = await screen.findByRole("region", { name: "Está na hora de refazer" });
+    expect(within(overdue).getByText("Saúde do idoso")).toBeInTheDocument();
   });
 
   it("sem overdue (api antigo): Disponíveis como hoje", async () => {

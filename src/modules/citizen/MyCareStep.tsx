@@ -63,7 +63,7 @@ export function MyCareStep({ citizenId, onBack, onValidate, onStartCatalog }:
               </ul>
             </section>
           )}
-          {data.lines.length === 0 && <p>{CARE_EMPTY}</p>}
+          {data.lines.length === 0 && data.overdue_triages.length === 0 && <p>{CARE_EMPTY}</p>}
           {data.lines.map((line, i) => (
             <section key={`${line.name}-${i}`} aria-labelledby={`care-line-${i}`}>
               <h2 id={`care-line-${i}`} style={h2}>{line.name || "Acompanhamento"}</h2>

@@ -96,6 +96,12 @@ describe("MyCareStep", () => {
     expect(await screen.findByText(CARE_EMPTY)).toBeInTheDocument();
   });
 
+  it("sem linhas mas com triagem vencida: o cartão aparece e a frase de vazio não", async () => {
+    setup({ lines: [], overdue_triages: CARE.overdue_triages });
+    expect(await screen.findByRole("region", { name: "Triagens para refazer" })).toBeInTheDocument();
+    expect(screen.queryByText(CARE_EMPTY)).not.toBeInTheDocument();
+  });
+
   it("interruptor desligado com a tela aberta: a frase do acompanhamento", async () => {
     setup(new ApiError(403, "feature_disabled"));
     expect(await screen.findByRole("alert")).toHaveTextContent(CARE_DISABLED);
