@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Flow } from "./Flow";
-import { citizenApi, ApiError } from "../../lib/citizenApi";
+import { citizenApi, ApiError, type Catalog } from "../../lib/citizenApi";
 import { setSessionFeatures } from "../../lib/sessionFeatures";
 
 beforeEach(() => {
@@ -53,6 +53,20 @@ describe("Flow — Meu acompanhamento (módulo 23)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Meu acompanhamento" }));
     await userEvent.click(await screen.findByRole("button", { name: "Validar no posto" }));
     expect(await screen.findByText("482913")).toBeInTheDocument();
+  });
+
+  it("triagem vencida: Começar abre Qual triagem fazer? para a mesma pessoa", async () => {
+    signedIn([ "care_lines" ]);
+    vi.spyOn(citizenApi, "care").mockResolvedValue({ lines: [], overdue_triages: [
+      { protocol_name: "saude-do-idoso", title: "Saúde do idoso", last_done_at: "2025-10-02" } ] });
+    const catalog: Catalog = { in_progress: null, suggested: [], recent: [], reference_units: [],
+      available: [ { protocol_name: "saude-do-idoso", title: "Saúde do idoso", summary: "Avaliação anual.", overdue: true, last_done_at: "2025-10-02" } ] };
+    const catalogSpy = vi.spyOn(citizenApi, "catalog").mockResolvedValue(catalog);
+    await toMyTriages();
+    await userEvent.click(screen.getByRole("button", { name: "Meu acompanhamento" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Começar: Saúde do idoso" }));
+    expect(await screen.findByRole("heading", { name: "Qual triagem fazer?" })).toBeInTheDocument();
+    expect(catalogSpy).toHaveBeenCalledWith("p1");
   });
 
   it("com os três interruptores: os três botões", async () => {

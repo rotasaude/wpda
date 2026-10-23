@@ -329,7 +329,12 @@ export function Flow() {
     case "care":
       view = <MyCareStep key={state.citizenId} citizenId={state.citizenId}
         onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })}
-        onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })} />;
+        onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })}
+        // Mesmo destino do choose(): catálogo da pessoa. O catálogo exige o termo
+        // (string); sem ele, o caminho do histórico: o termo primeiro.
+        onStartCatalog={() => setState(state.consentVersion
+          ? { at: "catalog", consentVersion: state.consentVersion, citizenId: state.citizenId, notice: null }
+          : { at: "consent" })} />;
       break;
     case "verify-code":
       view = <VerificationCodeStep citizenId={state.citizenId}

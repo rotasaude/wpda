@@ -12,8 +12,10 @@ import { BigButton, ErrorText, Screen } from "./ui";
 
 const TONE_BG: Record<CareTone, string> = { ok: "var(--ok-bg)", warn: "var(--warn-bg)", neutral: "var(--sunken)" };
 
-export function MyCareStep({ citizenId, onBack, onValidate }:
-  { citizenId: string; onBack: () => void; onValidate: (citizenId: string) => void }) {
+export function MyCareStep({ citizenId, onBack, onValidate, onStartCatalog }:
+  { citizenId: string; onBack: () => void; onValidate: (citizenId: string) => void;
+    // "Começar" nas triagens vencidas abre "Qual triagem fazer?" para esta pessoa.
+    onStartCatalog: () => void }) {
   const [ data, setData ] = useState<CitizenCare | null>(null);
   const [ notVerified, setNotVerified ] = useState(false);
   const [ error, setError ] = useState<string | null>(null);
@@ -54,11 +56,11 @@ export function MyCareStep({ citizenId, onBack, onValidate }:
                       <strong>{e.title || "Triagem"}</strong>
                       <div>Está na hora de refazer esta triagem.</div>
                       {last && <div style={muted}>{last}</div>}
+                      <BigButton aria-label={`Começar: ${e.title || "Triagem"}`} onClick={onStartCatalog} style={{ marginTop: 8 }}>Começar</BigButton>
                     </li>
                   );
                 })}
               </ul>
-              <p style={muted}>Para refazer, volte até “Para quem é esta triagem?” e escolha esta pessoa: abre a tela “Qual triagem fazer?”.</p>
             </section>
           )}
           {data.lines.length === 0 && <p>{CARE_EMPTY}</p>}

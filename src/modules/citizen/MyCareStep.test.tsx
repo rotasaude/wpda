@@ -23,8 +23,9 @@ function setup(care: CitizenCare | Error = CARE) {
   const careSpy = vi.spyOn(citizenApi, "care");
   if (care instanceof Error) careSpy.mockRejectedValue(care); else careSpy.mockResolvedValue(care);
   const onValidate = vi.fn();
-  render(<MyCareStep citizenId="p1" onBack={vi.fn()} onValidate={onValidate} />);
-  return { careSpy, onValidate };
+  const onStartCatalog = vi.fn();
+  render(<MyCareStep citizenId="p1" onBack={vi.fn()} onValidate={onValidate} onStartCatalog={onStartCatalog} />);
+  return { careSpy, onValidate, onStartCatalog };
 }
 
 describe("MyCareStep", () => {
@@ -45,12 +46,28 @@ describe("MyCareStep", () => {
     const item = within(screenings).getByRole("listitem", { name: "Saúde do idoso" });
     expect(within(item).getByText("Feita pela última vez em 02/10/2025")).toBeInTheDocument();
     // C06: a tela não tem como iniciar a triagem; ela nomeia onde fazer.
-    // Caminho real (Flow): Voltar → Minhas triagens → Voltar → "Para quem é esta triagem?" → escolher a pessoa → catálogo.
-    expect(within(screenings).getByText(/volte até “Para quem é esta triagem\?” e escolha esta pessoa: abre a tela “Qual triagem fazer\?”/)).toBeInTheDocument();
+    // C06: o cartão abre o catálogo por um botão; a frase de "volte e escolha" saiu.
+    expect(within(screenings).queryByText(/volte/)).not.toBeInTheDocument();
+  });
+
+  it("Começar: só no cartão das triagens vencidas, com o nome da triagem, e abre o catálogo", async () => {
+    const { onStartCatalog } = setup({ ...CARE, overdue_triages: [
+      ...CARE.overdue_triages, { protocol_name: "saude-da-mulher", title: "Saúde da mulher", last_done_at: "2025-09-01" } ] });
+    const screenings = await screen.findByRole("region", { name: "Triagens para refazer" });
+    expect(within(screenings).getAllByRole("button")).toHaveLength(2);
+    expect(within(screenings).getByRole("button", { name: "Começar: Saúde do idoso" })).toHaveTextContent("Começar");
+    await userEvent.click(within(screenings).getByRole("button", { name: "Começar: Saúde da mulher" }));
+    expect(onStartCatalog).toHaveBeenCalledTimes(1);
+    // Item de linha de cuidado não ganha "Começar".
+    const line = screen.getByRole("region", { name: "Pessoa com diabetes" });
+    expect(within(line).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getAllByRole("button", { name: /Começar/ })).toHaveLength(2);
   });
 
   it("sem triagem vencida: sem o aviso, o resto aparece", async () => {
     setup({ ...CARE, overdue_triages: [] });
+    expect(await screen.findByRole("region", { name: "Pessoa com diabetes" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Começar/ })).not.toBeInTheDocument();
     expect(await screen.findByRole("region", { name: "Pessoa com diabetes" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Triagens para refazer" })).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
