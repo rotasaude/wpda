@@ -43,9 +43,9 @@ function openRequestText(request: AppointmentRequest): string {
     case "screening":
       return unit ? `Pedido de consulta da sua triagem em ${unit}.` : "Pedido de consulta da sua triagem.";
     case "return":
-      return unit ? `Retorno pedido na ${unit} — a unidade vai marcar o horário` : "Retorno pedido — a unidade vai marcar o horário";
+      return unit ? `Retorno pedido na ${unit} — a unidade vai marcar o horário` : "Retorno pedido. A unidade vai marcar o horário.";
     case "referral":
-      return unit ? `Encaminhamento para ${unit} — a unidade vai marcar o horário` : "Encaminhamento — a unidade vai marcar o horário";
+      return unit ? `Encaminhamento para ${unit} — a unidade vai marcar o horário` : "Encaminhamento pedido. A unidade vai marcar o horário.";
     // Tipo que esta versão não conhece: nunca o código cru.
     default:
       return "Pedido de consulta aberto";
