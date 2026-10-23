@@ -64,7 +64,8 @@ export function ProfileStep({ citizenId, required, onSaved, onBack }:
   const profile = person.profile ?? null;
   // Módulo 23 (F-23.7): condição declarada é do par validado (verification_level, P8)
   // com care_lines na sessão, também abaixo do formulário do par validado por check-in.
-  const conditions = person.verification_level === "verified" && hasSessionFeature("care_lines")
+  // Nunca no passo obrigatório: declarar é voluntário e esse passo não pode parecer pedir dado de saúde.
+  const conditions = !required && person.verification_level === "verified" && hasSessionFeature("care_lines")
     ? <HealthConditions citizenId={person.id} /> : null;
   if (profile && profile.profile_source === "verified") {
     return (

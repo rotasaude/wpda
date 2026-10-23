@@ -191,6 +191,27 @@ describe("ProfileStep — condições de saúde", () => {
     expect(screen.getAllByRole("main")).toHaveLength(1);
   });
 
+  it("passo obrigatório (required): o par validado por check-in não vê a seção e o api de condições não é chamado", async () => {
+    setSessionFeatures([ "care_lines" ]);
+    vi.spyOn(citizenApi, "people").mockResolvedValue({ people: [ CHECKED_IN ] });
+    const load = vi.spyOn(citizenApi, "declaredConditions");
+    render(<ProfileStep citizenId="p1" required onSaved={vi.fn()} onBack={vi.fn()} />);
+    expect(await screen.findByLabelText("Data de nascimento")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Sobre esta pessoa");
+    expect(screen.queryByRole("heading", { name: "Condições de saúde" })).not.toBeInTheDocument();
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it("o mesmo par, no perfil (não obrigatório): vê a seção", async () => {
+    setSessionFeatures([ "care_lines" ]);
+    vi.spyOn(citizenApi, "people").mockResolvedValue({ people: [ CHECKED_IN ] });
+    vi.spyOn(citizenApi, "declaredConditions").mockResolvedValue([]);
+    render(<ProfileStep citizenId="p1" required={false} onSaved={vi.fn()} onBack={vi.fn()} />);
+    expect(await screen.findByLabelText("Data de nascimento")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Meu perfil");
+    expect(await screen.findByRole("heading", { name: "Condições de saúde" })).toBeInTheDocument();
+  });
+
   it("par só declarado: sem a seção e sem chamar o api de condições", async () => {
     setSessionFeatures([ "care_lines" ]);
     vi.spyOn(citizenApi, "people").mockResolvedValue({ people: [ DECLARED ] });
