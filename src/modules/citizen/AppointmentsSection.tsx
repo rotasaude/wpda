@@ -35,9 +35,21 @@ function openRequestText(request: AppointmentRequest): string {
       ? `Pedido da triagem: ${what} — a ${request.target_unit_name} vai entrar em contato para marcar o horário`
       : `Pedido da triagem: ${what} — a Secretaria de Saúde vai indicar a unidade e marcar o horário`;
   }
-  return request.kind === "return"
-    ? `Retorno pedido na ${request.target_unit_name} — a unidade vai marcar o horário`
-    : `Encaminhamento para ${request.target_unit_name} — a unidade vai marcar o horário`;
+  const unit = request.target_unit_name;
+  switch (request.kind) {
+    // Módulo 23: pedido aberto pela linha de cuidado (a equipe pediu o horário).
+    case "care_line":
+      return unit ? `Sua equipe pediu um horário de acompanhamento em ${unit}.` : "Sua equipe pediu um horário de acompanhamento.";
+    case "screening":
+      return unit ? `Pedido de consulta da sua triagem em ${unit}.` : "Pedido de consulta da sua triagem.";
+    case "return":
+      return unit ? `Retorno pedido na ${unit} — a unidade vai marcar o horário` : "Retorno pedido — a unidade vai marcar o horário";
+    case "referral":
+      return unit ? `Encaminhamento para ${unit} — a unidade vai marcar o horário` : "Encaminhamento — a unidade vai marcar o horário";
+    // Tipo que esta versão não conhece: nunca o código cru.
+    default:
+      return "Pedido de consulta aberto";
+  }
 }
 
 // O job de expiração roda a cada 15 min; até lá o horário ainda vem

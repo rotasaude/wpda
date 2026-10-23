@@ -252,7 +252,7 @@ export interface StartResult { conversation_id: string; citizen_id: string; resu
 export interface AppointmentRequest {
   id: string;
   // "triage" = pedido aberto pela triagem (módulo 17, ADR 0029).
-  kind: "return" | "referral" | "triage" | "care_line";
+  kind: "return" | "referral" | "triage" | "care_line" | "screening";
   // null só no pedido da triagem que está na fila "sem unidade" da cidade.
   target_unit_name: string | null;
   status: "open" | "scheduled" | "closed";

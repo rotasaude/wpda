@@ -407,6 +407,32 @@ describe("AppointmentsSection — módulo 17", () => {
 
 // Módulo 17 (spec §6; ADR 0029): "Não posso nesse horário" devolve o pedido à
 // fila com o mesmo prazo — não é o "Cancelar", que encerra o pedido.
+describe("AppointmentsSection — texto do pedido aberto por tipo (módulo 23)", () => {
+  function openOf(kind: string, unit: string | null): AppointmentItem {
+    return {
+      request: { id: "rk", kind: kind as AppointmentItem["request"]["kind"], target_unit_name: unit, status: "open", closed_reason: null, reopened_reason: null },
+      appointment: null
+    };
+  }
+  const cases: Array<[ string, string | null, string ]> = [
+    [ "care_line", "UBS Centro", "Sua equipe pediu um horário de acompanhamento em UBS Centro." ],
+    [ "care_line", null, "Sua equipe pediu um horário de acompanhamento." ],
+    [ "screening", "UBS Centro", "Pedido de consulta da sua triagem em UBS Centro." ],
+    [ "screening", null, "Pedido de consulta da sua triagem." ],
+    [ "referral", "UPA Norte", "Encaminhamento para UPA Norte — a unidade vai marcar o horário" ],
+    [ "referral", null, "Encaminhamento — a unidade vai marcar o horário" ],
+    [ "return", null, "Retorno pedido — a unidade vai marcar o horário" ],
+    [ "algo_novo", "UBS Centro", "Pedido de consulta aberto" ],
+    [ "algo_novo", null, "Pedido de consulta aberto" ]
+  ];
+  it.each(cases)("%s, unidade %s", async (kind, unit, text) => {
+    mockAppointments([ openOf(kind, unit) ]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/null|undefined|care_line|screening|algo_novo/);
+  });
+});
+
 describe("AppointmentsSection — 'Não posso nesse horário'", () => {
   beforeEach(() => vi.setSystemTime(new Date("2026-10-06T10:00:00-03:00")));
 
