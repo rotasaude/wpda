@@ -2,7 +2,7 @@
 // Perfil do par (spec 2026-10-05 §8.2; ADR 0027): data de nascimento, sexo e
 // identidade de gênero opcional. Sem <form> nativo: um submit GET poria o
 // perfil na URL. A validação local espelha os 422 do api.
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { citizenApi, type GenderIdentity, type ProfileInput, type Sex } from "../../lib/citizenApi";
 import {
   GENDER_IDENTITY_OPTIONS, SEX_OPTIONS, maskDate, toMaskedDate, todayInCity, validateProfile, type ProfileErrors
@@ -41,8 +41,8 @@ function ConsentTermLink() {
   );
 }
 
-export function ProfileForm({ title, who, initial, busy, error, submitLabel, onSubmit, onBack }: {
-  title: string; who?: string; initial?: ProfileInput | null; busy?: boolean; error?: string | null;
+export function ProfileForm({ title, who, initial, busy, error, submitLabel, onSubmit, onBack, children }: {
+  children?: ReactNode; title: string; who?: string; initial?: ProfileInput | null; busy?: boolean; error?: string | null;
   submitLabel: string; onSubmit: (profile: ProfileInput) => void; onBack: () => void;
 }) {
   const [birthDate, setBirthDate] = useState(initial ? toMaskedDate(initial.birth_date) : "");
@@ -83,6 +83,7 @@ export function ProfileForm({ title, who, initial, busy, error, submitLabel, onS
       {genderOpen && <RadioGroup legend="Identidade de gênero (opcional)" options={GENDER_IDENTITY_OPTIONS}
         value={genderIdentity} onChange={setGenderIdentity} disabled={busy} />}
       {error && <ErrorText>{error}</ErrorText>}
+      {children}
     </Screen>
   );
 }

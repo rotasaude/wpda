@@ -6,6 +6,8 @@ import { ApiError, citizenApi, type Person, type ProfileInput } from "../../lib/
 import { fmtCalendarDate } from "../../lib/format";
 import { genderIdentityLabel, sexLabel } from "../../lib/profile";
 import { ProfileForm } from "./ProfileForm";
+import { HealthConditions } from "./HealthConditions";
+import { hasSessionFeature } from "../../lib/sessionFeatures";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
 export const VERIFIED_PROFILE_TEXT =
@@ -60,6 +62,10 @@ export function ProfileStep({ citizenId, required, onSaved, onBack }:
   }
 
   const profile = person.profile ?? null;
+  // Módulo 23 (F-23.7): condição declarada é do par validado (verification_level, P8)
+  // com care_lines na sessão, também abaixo do formulário do par validado por check-in.
+  const conditions = person.verification_level === "verified" && hasSessionFeature("care_lines")
+    ? <HealthConditions citizenId={person.id} /> : null;
   if (profile && profile.profile_source === "verified") {
     return (
       <Screen title="Meu perfil" footer={back}>
@@ -74,11 +80,12 @@ export function ProfileStep({ citizenId, required, onSaved, onBack }:
           <dd style={{ margin: 0 }}>{genderIdentityLabel(profile.gender_identity)}</dd>
         </dl>
         <p style={{ padding: 12, borderRadius: 12, border: "1px solid var(--line)" }}>{VERIFIED_PROFILE_TEXT}</p>
+        {conditions}
       </Screen>
     );
   }
 
   return <ProfileForm key={person.id} title={title} who={`CPF ${person.cpf_masked}`} initial={profile}
     busy={busy} error={error} submitLabel={required ? "Continuar" : "Salvar"}
-    onSubmit={input => void save(input)} onBack={onBack} />;
+    onSubmit={input => void save(input)} onBack={onBack}>{conditions}</ProfileForm>;
 }
