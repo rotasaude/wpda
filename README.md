@@ -79,9 +79,12 @@ a entrada **Exame** baixa o PDF pela mesma rota do exame.
 
 **Linhas de cuidado (módulo 23).** Com `care_lines` ligado na cidade (vem em
 `features` da sessão), "Minhas triagens" ganha o botão **Meu acompanhamento**
-e o perfil conferido no posto ganha **Condições de saúde** — diabetes, pressão
-alta, gravidez e acompanhamento de saúde mental —, opcionais, retiráveis e
-nunca diagnóstico (a condição vai só no corpo, nunca na URL). Par validado: as
+e todo par validado (`verification_level` verificado, inclusive o validado por
+check-in, abaixo do formulário) ganha **Condições de saúde** — diabetes,
+pressão alta, gravidez e acompanhamento de saúde mental —, opcionais,
+retiráveis e nunca diagnóstico (a condição vai só no corpo, nunca na URL). A
+seção só aparece com `care_lines` na sessão e nunca no passo obrigatório
+"Sobre esta pessoa". Par validado: as
 linhas em que a pessoa foi inscrita e o que está para fazer, em linguagem
 simples, sem código, sugestão ou motivo. Par só declarado: o convite para
 validar no posto. A tela de triagens mostra **Está na hora de refazer** para a
