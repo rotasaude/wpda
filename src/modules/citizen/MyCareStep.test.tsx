@@ -45,7 +45,8 @@ describe("MyCareStep", () => {
     const item = within(screenings).getByRole("listitem", { name: "Saúde do idoso" });
     expect(within(item).getByText("Feita pela última vez em 02/10/2025")).toBeInTheDocument();
     // C06: a tela não tem como iniciar a triagem; ela nomeia onde fazer.
-    expect(within(screenings).getByText(/Qual triagem fazer\?/)).toBeInTheDocument();
+    // Caminho real (Flow): Voltar → Minhas triagens → Voltar → "Para quem é esta triagem?" → escolher a pessoa → catálogo.
+    expect(within(screenings).getByText(/volte até “Para quem é esta triagem\?” e escolha esta pessoa: abre a tela “Qual triagem fazer\?”/)).toBeInTheDocument();
   });
 
   it("sem triagem vencida: sem o aviso, o resto aparece", async () => {

@@ -25,13 +25,15 @@ function attendanceStatusText(a: AttendanceSummary): string {
   }
 }
 
-export function HistoryStep({ citizenId, onBack, onValidate, onCheckIn, onAppointmentCheckIn, onRecord, onExams }:
+export function HistoryStep({ citizenId, onBack, onValidate, onCheckIn, onAppointmentCheckIn, onRecord, onExams, onCare }:
   { citizenId: string; onBack: () => void; onValidate: (citizenId: string) => void; onCheckIn: (triageId: string) => void;
     onAppointmentCheckIn: (appointmentId: string) => void;
     // Módulo 20: "Meu histórico", só com patient_timeline ligado (quem decide é o Flow).
     onRecord?: () => void;
     // Módulo 21a: "Meus exames", só com exam_tracking ligado (quem decide é o Flow).
-    onExams?: () => void }) {
+    onExams?: () => void;
+    // Módulo 23: "Meu acompanhamento", só com care_lines ligado (quem decide é o Flow).
+    onCare?: () => void }) {
   const [data, setData] = useState<{ citizen: Person; triages: TriageSummary[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +56,7 @@ export function HistoryStep({ citizenId, onBack, onValidate, onCheckIn, onAppoin
           <AppointmentsSection citizenId={citizenId} onCheckIn={onAppointmentCheckIn} />
           {onRecord && <BigButton variant="secondary" onClick={onRecord} style={{ marginBottom: 16 }}>Meu histórico</BigButton>}
           {onExams && <BigButton variant="secondary" onClick={onExams} style={{ marginBottom: 16 }}>Meus exames</BigButton>}
+          {onCare && <BigButton variant="secondary" onClick={onCare} style={{ marginBottom: 16 }}>Meu acompanhamento</BigButton>}
           <p>CPF {data.citizen.cpf_masked}</p>
           {data.citizen.verification_level === "declared" ? (
             <>

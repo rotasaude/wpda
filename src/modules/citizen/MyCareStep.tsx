@@ -58,7 +58,7 @@ export function MyCareStep({ citizenId, onBack, onValidate }:
                   );
                 })}
               </ul>
-              <p style={muted}>Para refazer, volte e abra “Qual triagem fazer?”.</p>
+              <p style={muted}>Para refazer, volte até “Para quem é esta triagem?” e escolha esta pessoa: abre a tela “Qual triagem fazer?”.</p>
             </section>
           )}
           {data.lines.length === 0 && <p>{CARE_EMPTY}</p>}

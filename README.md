@@ -77,6 +77,17 @@ decide o laudo é o api (`result`); a tela nunca o deduz da situação e nunca
 mostra motivo de negação, a marca de crítico ou valores. Em "Meu histórico",
 a entrada **Exame** baixa o PDF pela mesma rota do exame.
 
+**Linhas de cuidado (módulo 23).** Com `care_lines` ligado na cidade (vem em
+`features` da sessão), "Minhas triagens" ganha o botão **Meu acompanhamento**
+e o perfil conferido no posto ganha **Condições de saúde** — diabetes, pressão
+alta, gravidez e acompanhamento de saúde mental —, opcionais, retiráveis e
+nunca diagnóstico (a condição vai só no corpo, nunca na URL). Par validado: as
+linhas em que a pessoa foi inscrita e o que está para fazer, em linguagem
+simples, sem código, sugestão ou motivo. Par só declarado: o convite para
+validar no posto. A tela de triagens mostra **Está na hora de refazer** para a
+oferta com intervalo de repetição vencido (`overdue`, do catálogo do módulo 15,
+inscrito ou não), e "Meu acompanhamento" repete o aviso.
+
 ### Relatório público (`src/modules/Report.tsx`)
 
 `/wpda/?token=<token>` busca o JSON congelado de `GET /r/:token`, sem login.
