@@ -22,11 +22,16 @@ const CARE = { overdue_triages: [ { protocol_name: "saude-do-idoso", title: "Sa�
 
 type Sent = { method: string; url: string; body: unknown };
 
+// Dado de saúde nunca vai na URL: o nome da condição (código ou português) só no corpo.
+const HEALTH_IN_URL = /diabetes|hypertension|pregnancy|mental_health|press[aã]o(%20|\+| )alta|gr[aá]vida|sa[uú]de(%20|\+| )mental/i;
+
 // Só o caminho /citizen/...: os módulos do Vite (/wpda/src/modules/citizen/…) passam direto.
-async function mockApi(page: Page, sent: Sent[]) {
+// `urls` recebe TODA requisição /citizen/* (não só a das condições).
+async function mockApi(page: Page, sent: Sent[], urls: string[]) {
   let active = [ { condition: "diabetes", declared_at: "2026-10-20T10:00:00-03:00" } ];
   await page.route((url) => url.pathname.startsWith("/citizen/"), async (route: Route) => {
     const req = route.request();
+    urls.push(req.url());
     const url = new URL(req.url());
     const path = url.pathname.replace(/^\/citizen/, "");
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -55,12 +60,13 @@ async function mockApi(page: Page, sent: Sent[]) {
 const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
 test.beforeEach(({}, info) => {
-  test.skip(!PHONES.has(info.project.name), "o fluxo do cidadão só abre no celular (device-gate.spec.ts)");
+  test.skip(!PHONES.has(info.project.name), "esta prova roda nos dois celulares (iphone e pixel)");
 });
 
 test("triagem vencida e condições de saúde no perfil, sem rolagem lateral", async ({ page }) => {
   const sent: Sent[] = [];
-  await mockApi(page, sent);
+  const urls: string[] = [];
+  await mockApi(page, sent, urls);
   await page.goto("/wpda/");
   await page.getByRole("button", { name: "Concordo", exact: true }).click();
   await page.getByRole("button", { name: `CPF ${PERSON.cpf_masked}` }).click();
@@ -84,12 +90,14 @@ test("triagem vencida e condições de saúde no perfil, sem rolagem lateral", a
   expect(writes.map((s) => [ s.method, s.body ])).toEqual([
     [ "POST", { citizen_id: "p1", condition: "hypertension" } ], [ "DELETE", { condition: "diabetes" } ]
   ]);
-  for (const s of sent) expect(s.url).not.toMatch(/diabetes|hypertension/);
+  expect(urls.length).toBeGreaterThan(sent.length);
+  for (const u of urls) expect(u).not.toMatch(HEALTH_IN_URL);
   expect(await noOverflow(page)).toBeLessThanOrEqual(0);
 });
 
 test("Meu acompanhamento em linguagem simples, sem rolagem lateral", async ({ page }) => {
-  await mockApi(page, []);
+  const urls: string[] = [];
+  await mockApi(page, [], urls);
   await page.goto("/wpda/");
   await page.getByRole("button", { name: "Concordo", exact: true }).click();
   await page.getByRole("button", { name: `Ver triagens de ${PERSON.cpf_masked}` }).click();
@@ -108,4 +116,6 @@ test("Meu acompanhamento em linguagem simples, sem rolagem lateral", async ({ pa
   // "Começar" leva ao catálogo da pessoa.
   await screenings.getByRole("button", { name: "Começar: Saúde do idoso" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Qual triagem fazer?" })).toBeVisible();
+  expect(urls.length).toBeGreaterThan(0);
+  for (const u of urls) expect(u).not.toMatch(HEALTH_IN_URL);
 });
