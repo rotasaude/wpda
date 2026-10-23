@@ -48,7 +48,11 @@ export interface Profile extends ProfileInput {
 
 // Catálogo de triagens de uma pessoa (contrato §3.4). O api decide o que é
 // oferecido; o wpda só mostra.
-export interface CatalogEntry { protocol_name: string; title: string; summary: string | null }
+// Módulo 23 (F-23.8; contrato §7, W4): oferta com intervalo de repetição já
+// vencido (`overdue`) e a última vez feita. Ausentes numa api anterior.
+export interface CatalogEntry {
+  protocol_name: string; title: string; summary: string | null; overdue?: boolean; last_done_at?: string | null;
+}
 export interface SuggestedEntry extends CatalogEntry {
   suggestion_id: string;
   source_triage_id: string;
@@ -248,7 +252,7 @@ export interface StartResult { conversation_id: string; citizen_id: string; resu
 export interface AppointmentRequest {
   id: string;
   // "triage" = pedido aberto pela triagem (módulo 17, ADR 0029).
-  kind: "return" | "referral" | "triage";
+  kind: "return" | "referral" | "triage" | "care_line";
   // null só no pedido da triagem que está na fila "sem unidade" da cidade.
   target_unit_name: string | null;
   status: "open" | "scheduled" | "closed";
@@ -344,6 +348,12 @@ function normalizePerson(p: Person): Person {
 
 function withSummary<T extends CatalogEntry>(e: T): T {
   return { ...e, summary: e.summary ?? null };
+}
+
+// Só `available` (oferta com intervalo de repetição): o api manda overdue e
+// last_done_at sempre que há intervalo; ausentes = não vencida.
+function withOverdue<T extends CatalogEntry>(e: T): T {
+  return { ...e, overdue: e.overdue === true, last_done_at: e.last_done_at ?? null };
 }
 
 function profileBody(profile: ProfileInput) {
@@ -478,6 +488,41 @@ async function pdf(path: string): Promise<Blob> {
 }
 
 
+// ─── Linhas de cuidado (módulo 23, ADR 0040; contrato §7; Divergências W1–W6) ───
+// Condição declarada: dado de saúde dito pelo próprio cidadão, nunca
+// diagnóstico; só no corpo, nunca na URL. "Meu acompanhamento": só as linhas
+// em que a pessoa foi inscrita, em linguagem simples — campo a mais (código,
+// motivo, sugestão) é descartado aqui.
+export type DeclaredCondition = "diabetes" | "hypertension" | "pregnancy" | "mental_health" | "none";
+export interface DeclaredConditionEntry { condition: DeclaredCondition | string; declared_at: string }
+export interface CareItem { label: string; status: string; due_on: string | null }
+export interface CareLineView { name: string; items: CareItem[] }
+// L9 do plano do api: as triagens periódicas vencidas vêm junto.
+export interface OverdueTriage { protocol_name: string; title: string; last_done_at: string | null }
+export interface CitizenCare { lines: CareLineView[]; overdue_triages: OverdueTriage[] }
+
+type RawConditions = { conditions?: { condition: string; declared_at?: string }[] } | undefined;
+type RawCare = {
+  lines?: { name?: string; items?: { label?: string; status?: string; due_on?: string | null }[] }[];
+  overdue_triages?: { protocol_name: string; title?: string; last_done_at?: string | null }[];
+};
+
+function normalizeConditions(d: RawConditions): DeclaredConditionEntry[] {
+  return (d?.conditions ?? []).map(c => ({ condition: c.condition, declared_at: c.declared_at ?? "" }));
+}
+
+function normalizeCare(d: RawCare): CitizenCare {
+  return {
+    lines: (d.lines ?? []).map(l => ({
+      name: l.name ?? "",
+      items: (l.items ?? []).map(i => ({ label: i.label ?? "", status: i.status ?? "", due_on: i.due_on ?? null }))
+    })),
+    overdue_triages: (d.overdue_triages ?? []).map(t => ({
+      protocol_name: t.protocol_name, title: t.title ?? "", last_done_at: t.last_done_at ?? null
+    }))
+  };
+}
+
 export interface CitizenSession {
   phone_masked: string;
   // Fuso IANA da cidade; ausente em api antigo.
@@ -530,7 +575,7 @@ export const citizenApi = {
     return {
       in_progress: d.in_progress ?? null,
       suggested: (d.suggested ?? []).map(e => ({ ...withSummary(e), source_title: e.source_title ?? null })),
-      available: (d.available ?? []).map(withSummary),
+      available: (d.available ?? []).map(e => withOverdue(withSummary(e))),
       recent: (d.recent ?? []).map(withSummary),
       reference_units: d.reference_units ?? []
     };
@@ -622,5 +667,21 @@ export const citizenApi = {
   },
   // PDF do laudo, só quando a política permite (senão 404 not_found).
   examPdf: (examId: string, citizenId: string): Promise<Blob> =>
-    pdf(`/exams/${encodeURIComponent(examId)}/pdf?citizen_id=${encodeURIComponent(citizenId)}`)
+    pdf(`/exams/${encodeURIComponent(examId)}/pdf?citizen_id=${encodeURIComponent(citizenId)}`),
+  // Condições declaradas ativas (só par validado: 403 not_verified).
+  declaredConditions: async (citizenId: string): Promise<DeclaredConditionEntry[]> =>
+    normalizeConditions(await call<RawConditions>("GET", `/declared_conditions?citizen_id=${encodeURIComponent(citizenId)}`)),
+  // Plano do api (L11): POST com citizen_id e condição no corpo.
+  declareCondition: async (citizenId: string, condition: DeclaredCondition): Promise<DeclaredConditionEntry[]> =>
+    normalizeConditions(await call<RawConditions>("POST", "/declared_conditions", { citizen_id: citizenId, condition })),
+  // Retirar grava withdrawn_at no api. A condição vai no CORPO, nunca na URL
+  // (W1: o plano do api lê `condition` de params, que o Rails monta também do
+  // corpo JSON). Sem corpo na resposta (204), relê a lista.
+  withdrawCondition: async (citizenId: string, condition: DeclaredCondition): Promise<DeclaredConditionEntry[]> => {
+    const d = await call<RawConditions>("DELETE", `/declared_conditions?citizen_id=${encodeURIComponent(citizenId)}`, { condition });
+    return d?.conditions ? normalizeConditions(d) : citizenApi.declaredConditions(citizenId);
+  },
+  // "Meu acompanhamento": só par validado (403 not_verified).
+  care: async (citizenId: string): Promise<CitizenCare> =>
+    normalizeCare(await call<RawCare>("GET", `/care?citizen_id=${encodeURIComponent(citizenId)}`))
 };

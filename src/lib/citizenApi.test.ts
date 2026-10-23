@@ -390,7 +390,11 @@ describe("citizenApi — módulo 15 (perfil, catálogo, sugestões)", () => {
         address: { street: null, number: null, complement: null, zip: null } } ]
     };
     const fn = mockFetch(200, full);
-    expect(await citizenApi.catalog("p1")).toEqual(full);
+    // Módulo 23: só `available` ganha overdue/last_done_at normalizados.
+    expect(await citizenApi.catalog("p1")).toEqual({
+      ...full,
+      available: full.available.map(e => ({ ...e, overdue: false, last_done_at: null }))
+    });
     const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/citizen/people/p1/catalog");
     expect(init.method).toBe("GET");
