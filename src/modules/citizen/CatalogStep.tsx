@@ -89,8 +89,13 @@ export function CatalogStep({ citizenId, notice, onStart, onProfileRequired, onP
   const nothingToStart = c !== null && c.in_progress === null && c.suggested.length === 0 && c.available.length === 0;
   // Módulo 23 (F-23.8): oferta com o intervalo de repetição vencido vem antes,
   // com a última vez; o resto segue em "Disponíveis". Sem `overdue`, como hoje.
-  const due = c ? c.available.filter(a => a.overdue === true) : [];
-  const rest = c ? c.available.filter(a => a.overdue !== true) : [];
+  // Sugerida e vencida passa para "refazer" e sai de "Sugeridas" (nunca duas
+  // vezes; o api já separa as duas listas, e o filtro por protocol_name é defesa).
+  const dueAll = c ? [ ...c.available, ...c.suggested ].filter(a => a.overdue === true) : [];
+  const due = dueAll.filter((a, i) => dueAll.findIndex(b => b.protocol_name === a.protocol_name) === i);
+  const dueNames = new Set(due.map(a => a.protocol_name));
+  const suggestedRest = c ? c.suggested.filter(s => s.overdue !== true) : [];
+  const rest = c ? c.available.filter(a => !dueNames.has(a.protocol_name)) : [];
 
   return (
     <Screen title="Qual triagem fazer?" footer={<>
@@ -115,9 +120,9 @@ export function CatalogStep({ citizenId, notice, onStart, onProfileRequired, onP
           })}
         </Section>
       )}
-      {c && c.suggested.length > 0 && (
+      {suggestedRest.length > 0 && (
         <Section id="catalog-suggested" title="Sugeridas para você">
-          {c.suggested.map(s => (
+          {suggestedRest.map(s => (
             <Item key={s.suggestion_id} title={s.title} summary={s.summary}
               lines={[ s.source_title
                 ? `Sugerida pelo resultado da triagem ${s.source_title} de ${fmtCalendarDate(s.suggested_on)}`

@@ -78,13 +78,12 @@ describe("cliente do acompanhamento (contrato §7)", () => {
     ]);
   });
 
-  it("catalog: só available normaliza overdue; suggested fica como veio (sem overdue)", async () => {
+  it("catalog: suggested também normaliza overdue e last_done_at (M1)", async () => {
     fetchMock.mockResolvedValueOnce(reply(200, {
       available: [], recent: [], in_progress: null,
       suggested: [ { protocol_name: "a", title: "A", summary: null, suggestion_id: "s1", source_triage_id: "t0", source_title: "B", suggested_on: "2026-10-02" } ]
     }));
     const c = await citizenApi.catalog("p1");
-    expect(c.suggested[0]).not.toHaveProperty("overdue");
-    expect(c.suggested[0]).not.toHaveProperty("last_done_at");
+    expect(c.suggested[0]).toMatchObject({ overdue: false, last_done_at: null });
   });
 });

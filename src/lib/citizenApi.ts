@@ -350,8 +350,8 @@ function withSummary<T extends CatalogEntry>(e: T): T {
   return { ...e, summary: e.summary ?? null };
 }
 
-// Só `available` (oferta com intervalo de repetição): o api manda overdue e
-// last_done_at sempre que há intervalo; ausentes = não vencida.
+// `available` e `suggested` (oferta com intervalo de repetição): o api manda
+// overdue e last_done_at sempre que há intervalo; ausentes = não vencida.
 function withOverdue<T extends CatalogEntry>(e: T): T {
   return { ...e, overdue: e.overdue === true, last_done_at: e.last_done_at ?? null };
 }
@@ -574,7 +574,7 @@ export const citizenApi = {
     const d = await call<Partial<Catalog>>("GET", `/people/${encodeURIComponent(citizenId)}/catalog`);
     return {
       in_progress: d.in_progress ?? null,
-      suggested: (d.suggested ?? []).map(e => ({ ...withSummary(e), source_title: e.source_title ?? null })),
+      suggested: (d.suggested ?? []).map(e => ({ ...withOverdue(withSummary(e)), source_title: e.source_title ?? null })),
       available: (d.available ?? []).map(e => withOverdue(withSummary(e))),
       recent: (d.recent ?? []).map(withSummary),
       reference_units: d.reference_units ?? []

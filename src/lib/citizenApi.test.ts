@@ -390,9 +390,10 @@ describe("citizenApi — módulo 15 (perfil, catálogo, sugestões)", () => {
         address: { street: null, number: null, complement: null, zip: null } } ]
     };
     const fn = mockFetch(200, full);
-    // Módulo 23: só `available` ganha overdue/last_done_at normalizados.
+    // Módulo 23 (M1): `available` e `suggested` ganham overdue/last_done_at normalizados.
     expect(await citizenApi.catalog("p1")).toEqual({
       ...full,
+      suggested: full.suggested.map(e => ({ ...e, overdue: false, last_done_at: null })),
       available: full.available.map(e => ({ ...e, overdue: false, last_done_at: null }))
     });
     const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
@@ -404,9 +405,17 @@ describe("citizenApi — módulo 15 (perfil, catálogo, sugestões)", () => {
     mockFetch(200, { suggested: [ { protocol_name: "a", title: "A", suggestion_id: "s1", source_triage_id: "t0", source_title: "Saúde mental", suggested_on: "2026-10-02" } ] });
     expect(await citizenApi.catalog("p1")).toEqual({
       in_progress: null,
-      suggested: [ { protocol_name: "a", title: "A", summary: null, suggestion_id: "s1", source_triage_id: "t0", source_title: "Saúde mental", suggested_on: "2026-10-02" } ],
+      suggested: [ { protocol_name: "a", title: "A", summary: null, overdue: false, last_done_at: null, suggestion_id: "s1", source_triage_id: "t0", source_title: "Saúde mental", suggested_on: "2026-10-02" } ],
       available: [], recent: [], reference_units: []
     });
+  });
+
+  it("catalog: suggested vencida preserva overdue e last_done_at", async () => {
+    mockFetch(200, { suggested: [ { protocol_name: "a", title: "A", suggestion_id: "s1", source_triage_id: "t0", suggested_on: "2026-10-02",
+      overdue: true, last_done_at: "2025-10-02" } ] });
+    const [ s1 ] = (await citizenApi.catalog("p1")).suggested;
+    expect(s1.overdue).toBe(true);
+    expect(s1.last_done_at).toBe("2025-10-02");
   });
 
   it("catalog: suggested sem source_title normaliza para null", async () => {

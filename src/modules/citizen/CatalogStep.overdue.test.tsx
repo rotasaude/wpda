@@ -70,4 +70,59 @@ describe("CatalogStep — triagem periódica vencida (módulo 23)", () => {
     const suggested = screen.getByRole("region", { name: "Sugeridas para você" });
     expect(due.compareDocumentPosition(suggested) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  describe("sugeridas (M1)", () => {
+    const sug = (protocol_name: string, title: string, extra: object = {}) =>
+      ({ suggestion_id: `s-${protocol_name}`, protocol_name, title, summary: null, source_title: null,
+        suggested_on: "2026-10-01", ...extra }) as unknown as Catalog["suggested"][number];
+    const withSuggested = (suggested: Catalog["suggested"], available: Catalog["available"] = []): Catalog =>
+      ({ in_progress: null, suggested, available, recent: [], reference_units: [] });
+
+    it("(a) sugerida vencida aparece só em 'Está na hora de refazer', com a última vez e o Começar", async () => {
+      const { onStart } = setup(withSuggested([ sug("saude-do-idoso", "Saúde do idoso", { overdue: true, last_done_at: "2025-10-02" }) ]));
+      const overdue = await screen.findByRole("region", { name: "Está na hora de refazer" });
+      expect(within(overdue).getByText("Saúde do idoso")).toBeInTheDocument();
+      expect(within(overdue).getByText("Feita pela última vez em 02/10/2025")).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Sugeridas para você" })).not.toBeInTheDocument();
+      expect(screen.getAllByText("Saúde do idoso")).toHaveLength(1);
+      await userEvent.click(within(overdue).getByRole("button", { name: "Começar: Saúde do idoso" }));
+      expect(onStart).toHaveBeenCalledWith("saude-do-idoso");
+      // nothingToStart segue falso: sem a frase de catálogo vazio.
+      expect(screen.queryByText(/Não há triagens disponíveis/)).not.toBeInTheDocument();
+    });
+
+    it("(b) sugerida não vencida aparece só em 'Sugeridas para você'", async () => {
+      setup(withSuggested([ sug("triage-respiratoria", "Sintomas respiratórios", { overdue: false, last_done_at: null }) ]));
+      const suggested = await screen.findByRole("region", { name: "Sugeridas para você" });
+      expect(within(suggested).getByText("Sintomas respiratórios")).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Está na hora de refazer" })).not.toBeInTheDocument();
+    });
+
+    it("(c) disponível vencida continua em refazer; mistura sem duplicata", async () => {
+      setup(withSuggested(
+        [ sug("saude-do-idoso", "Saúde do idoso", { overdue: true, last_done_at: "2025-10-02" }),
+          sug("triage-respiratoria", "Sintomas respiratórios", { overdue: false }) ],
+        [ { ...IDOSO, protocol_name: "saude-da-mulher", title: "Saúde da mulher", last_done_at: "2025-09-01" } ]));
+      const overdue = await screen.findByRole("region", { name: "Está na hora de refazer" });
+      expect(within(overdue).getAllByRole("listitem").map(li => li.querySelector("strong")?.textContent))
+        .toEqual([ "Saúde da mulher", "Saúde do idoso" ]);
+      expect(within(screen.getByRole("region", { name: "Sugeridas para você" })).getAllByRole("listitem")).toHaveLength(1);
+      expect(screen.queryByRole("region", { name: "Disponíveis" })).not.toBeInTheDocument();
+    });
+
+    it("mesmo protocolo nas duas listas (defesa): aparece uma vez só", async () => {
+      setup(withSuggested([ sug("saude-do-idoso", "Saúde do idoso", { overdue: true, last_done_at: "2025-10-02" }) ], [ IDOSO ]));
+      const overdue = await screen.findByRole("region", { name: "Está na hora de refazer" });
+      expect(within(overdue).getAllByRole("listitem")).toHaveLength(1);
+      expect(screen.getAllByText("Saúde do idoso")).toHaveLength(1);
+    });
+
+    it("(d) refazer vem antes das sugeridas, mesmo quando a vencida era sugerida", async () => {
+      setup(withSuggested([ sug("triage-respiratoria", "Sintomas respiratórios"),
+        sug("saude-do-idoso", "Saúde do idoso", { overdue: true, last_done_at: "2025-10-02" }) ]));
+      const due = await screen.findByRole("region", { name: "Está na hora de refazer" });
+      const suggested = screen.getByRole("region", { name: "Sugeridas para você" });
+      expect(due.compareDocumentPosition(suggested) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
 });
