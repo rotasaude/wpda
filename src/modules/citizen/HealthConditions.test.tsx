@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HealthConditions } from "./HealthConditions";
 import { ProfileStep } from "./ProfileStep";
-import { CARE_DISABLED, CONDITIONS_HELP } from "../../lib/care";
+import { CARE_DISABLED, CARE_PERSON_GONE, CONDITIONS_HELP, careMessage } from "../../lib/care";
 import { ApiError, citizenApi, type Person } from "../../lib/citizenApi";
 import { setSessionFeatures } from "../../lib/sessionFeatures";
 
@@ -100,6 +100,61 @@ describe("HealthConditions", () => {
     expect(screen.getByRole("switch", { name: "Tenho pressão alta" })).toBeChecked();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByText(/Não encontramos esta pessoa/)).not.toBeInTheDocument();
+  });
+
+  it("duas gravações em voo, a primeira responde por último: relê o api e os dois ficam ligados", async () => {
+    const read = vi.spyOn(citizenApi, "declaredConditions")
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([ DIABETES, PRESSURE ]);
+    let releaseFirst!: (v: typeof DIABETES[]) => void;
+    vi.spyOn(citizenApi, "declareCondition").mockImplementation((_id, condition) =>
+      condition === "diabetes" ? new Promise(r => { releaseFirst = r; }) : Promise.resolve([ DIABETES, PRESSURE ]));
+    render(<HealthConditions citizenId="p1" />);
+    await userEvent.click(await screen.findByRole("switch", { name: "Tenho diabetes" }));
+    await userEvent.click(screen.getByRole("switch", { name: "Tenho pressão alta" }));
+    await waitFor(() => expect(status()).toHaveTextContent("Informação salva."));
+    // B respondeu, A ainda em voo: nada foi aplicado (a lista de B não vale sozinha).
+    expect(read).toHaveBeenCalledTimes(1);
+    releaseFirst([ DIABETES ]); // resposta velha, sem B
+    await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Tenho diabetes" })).toBeChecked());
+    expect(screen.getByRole("switch", { name: "Tenho pressão alta" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "Tenho diabetes" })).toBeEnabled();
+    expect(status()).toHaveTextContent("Informação salva.");
+  });
+
+  it("declarar e o api dizer 404: a frase de pessoa não encontrada e o interruptor como estava", async () => {
+    vi.spyOn(citizenApi, "declaredConditions").mockResolvedValue([]);
+    vi.spyOn(citizenApi, "declareCondition").mockRejectedValue(new ApiError(404, "not_found"));
+    render(<HealthConditions citizenId="p1" />);
+    await userEvent.click(await screen.findByRole("switch", { name: "Tenho diabetes" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(CARE_PERSON_GONE);
+    expect(screen.getByRole("switch", { name: "Tenho diabetes" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "Tenho diabetes" })).toBeEnabled();
+  });
+
+  it("404 no DELETE e a releitura falha: mostra a frase da falha e não deixa o interruptor preso", async () => {
+    const failure = new ApiError(500, "server_error");
+    vi.spyOn(citizenApi, "declaredConditions")
+      .mockResolvedValueOnce([ DIABETES ])
+      .mockRejectedValueOnce(failure);
+    vi.spyOn(citizenApi, "withdrawCondition").mockRejectedValue(new ApiError(404, "not_found"));
+    render(<HealthConditions citizenId="p1" />);
+    await userEvent.click(await screen.findByRole("switch", { name: "Tenho diabetes" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(careMessage(failure));
+    expect(screen.queryByText(CARE_PERSON_GONE)).not.toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Tenho diabetes" })).toBeEnabled();
+  });
+
+  it("404 no DELETE e a releitura dá 403 not_verified: a seção some", async () => {
+    vi.spyOn(citizenApi, "declaredConditions")
+      .mockResolvedValueOnce([ DIABETES ])
+      .mockRejectedValueOnce(new ApiError(403, "not_verified"));
+    vi.spyOn(citizenApi, "withdrawCondition").mockRejectedValue(new ApiError(404, "not_found"));
+    render(<HealthConditions citizenId="p1" />);
+    await userEvent.click(await screen.findByRole("switch", { name: "Tenho diabetes" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Condições de saúde" })).not.toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("par declarado (403 not_verified) ou interruptor desligado: a seção some", async () => {
