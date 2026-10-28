@@ -252,7 +252,8 @@ export interface StartResult { conversation_id: string; citizen_id: string; resu
 export interface AppointmentRequest {
   id: string;
   // "triage" = pedido aberto pela triagem (módulo 17, ADR 0029).
-  kind: "return" | "referral" | "triage" | "care_line" | "screening";
+  // "regulated" = Módulo 26a: pedido aberto pela autorização da regulação na rede própria.
+  kind: "return" | "referral" | "triage" | "care_line" | "screening" | "regulated";
   // null só no pedido da triagem que está na fila "sem unidade" da cidade.
   target_unit_name: string | null;
   status: "open" | "scheduled" | "closed";
@@ -523,6 +524,33 @@ function normalizeCare(d: RawCare): CitizenCare {
   };
 }
 
+// ─── Encaminhamentos (módulo 26a, ADR 0044; contrato §9) ───
+// O cidadão vê só o que o contrato entrega: o que foi pedido, a situação, quando
+// e onde. Cor, posição, CID e justificativa nunca passam da borda: a
+// normalização monta os seis campos e descarta o resto.
+export type ReferralStatus = "waiting" | "scheduled" | "returned" | "denied" | "closed" | "completed";
+export interface CitizenReferral {
+  id: string;
+  label: string;
+  status: ReferralStatus | string;
+  scheduled_at: string | null;
+  place: string | null;
+  updated_at: string;
+}
+
+type RawReferral = { id: string } & Partial<Record<"label" | "status" | "scheduled_at" | "place" | "updated_at", string | null>>;
+
+function normalizeReferral(r: RawReferral): CitizenReferral {
+  return {
+    id: r.id,
+    label: r.label ?? "",
+    status: r.status ?? "",
+    scheduled_at: r.scheduled_at ?? null,
+    place: r.place ?? null,
+    updated_at: r.updated_at ?? ""
+  };
+}
+
 export interface CitizenSession {
   phone_masked: string;
   // Fuso IANA da cidade; ausente em api antigo.
@@ -683,5 +711,10 @@ export const citizenApi = {
   },
   // "Meu acompanhamento": só par validado (403 not_verified).
   care: async (citizenId: string): Promise<CitizenCare> =>
-    normalizeCare(await call<RawCare>("GET", `/care?citizen_id=${encodeURIComponent(citizenId)}`))
+    normalizeCare(await call<RawCare>("GET", `/care?citizen_id=${encodeURIComponent(citizenId)}`)),
+  // "Meus encaminhamentos" (módulo 26a): só par validado (403 not_verified);
+  // 403 feature_disabled se a cidade não ligou a regulação.
+  regulationRequests: async (citizenId: string): Promise<CitizenReferral[]> =>
+    ((await call<{ requests?: RawReferral[] }>("GET", `/regulation_requests?citizen_id=${encodeURIComponent(citizenId)}`)).requests ?? [])
+      .map(normalizeReferral)
 };
