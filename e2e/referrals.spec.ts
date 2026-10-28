@@ -55,12 +55,17 @@ test("Meus encaminhamentos: situação, data e local, sem fila nem cor, sem rola
 
   const cardio = page.getByRole("listitem", { name: "Consulta em Cardiologia" });
   await expect(cardio.getByText("Agendado", { exact: true })).toBeVisible();
+  // 10/11 às 14:30 no fuso da cidade (fmtWeekdayDateTime): pega deslocamento de fuso no navegador do celular.
+  await expect(cardio.getByText(/10\/11.*14:30/)).toBeVisible();
   await expect(cardio.getByText(/Ambulatório de Especialidades — Rua XV, 100/)).toBeVisible();
   await expect(page.getByRole("listitem", { name: "Ecocardiografia transtorácica" }).getByText("Aguardando a regulação")).toBeVisible();
   await expect(page.getByRole("listitem", { name: "Consulta em Ortopedia" }).getByText("Em revisão pela sua unidade")).toBeVisible();
 
   const body = await page.locator("body").innerText();
   expect(body).not.toMatch(/vermelh|amarel|posição|fila|I209|esforços|prazo|urgente|\b37\b/i);
+  const regulation = urls.filter((u) => new URL(u).pathname === "/citizen/regulation_requests");
+  expect(regulation.length).toBeGreaterThan(0);
+  for (const u of regulation) expect(new URL(u).search).toBe("?citizen_id=p1");
   for (const u of urls) {
     const q = new URL(u).search;
     expect(q === "" || /^\?citizen_id=p1$/.test(q)).toBe(true);
