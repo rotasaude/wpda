@@ -420,6 +420,8 @@ describe("AppointmentsSection — texto do pedido aberto por tipo (módulo 23)",
     [ "referral", "UPA Norte", "Encaminhamento para UPA Norte — a unidade vai marcar o horário" ],
     [ "referral", null, "Encaminhamento pedido. A unidade vai marcar o horário." ],
     [ "return", null, "Retorno pedido. A unidade vai marcar o horário." ],
+    [ "regulated", "Ambulatório de Especialidades", "Encaminhamento autorizado para Ambulatório de Especialidades — a unidade vai marcar o horário" ],
+    [ "regulated", null, "Encaminhamento autorizado. A unidade vai marcar o horário." ],
     [ "algo_novo", "UBS Centro", "Pedido de consulta aberto" ],
     [ "algo_novo", null, "Pedido de consulta aberto" ]
   ];
@@ -427,7 +429,7 @@ describe("AppointmentsSection — texto do pedido aberto por tipo (módulo 23)",
     mockAppointments([ openOf(kind, unit) ]);
     render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
     expect(await screen.findByText(text)).toBeInTheDocument();
-    expect(document.body.textContent).not.toMatch(/null|undefined|care_line|screening|algo_novo/);
+    expect(document.body.textContent).not.toMatch(/null|undefined|care_line|screening|algo_novo|regulated/);
   });
 });
 

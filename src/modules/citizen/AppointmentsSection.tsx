@@ -46,6 +46,9 @@ function openRequestText(request: AppointmentRequest): string {
       return unit ? `Retorno pedido na ${unit} — a unidade vai marcar o horário` : "Retorno pedido. A unidade vai marcar o horário.";
     case "referral":
       return unit ? `Encaminhamento para ${unit} — a unidade vai marcar o horário` : "Encaminhamento pedido. A unidade vai marcar o horário.";
+    // Módulo 26a: encaminhamento autorizado pela regulação na rede própria.
+    case "regulated":
+      return unit ? `Encaminhamento autorizado para ${unit} — a unidade vai marcar o horário` : "Encaminhamento autorizado. A unidade vai marcar o horário.";
     // Tipo que esta versão não conhece: nunca o código cru.
     default:
       return "Pedido de consulta aberto";

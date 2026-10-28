@@ -91,6 +91,17 @@ validar no posto. A tela de triagens mostra **Está na hora de refazer** para a
 oferta com intervalo de repetição vencido (`overdue`, do catálogo do módulo 15,
 inscrito ou não), e "Meu acompanhamento" repete o aviso.
 
+**Encaminhamentos (módulo 26a).** Com `care_regulation` ligado na cidade (vem
+em `features` da sessão), "Minhas triagens" ganha o botão **Meus
+encaminhamentos**. Par validado: cada encaminhamento a especialista ou
+procedimento pedido na consulta, com a situação em linguagem simples
+(aguardando a regulação, agendado com data e local, em revisão pela unidade,
+não autorizado, encerrado, realizado). Nunca a cor de risco, a posição na
+fila, o CID ou a justificativa: a posição muda com o risco dos outros pedidos
+e não é mostrada (ADR 0044). Par só declarado: o convite para validar no
+posto. O encaminhamento autorizado na rede própria aparece também em "Seus
+agendamentos", como pedido da unidade de destino.
+
 ### Relatório público (`src/modules/Report.tsx`)
 
 `/wpda/?token=<token>` busca o JSON congelado de `GET /r/:token`, sem login.

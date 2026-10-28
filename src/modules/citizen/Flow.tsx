@@ -17,6 +17,7 @@ import { HistoryStep } from "./HistoryStep";
 import { MyHistoryStep } from "./MyHistoryStep";
 import { MyExamsStep } from "./MyExamsStep";
 import { MyCareStep } from "./MyCareStep";
+import { MyReferralsStep } from "./MyReferralsStep";
 import { hasSessionFeature, setSessionFeatures } from "../../lib/sessionFeatures";
 import { VerificationCodeStep } from "./VerificationCodeStep";
 import { CounterCodeStep } from "./CounterCodeStep";
@@ -39,6 +40,7 @@ type State =
   | { at: "record"; consentVersion: string | null; citizenId: string }
   | { at: "exams"; consentVersion: string | null; citizenId: string }
   | { at: "care"; consentVersion: string | null; citizenId: string }
+  | { at: "referrals"; consentVersion: string | null; citizenId: string }
   | { at: "verify-code"; citizenId: string; consentVersion: string | null }
   | { at: "check-in-code"; triageId: string; citizenId: string; consentVersion: string | null }
   | { at: "appointment-check-in-code"; appointmentId: string; citizenId: string; consentVersion: string | null }
@@ -314,6 +316,9 @@ export function Flow() {
           : undefined}
         onCare={hasSessionFeature("care_lines")
           ? () => setState({ at: "care", consentVersion: state.consentVersion, citizenId: state.citizenId })
+          : undefined}
+        onReferrals={hasSessionFeature("care_regulation")
+          ? () => setState({ at: "referrals", consentVersion: state.consentVersion, citizenId: state.citizenId })
           : undefined} />;
       break;
     case "record":
@@ -335,6 +340,11 @@ export function Flow() {
         onStartCatalog={() => setState(state.consentVersion
           ? { at: "catalog", consentVersion: state.consentVersion, citizenId: state.citizenId, notice: null }
           : { at: "consent" })} />;
+      break;
+    case "referrals":
+      view = <MyReferralsStep key={state.citizenId} citizenId={state.citizenId}
+        onBack={() => setState({ at: "history", citizenId: state.citizenId, consentVersion: state.consentVersion })}
+        onValidate={id => setState({ at: "verify-code", citizenId: id, consentVersion: state.consentVersion })} />;
       break;
     case "verify-code":
       view = <VerificationCodeStep citizenId={state.citizenId}
