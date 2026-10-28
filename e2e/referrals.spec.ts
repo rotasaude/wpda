@@ -4,6 +4,10 @@
 // (mesmo que a resposta traga), sem rolagem lateral.
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+// O navegador roda em UTC de propósito: o "14:30" só aparece se o app formatar no fuso da cidade
+// (America/Sao_Paulo, vindo da sessão) e não no fuso do aparelho.
+test.use({ timezoneId: "UTC" });
+
 const PHONES = new Set([ "iphone", "pixel" ]);
 const PERSON = { id: "p1", cpf_masked: "***.982.247-**", verification_level: "verified", neighborhood: null, profile: null };
 // A resposta traz campos que o contrato proíbe mostrar: o cliente descarta, a tela não desenha.
@@ -55,7 +59,7 @@ test("Meus encaminhamentos: situação, data e local, sem fila nem cor, sem rola
 
   const cardio = page.getByRole("listitem", { name: "Consulta em Cardiologia" });
   await expect(cardio.getByText("Agendado", { exact: true })).toBeVisible();
-  // 10/11 às 14:30 no fuso da cidade (fmtWeekdayDateTime): pega deslocamento de fuso no navegador do celular.
+  // 10/11 às 14:30 no fuso da cidade (fmtWeekdayDateTime), com o navegador em UTC (test.use acima).
   await expect(cardio.getByText(/10\/11.*14:30/)).toBeVisible();
   await expect(cardio.getByText(/Ambulatório de Especialidades — Rua XV, 100/)).toBeVisible();
   await expect(page.getByRole("listitem", { name: "Ecocardiografia transtorácica" }).getByText("Aguardando a regulação")).toBeVisible();
