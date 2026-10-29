@@ -528,7 +528,7 @@ function normalizeCare(d: RawCare): CitizenCare {
 // O cidadão vê só o que o contrato entrega: o que foi pedido, a situação, quando
 // e onde. Cor, posição, CID e justificativa nunca passam da borda: a
 // normalização monta os seis campos e descarta o resto.
-export type ReferralStatus = "waiting" | "scheduled" | "returned" | "denied" | "closed" | "completed";
+export type ReferralStatus = "waiting" | "authorized" | "scheduled" | "returned" | "denied" | "closed" | "completed";
 export interface CitizenReferral {
   id: string;
   label: string;

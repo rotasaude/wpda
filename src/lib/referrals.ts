@@ -20,6 +20,9 @@ const SCHEDULE_UNKNOWN = "A unidade informa a data e o local.";
 const TABLE: Record<string, { status: string; detail: string | null; tone: ReferralTone }> = {
   waiting: { status: "Aguardando a regulação",
     detail: "A Secretaria de Saúde está organizando a vaga. A data e o local chegam por aqui.", tone: "warn" },
+  // G16 (contrato §13): autorizado sem horário tem situação própria, coerente com "Seus agendamentos".
+  authorized: { status: "Autorizado — aguardando o agendamento",
+    detail: "A unidade vai marcar o horário. A data e o local chegam por aqui.", tone: "warn" },
   returned: { status: "Em revisão pela sua unidade", detail: "A sua unidade de saúde está completando o pedido.", tone: "warn" },
   denied: { status: "Não autorizado", detail: "Procure a sua unidade de saúde para saber os próximos passos.", tone: "neutral" },
   closed: { status: "Encerrado", detail: "Se ainda precisar, procure a sua unidade de saúde.", tone: "neutral" },

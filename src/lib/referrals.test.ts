@@ -12,6 +12,7 @@ const when = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", w
 describe("referralView: tabela das situações; desconhecida vira Em andamento", () => {
   it.each([
     [ "waiting", "Aguardando a regulação", "A Secretaria de Saúde está organizando a vaga. A data e o local chegam por aqui.", "warn" ],
+    [ "authorized", "Autorizado — aguardando o agendamento", "A unidade vai marcar o horário. A data e o local chegam por aqui.", "warn" ],
     [ "returned", "Em revisão pela sua unidade", "A sua unidade de saúde está completando o pedido.", "warn" ],
     [ "denied", "Não autorizado", "Procure a sua unidade de saúde para saber os próximos passos.", "neutral" ],
     [ "closed", "Encerrado", "Se ainda precisar, procure a sua unidade de saúde.", "neutral" ],
