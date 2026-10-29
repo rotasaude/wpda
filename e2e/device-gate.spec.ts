@@ -20,8 +20,21 @@ test("o fluxo abre no celular; fora dele, só onde o desktop está liberado", as
   await expect(banner).toHaveCount(DESKTOP_ALLOWED ? 1 : 0);
 });
 
+// O relatório é público (GET /r/:token, sem login). A API é simulada aqui, como nos outros e2e:
+// o que se prova é só que o bloqueio por dispositivo não o alcança, em todos os perfis.
+const REPORT = { tier: "moderate", priority: 2, recommendation: null,
+  completed_at: "2026-10-27T10:00:00-03:00", expires_at: "2026-11-27T10:00:00-03:00" };
+
 test("o relatório nunca é bloqueado", async ({ page }) => {
-  await page.goto("/wpda/?token=invalido");
+  const paths: string[] = [];
+  await page.route((url) => url.pathname.startsWith("/r/"), (route) => {
+    paths.push(new URL(route.request().url()).pathname);
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(REPORT) });
+  });
+  await page.goto("/wpda/?token=abc123");
+  await expect(page.getByRole("heading", { level: 1, name: "Seu resultado" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1, name: "Abra no celular" })).toHaveCount(0);
-  await expect(page.getByText(/Link inválido|inválido ou expirou|Carregando/).first()).toBeVisible();
+  // O Vite de dev pode repetir o GET (efeito duas vezes): o que importa é que só o relatório foi pedido.
+  expect(paths.length).toBeGreaterThan(0);
+  expect(new Set(paths)).toEqual(new Set([ "/r/abc123" ]));
 });
