@@ -348,6 +348,42 @@ describe("AppointmentsSection — módulo 17", () => {
     expect(screen.getByText("Prazo previsto: até 05/11")).toBeInTheDocument();
   });
 
+  // G15.1: o prazo de um pedido regulado é o da cor de risco; nunca chega ao cidadão,
+  // nem se o api mandar due_on (defesa em profundidade).
+  it("pedido regulado aberto não mostra 'Prazo previsto', mesmo com due_on futuro", async () => {
+    mockAppointments([{
+      request: { id: "r5", kind: "regulated", target_unit_name: "Ambulatório de Especialidades", status: "open",
+                 closed_reason: null, reopened_reason: null, due_on: "2026-11-05" },
+      appointment: null
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText(
+      "Encaminhamento autorizado para Ambulatório de Especialidades — a unidade vai marcar o horário"
+    )).toBeInTheDocument();
+    expect(screen.queryByText(/Prazo previsto/)).not.toBeInTheDocument();
+  });
+
+  it("pedido regulado reaberto (horário expirado) também não mostra 'Prazo previsto'", async () => {
+    mockAppointments([{
+      request: { id: "r6", kind: "regulated", target_unit_name: "Ambulatório de Especialidades", status: "open",
+                 closed_reason: null, reopened_reason: "expired", due_on: "2026-11-05" },
+      appointment: { id: "a6", status: "expired", scheduled_at: "2026-09-20T09:00:00-03:00" } as AppointmentItem["appointment"]
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText(/sem confirmação no prazo/)).toBeInTheDocument();
+    expect(screen.queryByText(/Prazo previsto/)).not.toBeInTheDocument();
+  });
+
+  it("pedido sem regulação (retorno) com due_on futuro continua mostrando 'Prazo previsto'", async () => {
+    mockAppointments([{
+      request: { id: "r7", kind: "return", target_unit_name: "UBS Centro", status: "open",
+                 closed_reason: null, reopened_reason: null, due_on: "2026-11-05" },
+      appointment: null
+    }]);
+    render(<AppointmentsSection citizenId="p1" onCheckIn={vi.fn()} />);
+    expect(await screen.findByText("Prazo previsto: até 05/11")).toBeInTheDocument();
+  });
+
   it("pedido da triagem sem unidade (fila 'sem unidade'): a Secretaria indica, sem 'null'", async () => {
     mockAppointments([{
       request: { id: "r4", kind: "triage", target_unit_name: null, status: "open", closed_reason: null,

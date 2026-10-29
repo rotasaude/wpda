@@ -220,8 +220,10 @@ function AppointmentRow({ item, onReload, onCheckIn }:
 
       {/* Prazo já vencido some: o api preenche due_on = criação + 30 nos pedidos
           antigos, e um "até" passado (sem ano) seria lido como "perdi a vez".
-          Comparação por texto AAAA-MM-DD, nunca por new Date. */}
-      {request.status === "open" && request.due_on && request.due_on >= cityToday() && (
+          Comparação por texto AAAA-MM-DD, nunca por new Date.
+          Módulo 26a (G15.1): o prazo do pedido regulado é o da cor de risco da
+          regulação; nunca vai ao cidadão, mesmo que o api o mande. */}
+      {request.status === "open" && request.kind !== "regulated" && request.due_on && request.due_on >= cityToday() && (
         <p style={{ fontSize: 18 }}>{`Prazo previsto: até ${fmtDayMonth(request.due_on)}`}</p>
       )}
     </li>
