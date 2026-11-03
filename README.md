@@ -102,6 +102,14 @@ e não é mostrada (ADR 0044). Par só declarado: o convite para validar no
 posto. O encaminhamento autorizado na rede própria aparece também em "Seus
 agendamentos", como pedido da unidade de destino.
 
+**Minhas vacinas (módulo 29).** Com `vaccination` ligado na cidade (vem em
+`features` da sessão), "Minhas triagens" ganha o botão **Minhas vacinas**. Só
+par validado: o par declarado vê o convite para validar no posto. A tela mostra
+as doses aplicadas (vacina, dose, data e local; sem lote nem vacinador), a
+situação do envio ao Ministério (enviada ou em envio) e as próximas doses, estas
+só quando a equipe conferiu a caderneta; sem conferência, o convite para levar a
+caderneta. Sem polling. A entrada "Vacina" também aparece em "Meu histórico".
+
 ### Relatório público (`src/modules/Report.tsx`)
 
 `/wpda/?token=<token>` busca o JSON congelado de `GET /r/:token`, sem login.
