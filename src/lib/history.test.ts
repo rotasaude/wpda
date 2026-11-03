@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  NOT_VERIFIED_INVITE, PARTIAL_NOTICE, citizenKindLabel, citizenStatusLabel, documentFilename, entryPlace, mergeEntries, sinceText,
+  NOT_VERIFIED_INVITE, PARTIAL_NOTICE, citizenKindLabel, citizenStatusLabel, documentFilename, entryPlace, entryStatusText, mergeEntries, sinceText,
   vitalsLines
 } from "./history";
 import type { CitizenEntry } from "./citizenApi";
@@ -18,7 +18,7 @@ describe("tipos para o cidadão", () => {
     expect(citizenKindLabel("controlled_notification")).toBe("Receita de controle especial");
     expect(citizenKindLabel("clinical_document")).toBe("Documento");
     expect(citizenKindLabel("procedure")).toBe("Procedimento");
-    expect(citizenKindLabel("vaccination")).toBe("Registro");
+    expect(citizenKindLabel("hologram")).toBe("Registro");
     expect(citizenKindLabel("")).toBe("Registro");
   });
 
@@ -94,5 +94,15 @@ describe("textos", () => {
     expect(pdfMessageFor(new Error("offline"))).toBe(messageFor(new Error("offline")));
     // O código é o mesmo do SMS: a frase geral não muda.
     expect(messageFor(new ApiError(429, "too_many_requests"))).toBe("Muitas tentativas. Aguarde um pouco e tente de novo.");
+  });
+});
+
+describe("módulo 29", () => {
+  it("entrada vaccination: rótulo Vacina, só a unidade, sem status", () => {
+    const v = e("v1", { kind: "vaccination", title: "Vacina Pentavalente — 2ª dose", unit: { name: "UBS Vila Verde" },
+      professional_name: "Ana Souza", status: "cancelled" });
+    expect(citizenKindLabel("vaccination")).toBe("Vacina");
+    expect(entryPlace(v)).toBe("UBS Vila Verde");
+    expect(entryStatusText(v)).toBeNull();
   });
 });

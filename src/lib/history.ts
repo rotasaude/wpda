@@ -17,6 +17,8 @@ export const SUMMARY_EMPTY = {
 };
 export const DOCUMENT_GONE = "Este documento não está mais disponível. Ele pode ter sido cancelado.";
 
+export const VACCINATION_KIND = "vaccination";
+
 const KIND_LABEL: Record<string, string> = {
   triage: "Triagem",
   attendance: "Atendimento",
@@ -28,7 +30,9 @@ const KIND_LABEL: Record<string, string> = {
   controlled_notification: "Receita de controle especial",
   campaign: "Campanha",
   // Módulo 21a (contrato §10).
-  exam: "Exame"
+  exam: "Exame",
+  // Módulo 29, contrato §10.
+  vaccination: "Vacina"
 };
 
 // O cidadão não vê código de máquina: tipo novo do api vira "Registro".
@@ -69,6 +73,8 @@ export function mergeEntries(current: CitizenEntry[], next: CitizenEntry[]): Cit
 }
 
 export function entryPlace(entry: CitizenEntry): string | null {
+  // O cidadão não vê o vacinador (contrato §9).
+  if (entry.kind === VACCINATION_KIND) return entry.unit?.name ?? null;
   const parts = [ entry.unit?.name, entry.professional_name ].filter((p): p is string => !!p);
   return parts.length > 0 ? parts.join(" · ") : null;
 }
@@ -105,6 +111,7 @@ export function documentFilename(doc: CitizenDocumentRef): string {
 // tradução do código da origem. Código desconhecido sem rótulo: nada. No
 // exame, só o rótulo do api (A40): o código dele não passa pela tradução.
 export function entryStatusText(entry: CitizenEntry): string | null {
+  if (entry.kind === VACCINATION_KIND) return null;
   if (entry.kind === EXAM_KIND) return entry.status_label || null;
   return entry.status_label || citizenStatusLabel(entry.status);
 }

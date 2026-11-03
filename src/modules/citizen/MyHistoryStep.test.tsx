@@ -320,11 +320,11 @@ describe("MyHistoryStep", () => {
   });
 
   it("tipo desconhecido vira Registro", async () => {
-    api({ timeline: history({ entries: [ entry({ id: "vaccination:v1", kind: "vaccination", title: "Vacina contra a gripe" }) ] }) });
+    api({ timeline: history({ entries: [ entry({ id: "hologram:v1", kind: "hologram", title: "Vacina contra a gripe" }) ] }) });
     renderStep();
     const timeline = await screen.findByRole("region", { name: "Linha do tempo" });
     expect(within(timeline).getByText("Registro")).toBeInTheDocument();
-    expect(within(timeline).queryByText("vaccination")).not.toBeInTheDocument();
+    expect(within(timeline).queryByText("hologram")).not.toBeInTheDocument();
   });
 
   it("interruptor desligado no meio: a frase", async () => {

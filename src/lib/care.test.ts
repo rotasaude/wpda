@@ -53,3 +53,10 @@ describe("condições e frases", () => {
     expect(careMessage(new Error("boom"))).toBe("Sem conexão. Verifique a internet e tente de novo.");
   });
 });
+
+describe("módulo 29", () => {
+  it("marco de vacina com caderneta não conferida: leve a caderneta, sem pendência", () => {
+    expect(careItemView({ label: "pentavalente — 3ª dose", status: "unchecked", due_on: null }))
+      .toEqual({ title: "Pentavalente — 3ª dose", status: "Leve a caderneta de vacinação à unidade para conferir", tone: "neutral" });
+  });
+});

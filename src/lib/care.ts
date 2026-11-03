@@ -41,6 +41,8 @@ export function careItemView(item: CareItem): { title: string; status: string | 
     case "overdue": return { title, status: "Está na hora — procure a sua unidade de saúde", tone: "warn" };
     // O api nunca manda "untracked" (P5a); fica só como defesa.
     case "untracked": return { title, status: "Confira com a sua equipe de saúde", tone: "neutral" };
+    // Marco de vacina com a caderneta ainda não conferida (módulo 29): sem pendência.
+    case "unchecked": return { title, status: "Leve a caderneta de vacinação à unidade para conferir", tone: "neutral" };
     default: return { title, status: null, tone: "neutral" };
   }
 }
