@@ -60,8 +60,12 @@ test("Minhas vacinas: doses, envio e próximas, sem lote nem vacinador, sem rola
   await expect(bcg.getByText(/registrada a partir da caderneta/)).toBeVisible();
   await expect(page.getByRole("listitem", { name: "Pentavalente — 3ª dose" }).getByText(/10\/11\/2026/)).toBeVisible();
 
+  // A dose cancelada não chega à tela: só as duas outras, e nenhuma Hepatite B.
+  await expect(page.getByRole("region", { name: "Vacinas aplicadas" }).getByRole("listitem")).toHaveCount(2);
+  await expect(page.getByRole("listitem", { name: /Hepatite B/ })).toHaveCount(0);
+
   const body = await page.locator("body").innerText();
-  expect(body).not.toMatch(/AB123|Serum|Ana Souza|cancelad|lote/i);
+  expect(body).not.toMatch(/AB123|Serum|Ana Souza|cancelad|lote|Hepatite B/i);
   for (const u of urls) {
     const q = new URL(u).search;
     expect(q === "" || /^\?citizen_id=p1$/.test(q)).toBe(true);
