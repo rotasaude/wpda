@@ -11,7 +11,7 @@ import {
 } from "../../lib/citizenApi";
 import {
   DOCUMENT_GONE, NOT_VERIFIED_INVITE, PARTIAL_NOTICE, SUMMARY_EMPTY, citizenKindLabel, entryFilename,
-  entryPlace, entryStatusText, mergeEntries, sinceText, vitalsLines
+  VACCINATION_KIND, entryPlace, entryStatusText, mergeEntries, sinceText, vitalsLines
 } from "../../lib/history";
 import { EXAM_KIND, EXAM_PDF_GONE } from "../../lib/exams";
 import { fmtDate, fmtDateTime } from "../../lib/format";
@@ -212,15 +212,17 @@ function EntryList({ entries, downloading, downloadError, onDownload }:
       {entries.map((e) => {
         const place = entryPlace(e);
         const status = entryStatusText(e);
+        // Vacina (módulo 29, RF5): só título, data e unidade; resumo e documento do api não se desenham.
+        const vaccine = e.kind === VACCINATION_KIND;
         return (
           <li key={e.id} style={card}>
             <strong>{citizenKindLabel(e.kind)}</strong>
             <div>{fmtDateTime(e.occurred_at)}</div>
             <div>{e.title}</div>
-            {e.summary && e.summary !== status && <div style={muted}>{e.summary}</div>}
+            {!vaccine && e.summary && e.summary !== status && <div style={muted}>{e.summary}</div>}
             {place && <div style={muted}>{place}</div>}
             {status && <div>{status}</div>}
-            {e.document && (
+            {!vaccine && e.document && (
               <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
                 {e.document.short_code && <div>{`Código de conferência: ${e.document.short_code}`}</div>}
                 {e.document.verification_url && e.document.short_code && (

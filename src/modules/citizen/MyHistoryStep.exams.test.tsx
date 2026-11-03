@@ -88,4 +88,20 @@ describe("MyHistoryStep — exames (módulo 21a)", () => {
     expect(documentPdf).toHaveBeenCalledWith("doc2", "p1");
     expect(examPdf).not.toHaveBeenCalled();
   });
+  it("vacina na linha do tempo: sem vacinador, sem cancelado, sem resumo nem documento, mesmo que o api mande", async () => {
+    const VACCINE: CitizenEntry = {
+      id: "vaccination:v1", kind: "vaccination", occurred_at: "2026-10-08T10:00:00-03:00", unit: { name: "UBS Centro" },
+      professional_name: "Ana Souza", title: "Vacina Pentavalente — 2ª dose", summary: "Lote AB123 cancelado", status: "cancelled",
+      status_label: "cancelado",
+      document: { id: "d9", short_code: "ZZ9ZZ-9ZZ9Z", verification_url: null, downloadable: true }
+    };
+    api([ VACCINE ]);
+    renderStep();
+    const timeline = await screen.findByRole("region", { name: "Linha do tempo" });
+    expect(await within(timeline).findByText("Vacina Pentavalente — 2ª dose")).toBeInTheDocument();
+    expect(within(timeline).getByText("UBS Centro")).toBeInTheDocument();
+    const text = timeline.textContent ?? "";
+    expect(text).not.toMatch(/Ana Souza|cancelad|AB123|ZZ9ZZ/i);
+    expect(within(timeline).queryByRole("button", { name: /Baixar PDF/ })).not.toBeInTheDocument();
+  });
 });
