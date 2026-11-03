@@ -551,6 +551,64 @@ function normalizeReferral(r: RawReferral): CitizenReferral {
   };
 }
 
+// ─── Minhas vacinas (módulo 29, ADR 0047; contrato §9) ───
+// Só os campos do contrato passam da borda: lote, fabricante, vacinador, id e
+// doses canceladas são descartados mesmo que o api mande. `rnds` fora de
+// sent|sending vira null (nunca o código interno). Sem caderneta conferida não
+// há próxima dose, mesmo que o api envie alguma.
+export type VaccineRnds = "sent" | "sending";
+export interface CitizenVaccineDose {
+  immunobiological_name: string;
+  dose_name: string;
+  applied_on: string;
+  place_name: string | null;
+  transcription: boolean;
+  rnds: VaccineRnds | null;
+}
+export interface CitizenUpcomingDose {
+  immunobiological_name: string;
+  dose_name: string;
+  due_on: string | null;
+}
+export interface CitizenVaccinations {
+  checked: boolean;
+  items: CitizenVaccineDose[];
+  upcoming: CitizenUpcomingDose[];
+}
+
+interface RawVaccinations {
+  checked?: boolean;
+  items?: Array<Record<string, unknown>> | null;
+  upcoming?: Array<Record<string, unknown>> | null;
+}
+
+const str = (v: unknown): string => (typeof v === "string" ? v : "");
+const strOrNull = (v: unknown): string | null => (typeof v === "string" ? v : null);
+
+function normalizeVaccinations(raw: RawVaccinations): CitizenVaccinations {
+  const checked = raw?.checked === true;
+  return {
+    checked,
+    items: (raw?.items ?? [])
+      .filter(i => i.status !== "cancelled")
+      .map(i => ({
+        immunobiological_name: str(i.immunobiological_name),
+        dose_name: str(i.dose_name),
+        applied_on: str(i.applied_on),
+        place_name: strOrNull(i.place_name),
+        transcription: i.transcription === true,
+        rnds: i.rnds === "sent" || i.rnds === "sending" ? i.rnds : null
+      })),
+    upcoming: checked
+      ? (raw?.upcoming ?? []).map(u => ({
+          immunobiological_name: str(u.immunobiological_name),
+          dose_name: str(u.dose_name),
+          due_on: strOrNull(u.due_on)
+        }))
+      : []
+  };
+}
+
 export interface CitizenSession {
   phone_masked: string;
   // Fuso IANA da cidade; ausente em api antigo.
@@ -716,5 +774,9 @@ export const citizenApi = {
   // 403 feature_disabled se a cidade não ligou a regulação.
   regulationRequests: async (citizenId: string): Promise<CitizenReferral[]> =>
     ((await call<{ requests?: RawReferral[] }>("GET", `/regulation_requests?citizen_id=${encodeURIComponent(citizenId)}`)).requests ?? [])
-      .map(normalizeReferral)
+      .map(normalizeReferral),
+  // "Minhas vacinas" (módulo 29): só par validado (403 not_verified); 403
+  // feature_disabled se a cidade não ligou a sala de vacina.
+  vaccinations: async (citizenId: string): Promise<CitizenVaccinations> =>
+    normalizeVaccinations(await call<RawVaccinations>("GET", `/vaccinations?citizen_id=${encodeURIComponent(citizenId)}`))
 };
