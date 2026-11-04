@@ -50,8 +50,10 @@ async function mockApi(page: Page, urls: string[]) {
 
 const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
-test.beforeEach(({}, info) => {
+test.beforeEach(async ({ page }, info) => {
   test.skip(!PHONES.has(info.project.name), "esta prova roda nos dois celulares (iphone e pixel)");
+  // Relógio fixo: o app mostra o ano quando a viagem é de outro ano que o de hoje.
+  await page.clock.setFixedTime(new Date("2026-11-03T10:00:00-03:00"));
 });
 
 test("Minhas viagens: próximas, anteriores e TFD, sem dado clínico nem escala, sem rolagem lateral", async ({ page }) => {
