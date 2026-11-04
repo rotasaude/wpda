@@ -1,13 +1,15 @@
 // src/modules/citizen/NoticesStep.tsx
 // Caixa de avisos da Secretaria (spec 2026-09-29 §8; ADR 0024; módulo 17
-// F-17.8). Avisos de todas as pessoas do telefone da sessão: campanhas e o
-// lembrete da véspera de um horário confirmado. Com mais de uma pessoa, o CPF
+// F-17.8; módulo 30). Avisos de todas as pessoas do telefone da sessão:
+// campanhas, o lembrete da véspera de um horário confirmado e os avisos de
+// viagem (marcada, horário ou embarque mudou, cancelada). Com mais de uma pessoa, o CPF
 // mascarado diz de quem é (cidadão não tem nome). Tocar abre o texto e marca
 // lido. O texto é simples: o React escapa tudo e o pre-wrap preserva as
 // quebras de linha.
 import { useEffect, useRef, useState } from "react";
 import { citizenApi, type Notice, type ReminderNotice, type TripNotice } from "../../lib/citizenApi";
 import { fmtCalendarDate, fmtDate, fmtWeekdayDateTime } from "../../lib/format";
+import { hasSessionFeature } from "../../lib/sessionFeatures";
 import { formatAddress } from "../../lib/territory";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
@@ -30,10 +32,17 @@ export function tripNoticeTitle(event: string): string {
   return Object.prototype.hasOwnProperty.call(TRIP_TITLES, event) ? TRIP_TITLES[event] : "Aviso de viagem";
 }
 
-// A hora é a do envio do aviso; sem hora válida, só a data da viagem.
-export function tripNoticeWhen(n: TripNotice): string {
+// Cancelada ou retirada: a viagem não sai mais, então mostra só o dia dela.
+export function tripNoticeEnded(n: TripNotice): boolean {
+  return n.event === "cancelled" || n.event === "removed";
+}
+
+// A hora é a do envio do aviso; sem hora válida (ou viagem encerrada), só a data.
+export function tripNoticeWhen(n: TripNotice): { kind: "departure" | "day"; text: string } {
   const when = fmtWeekdayDateTime(n.departure_at);
-  return when === "—" ? `Viagem de ${fmtCalendarDate(n.date)}` : when;
+  return when === "—" || tripNoticeEnded(n)
+    ? { kind: "day", text: `Viagem de ${fmtCalendarDate(n.date)}` }
+    : { kind: "departure", text: when };
 }
 
 const itemStyle = {
@@ -65,14 +74,15 @@ function ReminderDetail({ notice, onBack }: { notice: ReminderNotice; onBack: ()
 
 function TripDetail({ notice, onBack }: { notice: TripNotice; onBack: () => void }) {
   const when = tripNoticeWhen(notice);
-  const ended = notice.event === "cancelled" || notice.event === "removed";
+  const ended = tripNoticeEnded(notice);
   return (
     <Screen title={tripNoticeTitle(notice.event)}
       footer={<BigButton variant="secondary" onClick={onBack}>Voltar aos avisos</BigButton>}>
-      <p style={{ margin: "0 0 8px", fontWeight: 600 }}>{when.startsWith("Viagem de ") ? when : `Saída: ${when}`}</p>
+      <p style={{ margin: "0 0 8px", fontWeight: 600 }}>{when.kind === "day" ? when.text : `Saída: ${when.text}`}</p>
       {notice.cpf_masked && <p style={{ margin: "0 0 4px" }}>Para o CPF {notice.cpf_masked}</p>}
       {notice.boarding_label && <p style={{ margin: "0 0 4px" }}>Embarque: {notice.boarding_label}</p>}
-      <p style={{ marginTop: 16 }}>{ended ? TRIP_NOTICE_CANCELLED_HINT : TRIP_NOTICE_HINT}</p>
+      {(ended || hasSessionFeature("sanitary_transport")) &&
+        <p style={{ marginTop: 16 }}>{ended ? TRIP_NOTICE_CANCELLED_HINT : TRIP_NOTICE_HINT}</p>}
     </Screen>
   );
 }
@@ -98,7 +108,7 @@ function ItemContent({ notice }: { notice: Notice }) {
         <span style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
           <strong>{tripNoticeTitle(notice.event)}</strong>{badge}
         </span>
-        <span style={{ color: "var(--ink2)" }}>{tripNoticeWhen(notice)}</span>
+        <span style={{ color: "var(--ink2)" }}>{tripNoticeWhen(notice).text}</span>
         {cpf}
       </>
     );

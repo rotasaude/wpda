@@ -5,13 +5,14 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NoticesStep, tripNoticeTitle, TRIP_NOTICE_HINT, TRIP_NOTICE_CANCELLED_HINT } from "./NoticesStep";
+import { setSessionFeatures } from "../../lib/sessionFeatures";
 import { citizenApi, type Notice, type TripNotice } from "../../lib/citizenApi";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: [ "Date" ] });
   vi.setSystemTime(new Date("2026-11-03T10:00:00-03:00"));
 });
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); setSessionFeatures(null); });
 
 const changed: TripNotice = { kind: "trip", id: "n1", event: "departure_changed", date: "2026-11-05",
   departure_at: "2026-11-05T06:00:00-03:00", boarding_label: "Praça da Matriz", read: false, cpf_masked: null };
@@ -32,6 +33,7 @@ describe("NoticesStep — aviso de viagem (módulo 30)", () => {
   });
 
   it("aviso de viagem: abre com data, hora e embarque, sem destino", async () => {
+    setSessionFeatures([ "sanitary_transport" ]);
     const leaky = { ...changed, destination_name: "Curitiba", provider_name: "Hospital Erasto Gaertner" } as unknown as TripNotice;
     const { markRead } = setup([ leaky ]);
     await userEvent.click(await screen.findByRole("button", { name: /Horário da viagem mudou/ }));
@@ -47,6 +49,28 @@ describe("NoticesStep — aviso de viagem (módulo 30)", () => {
     expect([ "added", "departure_changed", "boarding_changed", "cancelled", "removed", "reminder", "foo" ].map(tripNoticeTitle)).toEqual([
       "Viagem marcada", "Horário da viagem mudou", "Local de embarque mudou", "Viagem cancelada",
       "Você saiu da lista desta viagem", "Lembrete de viagem", "Aviso de viagem" ]);
+  });
+
+  it("cancelada ou retirada com saída real: mostra o dia da viagem, nunca \"Saída\"", async () => {
+    setup([ { ...changed, id: "n5", event: "cancelled" }, { ...changed, id: "n6", event: "removed" } ]);
+    await userEvent.click(await screen.findByRole("button", { name: /Viagem cancelada/ }));
+    expect(await screen.findByText("Viagem de 05/11/2026")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Saída|06:00/);
+    expect(screen.getByText(TRIP_NOTICE_CANCELLED_HINT)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Voltar aos avisos" }));
+    const item = await screen.findByRole("button", { name: /Você saiu da lista/ });
+    expect(within(item).getByText("Viagem de 05/11/2026")).toBeInTheDocument();
+    expect(item.textContent).not.toMatch(/06:00/);
+    await userEvent.click(item);
+    expect(await screen.findByText("Viagem de 05/11/2026")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Saída|06:00/);
+  });
+
+  it("sem sanitary_transport na sessão, o aviso continua legível mas sem a dica de Minhas viagens", async () => {
+    setup([ changed ]);
+    await userEvent.click(await screen.findByRole("button", { name: /Horário da viagem mudou/ }));
+    expect(await screen.findByText("Saída: qui., 05/11, 06:00")).toBeInTheDocument();
+    expect(screen.queryByText(TRIP_NOTICE_HINT)).toBeNull();
   });
 
   it("cancelada ou retirada: a dica da central, sem hora; sem hora válida, só a data", async () => {
