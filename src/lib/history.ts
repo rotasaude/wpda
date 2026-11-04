@@ -127,9 +127,9 @@ export function entryFilename(entry: CitizenEntry): string {
   return entry.document ? documentFilename(entry.document) : "documento-pdf.pdf";
 }
 
-// Quando aconteceu. A passagem de TFD feita chega do api com 12:00 artificial
-// (módulo 30): o título "TFD para <cidade>" a identifica e mostra só o dia.
+// Quando aconteceu. Viagem (módulo 30): só o dia. A passagem de TFD feita chega
+// do api com 12:00 artificial e o horário da viagem não é para o histórico.
 export function entryWhen(entry: CitizenEntry): string {
-  if (entry.kind === TRANSPORT_KIND && entry.title.startsWith("TFD para ")) return fmtDate(entry.occurred_at);
+  if (entry.kind === TRANSPORT_KIND) return fmtDate(entry.occurred_at);
   return fmtDateTime(entry.occurred_at);
 }

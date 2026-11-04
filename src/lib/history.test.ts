@@ -117,12 +117,10 @@ describe("módulo 30", () => {
     expect(entryPlace(e("t2", { kind: "transport", title: "TFD para Curitiba" }))).toBeNull();
   });
 
-  it("TFD de passagem mostra só a data (sem 12:00 artificial); viagem mostra data e hora", () => {
-    const at = "2026-09-09T12:00:00-03:00";
+  it("toda entrada transport mostra só a data; as demais, data e hora", () => {
+    const at = "2026-09-09T06:30:00-03:00";
     expect(entryWhen(e("t3", { kind: "transport", title: "TFD para Londrina", occurred_at: at }))).toBe("09/09/2026");
-    const trip = entryWhen(e("t4", { kind: "transport", title: "Viagem para Curitiba", occurred_at: at }));
-    expect(trip).toContain("09/09/2026");
-    expect(trip).toMatch(/12:00/);
-    expect(entryWhen(e("t5", { title: "TFD para algo", occurred_at: at }))).toMatch(/12:00/);
+    expect(entryWhen(e("t4", { kind: "transport", title: "Viagem para Curitiba", occurred_at: at }))).toBe("09/09/2026");
+    expect(entryWhen(e("t5", { title: "TFD para algo", occurred_at: at }))).toMatch(/06:30/);
   });
 });

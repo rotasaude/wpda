@@ -11,7 +11,7 @@ import {
 } from "../../lib/citizenApi";
 import {
   DOCUMENT_GONE, NOT_VERIFIED_INVITE, PARTIAL_NOTICE, SUMMARY_EMPTY, citizenKindLabel, entryFilename,
-  VACCINATION_KIND, entryPlace, entryStatusText, entryWhen, mergeEntries, sinceText, vitalsLines
+  VACCINATION_KIND, TRANSPORT_KIND, entryPlace, entryStatusText, entryWhen, mergeEntries, sinceText, vitalsLines
 } from "../../lib/history";
 import { EXAM_KIND, EXAM_PDF_GONE } from "../../lib/exams";
 import { fmtDate } from "../../lib/format";
@@ -213,7 +213,7 @@ function EntryList({ entries, downloading, downloadError, onDownload }:
         const place = entryPlace(e);
         const status = entryStatusText(e);
         // Vacina (módulo 29, RF5): só título, data e unidade; resumo e documento do api não se desenham.
-        const vaccine = e.kind === VACCINATION_KIND;
+        const vaccine = e.kind === VACCINATION_KIND || e.kind === TRANSPORT_KIND;
         return (
           <li key={e.id} style={card}>
             <strong>{citizenKindLabel(e.kind)}</strong>
