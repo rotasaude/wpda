@@ -14,7 +14,8 @@ export const REMINDER_EXPLANATION =
   "Antes do prazo para confirmar um horário, a Secretaria de Saúde manda um SMS lembrando. A mensagem não diz o local nem o motivo.";
 export const TRIP_SMS_EXPLANATION =
   "Se tiver viagem marcada pela Secretaria, o SMS diz a data, a hora e o local de embarque, ou que a viagem foi cancelada, nunca o destino nem o motivo. " +
-  "Ele só sai entre 8h e 20h e também é desligado pelo \"Lembrete de horário por SMS\".";
+  "Ele só sai com \"Receber avisos por SMS\" ligado, entre 8h e 20h, e não sai se o \"Lembrete de horário por SMS\" estiver desligado ou se os avisos desta pessoa estiverem silenciados.";
+export const MUTE_TRIP_SMS_NOTE = " Com os avisos silenciados, o SMS de viagem também não é enviado.";
 export const MUTE_EXPLANATION =
   "Os avisos novos deixam de aparecer no número ao lado de Avisos. Eles continuam na lista de avisos.";
 
@@ -89,7 +90,8 @@ export function PreferencesStep({ onBack, onSaved }: { onBack: () => void; onSav
                 onChange={v => void change(p, { appointment_reminders_muted: !v })} />}
             {prefs.sms_available && hasSessionFeature("sanitary_transport") &&
               <p style={{ color: "var(--ink2)" }}>{TRIP_SMS_EXPLANATION}</p>}
-            <Toggle label="Silenciar avisos" description={MUTE_EXPLANATION}
+            <Toggle label="Silenciar avisos"
+              description={prefs.sms_available && hasSessionFeature("sanitary_transport") ? MUTE_EXPLANATION + MUTE_TRIP_SMS_NOTE : MUTE_EXPLANATION}
               checked={p.notices_muted} disabled={saving}
               onChange={v => void change(p, { notices_muted: v })} />
             {mine && (mine.ok ? <p role="status" style={{ margin: 0 }}>{mine.text}</p> : <ErrorText>{mine.text}</ErrorText>)}

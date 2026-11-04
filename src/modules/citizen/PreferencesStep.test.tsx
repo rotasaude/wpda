@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, within, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PreferencesStep, TRIP_SMS_EXPLANATION, SMS_EXPLANATION, MUTE_EXPLANATION, EMPTY_PREFERENCES } from "./PreferencesStep";
+import { PreferencesStep, TRIP_SMS_EXPLANATION, SMS_EXPLANATION, MUTE_EXPLANATION, MUTE_TRIP_SMS_NOTE, EMPTY_PREFERENCES } from "./PreferencesStep";
 import { setSessionFeatures } from "../../lib/sessionFeatures";
 import { citizenApi, type ContactPreference, type ContactPreferences } from "../../lib/citizenApi";
 
@@ -163,7 +163,19 @@ describe("PreferencesStep — SMS de viagem (módulo 30)", () => {
     expect(within(await person("***.982.247-**")).getByText(TRIP_SMS_EXPLANATION)).toBeInTheDocument();
     expect(TRIP_SMS_EXPLANATION).toBe(
       "Se tiver viagem marcada pela Secretaria, o SMS diz a data, a hora e o local de embarque, ou que a viagem foi cancelada, nunca o destino nem o motivo. " +
-      "Ele só sai entre 8h e 20h e também é desligado pelo \"Lembrete de horário por SMS\".");
+      "Ele só sai com \"Receber avisos por SMS\" ligado, entre 8h e 20h, e não sai se o \"Lembrete de horário por SMS\" estiver desligado ou se os avisos desta pessoa estiverem silenciados.");
+  });
+
+  it("\"Silenciar avisos\" avisa que também para o SMS de viagem, só com transporte e SMS", async () => {
+    setSessionFeatures([ "sanitary_transport" ]);
+    setup({ sms_available: true, people: [ p1 ] });
+    const el = await person("***.982.247-**");
+    expect(within(el).getByText(MUTE_EXPLANATION + MUTE_TRIP_SMS_NOTE)).toBeInTheDocument();
+    expect(MUTE_TRIP_SMS_NOTE).toBe(" Com os avisos silenciados, o SMS de viagem também não é enviado.");
+    cleanup(); vi.restoreAllMocks();
+    setSessionFeatures(null);
+    setup({ sms_available: true, people: [ p1 ] });
+    expect(within(await person("***.982.247-**")).getByText(MUTE_EXPLANATION)).toBeInTheDocument();
   });
 
   it("sem sanitary_transport, ou sem SMS na cidade: nada", async () => {
