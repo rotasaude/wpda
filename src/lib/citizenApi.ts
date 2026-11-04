@@ -609,6 +609,78 @@ function normalizeVaccinations(raw: RawVaccinations): CitizenVaccinations {
   };
 }
 
+// ─── Minhas viagens (módulo 30, ADR 0048; contrato §8) ───
+
+export type TripStatus = "planned" | "confirmed" | "in_progress" | "done" | "cancelled";
+export type TfdStatus = "submitted" | "returned" | "authorized" | "denied" | "scheduled" | "travelling" | "completed" | "cancelled";
+
+export interface CitizenTrip {
+  // Id do PASSAGEIRO (não da viagem): serve só de chave do React.
+  id: string;
+  date: string;
+  departure_at: string | null;
+  boarding_label: string | null;
+  destination_name: string;
+  provider_name: string | null;
+  status: TripStatus | string;
+  companion: boolean;
+}
+
+export interface CitizenTfdCase {
+  id: string;
+  status: TfdStatus | string;
+  destination_name: string;
+  appointment_at: string | null;
+  allowance_total_cents: number | null;
+  paid: boolean;
+}
+
+export interface CitizenTrips {
+  items: CitizenTrip[];
+  tfd: CitizenTfdCase[];
+}
+
+interface RawTrips {
+  items?: Array<Record<string, unknown>> | null;
+  tfd?: Array<Record<string, unknown>> | null;
+}
+
+const rec = (v: unknown): Record<string, unknown> =>
+  (v !== null && typeof v === "object" ? (v as Record<string, unknown>) : {});
+
+function normalizeTrips(raw: RawTrips): CitizenTrips {
+  const items: CitizenTrip[] = [];
+  for (const i of Array.isArray(raw?.items) ? raw.items : []) {
+    if (typeof i?.id !== "string" || typeof i?.date !== "string") continue;
+    const boarding = rec(i.boarding);
+    const destination = rec(i.destination);
+    items.push({
+      id: i.id,
+      date: i.date,
+      departure_at: strOrNull(i.departure_at),
+      boarding_label: strOrNull(boarding.label),
+      destination_name: str(destination.name),
+      provider_name: strOrNull(destination.provider_name),
+      status: str(i.status),
+      companion: i.companion === true
+    });
+  }
+  const tfd: CitizenTfdCase[] = [];
+  for (const c of Array.isArray(raw?.tfd) ? raw.tfd : []) {
+    if (typeof c?.id !== "string" || c.status === "draft") continue;
+    const cents = c.allowance_total_cents;
+    tfd.push({
+      id: c.id,
+      status: str(c.status),
+      destination_name: str(c.destination_name),
+      appointment_at: strOrNull(c.appointment_at),
+      allowance_total_cents: typeof cents === "number" && Number.isInteger(cents) && cents >= 0 ? cents : null,
+      paid: c.paid === true
+    });
+  }
+  return { items, tfd };
+}
+
 export interface CitizenSession {
   phone_masked: string;
   // Fuso IANA da cidade; ausente em api antigo.
@@ -778,5 +850,9 @@ export const citizenApi = {
   // "Minhas vacinas" (módulo 29): só par validado (403 not_verified); 403
   // feature_disabled se a cidade não ligou a sala de vacina.
   vaccinations: async (citizenId: string): Promise<CitizenVaccinations> =>
-    normalizeVaccinations(await call<RawVaccinations>("GET", `/vaccinations?citizen_id=${encodeURIComponent(citizenId)}`))
+    normalizeVaccinations(await call<RawVaccinations>("GET", `/vaccinations?citizen_id=${encodeURIComponent(citizenId)}`)),
+  // "Minhas viagens" (módulo 30): só par validado (403 not_verified); 403
+  // feature_disabled se a cidade não ligou o transporte sanitário.
+  trips: async (citizenId: string): Promise<CitizenTrips> =>
+    normalizeTrips(await call<RawTrips>("GET", `/trips?citizen_id=${encodeURIComponent(citizenId)}`))
 };
