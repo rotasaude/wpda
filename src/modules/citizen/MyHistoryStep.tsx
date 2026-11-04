@@ -11,10 +11,10 @@ import {
 } from "../../lib/citizenApi";
 import {
   DOCUMENT_GONE, NOT_VERIFIED_INVITE, PARTIAL_NOTICE, SUMMARY_EMPTY, citizenKindLabel, entryFilename,
-  VACCINATION_KIND, entryPlace, entryStatusText, mergeEntries, sinceText, vitalsLines
+  VACCINATION_KIND, entryPlace, entryStatusText, entryWhen, mergeEntries, sinceText, vitalsLines
 } from "../../lib/history";
 import { EXAM_KIND, EXAM_PDF_GONE } from "../../lib/exams";
-import { fmtDate, fmtDateTime } from "../../lib/format";
+import { fmtDate } from "../../lib/format";
 import { BigButton, ErrorText, Screen, messageFor, pdfMessageFor } from "./ui";
 
 const PDF_URL_TTL_MS = 60_000;
@@ -217,7 +217,7 @@ function EntryList({ entries, downloading, downloadError, onDownload }:
         return (
           <li key={e.id} style={card}>
             <strong>{citizenKindLabel(e.kind)}</strong>
-            <div>{fmtDateTime(e.occurred_at)}</div>
+            <div>{entryWhen(e)}</div>
             <div>{e.title}</div>
             {!vaccine && e.summary && e.summary !== status && <div style={muted}>{e.summary}</div>}
             {place && <div style={muted}>{place}</div>}

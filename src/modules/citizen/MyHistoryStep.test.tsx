@@ -327,6 +327,21 @@ describe("MyHistoryStep", () => {
     expect(within(timeline).queryByText("hologram")).not.toBeInTheDocument();
   });
 
+  it("viagem e TFD de passagem: rótulo Viagem, TFD só com a data, sem motorista", async () => {
+    api({ timeline: history({ entries: [
+      entry({ id: "transport:a", kind: "transport", occurred_at: "2026-10-05T06:30:00-03:00", title: "Viagem para Curitiba",
+        professional_name: "João Motorista", unit: { name: "Hospital Erasto Gaertner" } }),
+      entry({ id: "transport:b", kind: "transport", occurred_at: "2026-10-06T12:00:00-03:00", title: "TFD para Londrina" })
+    ] }) });
+    renderStep();
+    const timeline = await screen.findByRole("region", { name: "Linha do tempo" });
+    expect(within(timeline).getAllByText("Viagem")).toHaveLength(2);
+    expect(within(timeline).getByText("05/10/2026, 06:30")).toBeInTheDocument();
+    expect(within(timeline).getByText("06/10/2026")).toBeInTheDocument();
+    expect(within(timeline).queryByText(/12:00/)).not.toBeInTheDocument();
+    expect(within(timeline).queryByText(/João Motorista|Erasto/)).not.toBeInTheDocument();
+  });
+
   it("interruptor desligado no meio: a frase", async () => {
     vi.spyOn(citizenApi, "history").mockRejectedValue(new ApiError(403, "feature_disabled"));
     renderStep();

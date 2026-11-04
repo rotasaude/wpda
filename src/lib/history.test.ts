@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  NOT_VERIFIED_INVITE, PARTIAL_NOTICE, citizenKindLabel, citizenStatusLabel, documentFilename, entryPlace, entryStatusText, mergeEntries, sinceText,
+  NOT_VERIFIED_INVITE, PARTIAL_NOTICE, citizenKindLabel, citizenStatusLabel, documentFilename, entryPlace, entryStatusText, entryWhen, mergeEntries, sinceText,
   vitalsLines
 } from "./history";
 import type { CitizenEntry } from "./citizenApi";
@@ -104,5 +104,25 @@ describe("módulo 29", () => {
     expect(citizenKindLabel("vaccination")).toBe("Vacina");
     expect(entryPlace(v)).toBe("UBS Vila Verde");
     expect(entryStatusText(v)).toBeNull();
+  });
+});
+
+describe("módulo 30", () => {
+  it("entrada transport: rótulo Viagem, sem lugar nem motorista, sem status", () => {
+    const t = e("t1", { kind: "transport", title: "Viagem para Curitiba", unit: { name: "Hospital Erasto Gaertner" },
+      professional_name: "João Motorista", status: "no_show" });
+    expect(citizenKindLabel("transport")).toBe("Viagem");
+    expect(entryPlace(t)).toBeNull();
+    expect(entryStatusText(t)).toBeNull();
+    expect(entryPlace(e("t2", { kind: "transport", title: "TFD para Curitiba" }))).toBeNull();
+  });
+
+  it("TFD de passagem mostra só a data (sem 12:00 artificial); viagem mostra data e hora", () => {
+    const at = "2026-09-09T12:00:00-03:00";
+    expect(entryWhen(e("t3", { kind: "transport", title: "TFD para Londrina", occurred_at: at }))).toBe("09/09/2026");
+    const trip = entryWhen(e("t4", { kind: "transport", title: "Viagem para Curitiba", occurred_at: at }));
+    expect(trip).toContain("09/09/2026");
+    expect(trip).toMatch(/12:00/);
+    expect(entryWhen(e("t5", { title: "TFD para algo", occurred_at: at }))).toMatch(/12:00/);
   });
 });

@@ -2,7 +2,7 @@
 // §8; contrato §2 e §4). Os textos das entradas vêm prontos do api; aqui só o
 // rótulo do tipo, a junção das páginas, as linhas do resumo e o nome do PDF.
 import type { CitizenDocumentRef, CitizenEntry, HealthVitals } from "./citizenApi";
-import { fmtCalendarDate, fmtDate } from "./format";
+import { fmtCalendarDate, fmtDate, fmtDateTime } from "./format";
 import { EXAM_KIND, examFilename } from "./exams";
 
 export const PARTIAL_NOTICE =
@@ -18,6 +18,7 @@ export const SUMMARY_EMPTY = {
 export const DOCUMENT_GONE = "Este documento não está mais disponível. Ele pode ter sido cancelado.";
 
 export const VACCINATION_KIND = "vaccination";
+export const TRANSPORT_KIND = "transport";
 
 const KIND_LABEL: Record<string, string> = {
   triage: "Triagem",
@@ -32,7 +33,9 @@ const KIND_LABEL: Record<string, string> = {
   // Módulo 21a (contrato §10).
   exam: "Exame",
   // Módulo 29, contrato §10.
-  vaccination: "Vacina"
+  vaccination: "Vacina",
+  // Módulo 30, contrato §9.
+  transport: "Viagem"
 };
 
 // O cidadão não vê código de máquina: tipo novo do api vira "Registro".
@@ -75,6 +78,8 @@ export function mergeEntries(current: CitizenEntry[], next: CitizenEntry[]): Cit
 export function entryPlace(entry: CitizenEntry): string | null {
   // O cidadão não vê o vacinador (contrato §9).
   if (entry.kind === VACCINATION_KIND) return entry.unit?.name ?? null;
+  // Nem o motorista nem o prestador da viagem (módulo 30, W7).
+  if (entry.kind === TRANSPORT_KIND) return null;
   const parts = [ entry.unit?.name, entry.professional_name ].filter((p): p is string => !!p);
   return parts.length > 0 ? parts.join(" · ") : null;
 }
@@ -111,7 +116,7 @@ export function documentFilename(doc: CitizenDocumentRef): string {
 // tradução do código da origem. Código desconhecido sem rótulo: nada. No
 // exame, só o rótulo do api (A40): o código dele não passa pela tradução.
 export function entryStatusText(entry: CitizenEntry): string | null {
-  if (entry.kind === VACCINATION_KIND) return null;
+  if (entry.kind === VACCINATION_KIND || entry.kind === TRANSPORT_KIND) return null;
   if (entry.kind === EXAM_KIND) return entry.status_label || null;
   return entry.status_label || citizenStatusLabel(entry.status);
 }
@@ -120,4 +125,11 @@ export function entryStatusText(entry: CitizenEntry): string | null {
 export function entryFilename(entry: CitizenEntry): string {
   if (entry.kind === EXAM_KIND && entry.document) return examFilename(entry.document.id);
   return entry.document ? documentFilename(entry.document) : "documento-pdf.pdf";
+}
+
+// Quando aconteceu. A passagem de TFD feita chega do api com 12:00 artificial
+// (módulo 30): o título "TFD para <cidade>" a identifica e mostra só o dia.
+export function entryWhen(entry: CitizenEntry): string {
+  if (entry.kind === TRANSPORT_KIND && entry.title.startsWith("TFD para ")) return fmtDate(entry.occurred_at);
+  return fmtDateTime(entry.occurred_at);
 }
