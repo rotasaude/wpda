@@ -7,7 +7,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { citizenApi, ApiError, type CitizenTrip, type CitizenTrips } from "../../lib/citizenApi";
 import { cityToday } from "../../lib/format";
 import {
-  TFD_HELP, TRIPS_EMPTY, TRIPS_HELP, TRIPS_NOT_VERIFIED,
+  TFD_HELP, TRIPS_EMPTY, TRIPS_NO_UPCOMING, TRIPS_HELP, TRIPS_NOT_VERIFIED,
   allowanceText, appointmentText, boardingText, departureText, destinationText,
   splitTrips, tfdView, tripLabel, tripStatusView, tripTitle, tripsMessage, type TripTone
 } from "../../lib/trips";
@@ -73,8 +73,10 @@ export function MyTripsStep({ citizenId, onBack, onValidate }:
         <>
           <section aria-label="Próximas viagens" style={{ display: "grid", gap: 12 }}>
             <h2 style={h2}>Próximas viagens</h2>
-            {upcoming.length === 0 && <p>{TRIPS_EMPTY}</p>}
-            <ul style={list}>{upcoming.map((t) => <TripItem key={t.id} t={t} />)}</ul>
+            {upcoming.length === 0 && (
+              <p>{past.length === 0 && data.tfd.length === 0 ? TRIPS_EMPTY : TRIPS_NO_UPCOMING}</p>
+            )}
+            {upcoming.length > 0 && <ul style={list}>{upcoming.map((t) => <TripItem key={t.id} t={t} />)}</ul>}
           </section>
           {data.tfd.length > 0 && (
             <section aria-label="Tratamento Fora de Domicílio" style={{ display: "grid", gap: 12 }}>

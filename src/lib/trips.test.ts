@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ApiError, type CitizenTfdCase, type CitizenTrip } from "./citizenApi";
 import {
-  TFD_HELP, TRIPS_DISABLED, TRIPS_EMPTY, TRIPS_HELP, TRIPS_NOT_VERIFIED, allowanceText, appointmentText, boardingText,
+  TFD_HELP, TRIPS_DISABLED, TRIPS_EMPTY, TRIPS_HELP, TRIPS_NO_UPCOMING, TRIPS_NOT_VERIFIED, allowanceText, appointmentText, boardingText,
   departureText, destinationText, moneyText, splitTrips, tfdView, tripLabel, tripStatusView, tripTitle, tripsMessage
 } from "./trips";
 
@@ -14,12 +14,16 @@ const tfd = (over: Partial<CitizenTfdCase> = {}): CitizenTfdCase => ({
   allowance_total_cents: 12345, paid: false, ...over
 });
 
+beforeEach(() => { vi.useFakeTimers({ toFake: [ "Date" ] }); vi.setSystemTime(new Date("2026-11-03T10:00:00-03:00")); });
+afterEach(() => vi.useRealTimers());
+
 describe("trips", () => {
   it("textos fixos", () => {
     expect(TRIPS_NOT_VERIFIED).toBe(
       "Para ver suas viagens por aqui, valide seu cadastro na unidade de saúde com um documento com foto.");
     expect(TRIPS_DISABLED).toBe("As viagens ainda não aparecem por aqui nesta cidade.");
     expect(TRIPS_EMPTY).toBe("Nenhuma viagem marcada por aqui.");
+    expect(TRIPS_NO_UPCOMING).toBe("Nenhuma viagem futura.");
     expect(TRIPS_HELP).toBe(
       "Aqui aparecem as viagens marcadas pela Secretaria de Saúde para o seu atendimento em outra cidade. Se algo mudar, você recebe um aviso.");
     expect(TFD_HELP).toBe(
@@ -38,6 +42,15 @@ describe("trips", () => {
     expect(departureText(trip())).toBe("Saída: qui., 05/11, 05:30");
     expect(departureText(trip({ departure_at: null }))).toBe("Saída em 05/11/2026 — a Secretaria informa a hora");
     expect(departureText(trip({ departure_at: "amanhã" }))).toBe("Saída em 05/11/2026 — a Secretaria informa a hora");
+  });
+
+  it("departureText: mostra o ano só quando a viagem não é do ano corrente", () => {
+    expect(departureText(trip({ date: "2025-12-15", departure_at: "2025-12-15T06:00:00-03:00" })))
+      .toBe("Saída: seg., 15/12/2025, 06:00");
+    expect(departureText(trip({ date: "2027-01-04", departure_at: "2027-01-04T06:00:00-03:00" })))
+      .toBe("Saída: seg., 04/01/2027, 06:00");
+    expect(departureText(trip({ date: "2026-12-15", departure_at: "2026-12-15T06:00:00-03:00" })))
+      .toBe("Saída: ter., 15/12, 06:00");
   });
 
   it("boardingText: com e sem local", () => {

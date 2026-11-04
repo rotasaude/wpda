@@ -1,7 +1,7 @@
 // Regras de tela de "Minhas viagens" (módulo 30): frases, tons e ordenação.
 // Só o que a api entrega ao cidadão; nada clínico nem da escala da frota.
 import { ApiError, type CitizenTfdCase, type CitizenTrip } from "./citizenApi";
-import { fmtCalendarDate, fmtWeekdayDateTime } from "./format";
+import { cityDateFormat, cityToday, fmtCalendarDate, fmtWeekdayDateTime } from "./format";
 import { messageFor } from "../modules/citizen/ui";
 
 export const TRIPS_HELP =
@@ -10,6 +10,7 @@ export const TRIPS_NOT_VERIFIED =
   "Para ver suas viagens por aqui, valide seu cadastro na unidade de saúde com um documento com foto.";
 export const TRIPS_DISABLED = "As viagens ainda não aparecem por aqui nesta cidade.";
 export const TRIPS_EMPTY = "Nenhuma viagem marcada por aqui.";
+export const TRIPS_NO_UPCOMING = "Nenhuma viagem futura.";
 export const TFD_HELP =
   "O Tratamento Fora de Domicílio (TFD) paga a viagem e a ajuda de custo de quem precisa se tratar em outra cidade. A Secretaria informa quando e como receber.";
 
@@ -24,8 +25,18 @@ export function tripLabel(t: CitizenTrip): string {
   return `${tripTitle(t)} — ${fmtCalendarDate(t.date)}`;
 }
 
+// "qui., 05/11, 05:30"; com o ano ("seg., 15/12/2026, 06:00") quando a viagem
+// não é do ano corrente na cidade, como o rótulo (tripLabel) já mostra.
+function fmtDepartureInstant(t: CitizenTrip): string {
+  if (t.date.slice(0, 4) === cityToday().slice(0, 4)) return fmtWeekdayDateTime(t.departure_at);
+  const d = new Date(t.departure_at as string);
+  if (Number.isNaN(d.getTime())) return "—";
+  return cityDateFormat({ weekday: "short", day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit" }).format(d);
+}
+
 export function departureText(t: CitizenTrip): string {
-  const when = t.departure_at ? fmtWeekdayDateTime(t.departure_at) : "—";
+  const when = t.departure_at ? fmtDepartureInstant(t) : "—";
   return when === "—"
     ? `Saída em ${fmtCalendarDate(t.date)} — a Secretaria informa a hora`
     : `Saída: ${when}`;

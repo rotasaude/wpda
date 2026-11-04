@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MyTripsStep } from "./MyTripsStep";
 import { citizenApi, ApiError, type CitizenTrips } from "../../lib/citizenApi";
-import { TRIPS_DISABLED, TRIPS_EMPTY, TRIPS_NOT_VERIFIED } from "../../lib/trips";
+import { TRIPS_DISABLED, TRIPS_EMPTY, TRIPS_NO_UPCOMING, TRIPS_NOT_VERIFIED } from "../../lib/trips";
 
 beforeEach(() => { vi.useFakeTimers({ toFake: [ "Date" ] }); vi.setSystemTime(new Date("2026-11-03T10:00:00-03:00")); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
@@ -54,6 +54,21 @@ describe("MyTripsStep", () => {
     expect(await screen.findByText(TRIPS_EMPTY)).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Viagens anteriores" })).toBeNull();
     expect(screen.queryByRole("region", { name: "Tratamento Fora de Domicílio" })).toBeNull();
+  });
+
+  it("só anteriores ou só TFD: \"Nenhuma viagem futura.\", sem lista vazia", async () => {
+    vi.spyOn(citizenApi, "trips").mockResolvedValue({ items: [ DATA.items[1] ], tfd: [] });
+    renderStep();
+    const next = within(await screen.findByRole("region", { name: "Próximas viagens" }));
+    expect(next.getByText(TRIPS_NO_UPCOMING)).toBeInTheDocument();
+    expect(next.queryByText(TRIPS_EMPTY)).toBeNull();
+    expect(next.queryByRole("list")).toBeNull();
+    cleanup();
+    vi.spyOn(citizenApi, "trips").mockResolvedValue({ items: [], tfd: DATA.tfd });
+    renderStep();
+    const next2 = within(await screen.findByRole("region", { name: "Próximas viagens" }));
+    expect(next2.getByText(TRIPS_NO_UPCOMING)).toBeInTheDocument();
+    expect(next2.queryByRole("list")).toBeNull();
   });
 
   it("par declarado (403 not_verified): só o convite", async () => {
