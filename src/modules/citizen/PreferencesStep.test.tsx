@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PreferencesStep, SMS_EXPLANATION, MUTE_EXPLANATION, EMPTY_PREFERENCES } from "./PreferencesStep";
+import { PreferencesStep, TRIP_SMS_EXPLANATION, SMS_EXPLANATION, MUTE_EXPLANATION, EMPTY_PREFERENCES } from "./PreferencesStep";
+import { setSessionFeatures } from "../../lib/sessionFeatures";
 import { citizenApi, type ContactPreference, type ContactPreferences } from "../../lib/citizenApi";
 
 afterEach(() => vi.restoreAllMocks());
@@ -150,5 +151,29 @@ describe("PreferencesStep", () => {
     setup({ sms_available: false, people: [ p1 ] });
     const a = await person("***.982.247-**");
     expect(within(a).queryByRole("switch", { name: "Lembrete de horário por SMS" })).not.toBeInTheDocument();
+  });
+});
+
+describe("PreferencesStep — SMS de viagem (módulo 30)", () => {
+  afterEach(() => setSessionFeatures(null));
+
+  it("com sanitary_transport e SMS: explica o que o SMS de viagem diz", async () => {
+    setSessionFeatures([ "sanitary_transport" ]);
+    setup({ sms_available: true, people: [ p1 ] });
+    expect(within(await person("***.982.247-**")).getByText(TRIP_SMS_EXPLANATION)).toBeInTheDocument();
+    expect(TRIP_SMS_EXPLANATION).toBe(
+      "Se tiver viagem marcada pela Secretaria, o SMS diz a data, a hora e o local de embarque, ou que a viagem foi cancelada, nunca o destino nem o motivo. " +
+      "Ele só sai entre 8h e 20h e também é desligado pelo \"Lembrete de horário por SMS\".");
+  });
+
+  it("sem sanitary_transport, ou sem SMS na cidade: nada", async () => {
+    setup({ sms_available: true, people: [ p1 ] });
+    await person("***.982.247-**");
+    expect(screen.queryByText(TRIP_SMS_EXPLANATION)).toBeNull();
+    cleanup(); vi.restoreAllMocks();
+    setSessionFeatures([ "sanitary_transport" ]);
+    setup({ sms_available: false, people: [ p1 ] });
+    await person("***.982.247-**");
+    expect(screen.queryByText(TRIP_SMS_EXPLANATION)).toBeNull();
   });
 });

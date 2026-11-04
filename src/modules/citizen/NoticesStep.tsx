@@ -6,8 +6,8 @@
 // lido. O texto é simples: o React escapa tudo e o pre-wrap preserva as
 // quebras de linha.
 import { useEffect, useRef, useState } from "react";
-import { citizenApi, type Notice, type ReminderNotice } from "../../lib/citizenApi";
-import { fmtDate, fmtWeekdayDateTime } from "../../lib/format";
+import { citizenApi, type Notice, type ReminderNotice, type TripNotice } from "../../lib/citizenApi";
+import { fmtCalendarDate, fmtDate, fmtWeekdayDateTime } from "../../lib/format";
 import { formatAddress } from "../../lib/territory";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
@@ -15,6 +15,26 @@ export const EMPTY_NOTICES = "Nenhum aviso da Secretaria por enquanto.";
 export const REMINDER_TITLE = "Lembrete de horário";
 export const REMINDER_HINT =
   "Se não puder ir, abra \"Seus agendamentos\", em Minhas triagens, e toque em \"Não posso nesse horário\".";
+
+export const TRIP_NOTICE_HINT = "Os detalhes estão em \"Minhas viagens\", em Minhas triagens.";
+export const TRIP_NOTICE_CANCELLED_HINT =
+  "Se ainda precisar ir, procure a central de transporte da Secretaria de Saúde.";
+
+const TRIP_TITLES: Record<string, string> = {
+  added: "Viagem marcada", departure_changed: "Horário da viagem mudou",
+  boarding_changed: "Local de embarque mudou", cancelled: "Viagem cancelada",
+  removed: "Você saiu da lista desta viagem", reminder: "Lembrete de viagem"
+};
+
+export function tripNoticeTitle(event: string): string {
+  return Object.prototype.hasOwnProperty.call(TRIP_TITLES, event) ? TRIP_TITLES[event] : "Aviso de viagem";
+}
+
+// A hora é a do envio do aviso; sem hora válida, só a data da viagem.
+export function tripNoticeWhen(n: TripNotice): string {
+  const when = fmtWeekdayDateTime(n.departure_at);
+  return when === "—" ? `Viagem de ${fmtCalendarDate(n.date)}` : when;
+}
 
 const itemStyle = {
   display: "grid", gap: 4, width: "100%", minHeight: 56, padding: 12, textAlign: "left",
@@ -43,6 +63,20 @@ function ReminderDetail({ notice, onBack }: { notice: ReminderNotice; onBack: ()
   );
 }
 
+function TripDetail({ notice, onBack }: { notice: TripNotice; onBack: () => void }) {
+  const when = tripNoticeWhen(notice);
+  const ended = notice.event === "cancelled" || notice.event === "removed";
+  return (
+    <Screen title={tripNoticeTitle(notice.event)}
+      footer={<BigButton variant="secondary" onClick={onBack}>Voltar aos avisos</BigButton>}>
+      <p style={{ margin: "0 0 8px", fontWeight: 600 }}>{when.startsWith("Viagem de ") ? when : `Saída: ${when}`}</p>
+      {notice.cpf_masked && <p style={{ margin: "0 0 4px" }}>Para o CPF {notice.cpf_masked}</p>}
+      {notice.boarding_label && <p style={{ margin: "0 0 4px" }}>Embarque: {notice.boarding_label}</p>}
+      <p style={{ marginTop: 16 }}>{ended ? TRIP_NOTICE_CANCELLED_HINT : TRIP_NOTICE_HINT}</p>
+    </Screen>
+  );
+}
+
 function ItemContent({ notice }: { notice: Notice }) {
   const badge = !notice.read && <span style={newStyle}>novo</span>;
   const cpf = notice.cpf_masked && <span>Para o CPF {notice.cpf_masked}</span>;
@@ -54,6 +88,17 @@ function ItemContent({ notice }: { notice: Notice }) {
         </span>
         <span style={{ color: "var(--ink2)" }}>{fmtWeekdayDateTime(notice.scheduled_at)}</span>
         {notice.appointment_type_name && <span>{notice.appointment_type_name}</span>}
+        {cpf}
+      </>
+    );
+  }
+  if (notice.kind === "trip") {
+    return (
+      <>
+        <span style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+          <strong>{tripNoticeTitle(notice.event)}</strong>{badge}
+        </span>
+        <span style={{ color: "var(--ink2)" }}>{tripNoticeWhen(notice)}</span>
         {cpf}
       </>
     );
@@ -101,6 +146,9 @@ export function NoticesStep({ onBack, onPreferences, onRead }:
   const current = notices?.find(n => n.id === openId) ?? null;
   if (current && current.kind === "appointment_reminder") {
     return <ReminderDetail notice={current} onBack={() => setOpenId(null)} />;
+  }
+  if (current && current.kind === "trip") {
+    return <TripDetail notice={current} onBack={() => setOpenId(null)} />;
   }
   if (current) {
     return (

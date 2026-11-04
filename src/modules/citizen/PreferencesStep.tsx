@@ -5,12 +5,16 @@ import { useEffect, useRef, useState } from "react";
 import {
   citizenApi, type ContactPreference, type ContactPreferenceChange, type ContactPreferences
 } from "../../lib/citizenApi";
+import { hasSessionFeature } from "../../lib/sessionFeatures";
 import { BigButton, ErrorText, Screen, Toggle, messageFor } from "./ui";
 
 export const SMS_EXPLANATION =
   "A Secretaria de Saúde pode enviar um SMS avisando que há um aviso novo aqui. Você pode desligar quando quiser.";
 export const REMINDER_EXPLANATION =
   "Antes do prazo para confirmar um horário, a Secretaria de Saúde manda um SMS lembrando. A mensagem não diz o local nem o motivo.";
+export const TRIP_SMS_EXPLANATION =
+  "Se tiver viagem marcada pela Secretaria, o SMS diz a data, a hora e o local de embarque, ou que a viagem foi cancelada, nunca o destino nem o motivo. " +
+  "Ele só sai entre 8h e 20h e também é desligado pelo \"Lembrete de horário por SMS\".";
 export const MUTE_EXPLANATION =
   "Os avisos novos deixam de aparecer no número ao lado de Avisos. Eles continuam na lista de avisos.";
 
@@ -83,6 +87,8 @@ export function PreferencesStep({ onBack, onSaved }: { onBack: () => void; onSav
               <Toggle label="Lembrete de horário por SMS" description={REMINDER_EXPLANATION}
                 checked={!p.appointment_reminders_muted} disabled={saving}
                 onChange={v => void change(p, { appointment_reminders_muted: !v })} />}
+            {prefs.sms_available && hasSessionFeature("sanitary_transport") &&
+              <p style={{ color: "var(--ink2)" }}>{TRIP_SMS_EXPLANATION}</p>}
             <Toggle label="Silenciar avisos" description={MUTE_EXPLANATION}
               checked={p.notices_muted} disabled={saving}
               onChange={v => void change(p, { notices_muted: v })} />

@@ -117,7 +117,24 @@ export interface ReminderNotice {
   cpf_masked: string | null;
 }
 
-export type Notice = CampaignNotice | ReminderNotice;
+export type TripNoticeEvent =
+  "added" | "departure_changed" | "boarding_changed" | "cancelled" | "removed" | "reminder";
+
+// Aviso de viagem (módulo 30; api-surface §3). Hora e embarque são o retrato de
+// quando o aviso foi enviado, não o dado atual da viagem. Nunca traz destino,
+// prestador, veículo nem motorista: só os campos abaixo passam.
+export interface TripNotice {
+  kind: "trip";
+  id: string;
+  event: TripNoticeEvent | string; // código desconhecido ganha título neutro na tela
+  date: string; // AAAA-MM-DD
+  departure_at: string | null;
+  boarding_label: string | null;
+  read: boolean;
+  cpf_masked: string | null;
+}
+
+export type Notice = CampaignNotice | ReminderNotice | TripNotice;
 
 // Forma crua de GET /citizen/notices: tudo pode faltar, menos o id.
 interface RawNotice {
@@ -134,6 +151,10 @@ interface RawNotice {
   unit_address?: UnitAddress | null;
   scheduled_at?: string;
   professional_name?: string | null;
+  event?: string;
+  date?: string;
+  departure_at?: string | null;
+  boarding?: { label?: string | null } | null;
 }
 
 // Tipo desconhecido (api mais nova) ou lembrete sem horário: fora da lista,
@@ -148,6 +169,13 @@ function normalizeNotice(n: RawNotice): Notice | null {
       appointment_type_name: n.appointment_type_name ?? null, unit_name: n.unit_name ?? null,
       unit_address: n.unit_address ?? null, scheduled_at: n.scheduled_at,
       professional_name: n.professional_name ?? null, read, cpf_masked
+    };
+  }
+  if (n.kind === "trip") {
+    if (typeof n.date !== "string" || n.date === "") return null;
+    return {
+      kind: "trip", id: n.id, event: n.event ?? "", date: n.date, departure_at: n.departure_at ?? null,
+      boarding_label: n.boarding?.label ?? null, read, cpf_masked
     };
   }
   if (n.kind !== undefined && n.kind !== "campaign") return null;
