@@ -110,6 +110,17 @@ situação do envio ao Ministério (enviada ou em envio) e as próximas doses, e
 só quando a equipe conferiu a caderneta; sem conferência, o convite para levar a
 caderneta. Sem polling. A entrada "Vacina" também aparece em "Meu histórico".
 
+**Minhas viagens (módulo 30).** Com `sanitary_transport` ligado na cidade (vem
+em `features` da sessão), "Minhas triagens" ganha o botão **Minhas viagens**.
+Só par validado: o par declarado vê o convite para validar no posto. Cada
+viagem mostra data, hora de saída, embarque, destino (prestador e cidade),
+situação e se há acompanhante. O TFD mostra situação, atendimento no destino e
+ajuda de custo (paga ou a receber), nunca laudo, CID ou procedimento. Nunca
+aparecem veículo nem motorista. Sem polling. O aviso de viagem chega à caixa de
+avisos só para pessoas validadas do celular e traz apenas data, hora e
+embarque. A entrada "Viagem" aparece em "Meu histórico" mesmo com o interruptor
+de transporte desligado (registro retido).
+
 ### Relatório público (`src/modules/Report.tsx`)
 
 `/wpda/?token=<token>` busca o JSON congelado de `GET /r/:token`, sem login.
