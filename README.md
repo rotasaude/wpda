@@ -118,8 +118,13 @@ situação e se há acompanhante. O TFD mostra situação, atendimento no destin
 ajuda de custo (paga ou a receber), nunca laudo, CID ou procedimento. Nunca
 aparecem veículo nem motorista. Sem polling. O aviso de viagem chega à caixa de
 avisos só para pessoas validadas do celular e traz apenas data, hora e
-embarque. A entrada "Viagem" aparece em "Meu histórico" mesmo com o interruptor
-de transporte desligado (registro retido).
+embarque (cancelada ou retirada: só o dia da viagem). O bloco do TFD só aparece
+quando há casos utilizáveis em `tfd`. A entrada "Viagem" em "Meu histórico"
+exige `patient_timeline` e um par validado, e aparece mesmo com o interruptor de
+transporte desligado (registro retido). SMS de viagem: diz data, hora e
+embarque, ou que a viagem foi cancelada, nunca o destino nem o motivo; só sai
+com "Receber avisos por SMS" ligado, entre 8h e 20h, e não sai com o "Lembrete
+de horário por SMS" desligado nem com "Silenciar avisos" ligado.
 
 ### Relatório público (`src/modules/Report.tsx`)
 
