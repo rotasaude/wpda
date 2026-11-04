@@ -212,17 +212,17 @@ function EntryList({ entries, downloading, downloadError, onDownload }:
       {entries.map((e) => {
         const place = entryPlace(e);
         const status = entryStatusText(e);
-        // Vacina (módulo 29, RF5): só título, data e unidade; resumo e documento do api não se desenham.
-        const vaccine = e.kind === VACCINATION_KIND || e.kind === TRANSPORT_KIND;
+        // Vacina (módulo 29, RF5) e viagem (módulo 30): só título, data e unidade; resumo e documento do api não se desenham.
+        const noDetail = e.kind === VACCINATION_KIND || e.kind === TRANSPORT_KIND;
         return (
           <li key={e.id} style={card}>
             <strong>{citizenKindLabel(e.kind)}</strong>
             <div>{entryWhen(e)}</div>
             <div>{e.title}</div>
-            {!vaccine && e.summary && e.summary !== status && <div style={muted}>{e.summary}</div>}
+            {!noDetail && e.summary && e.summary !== status && <div style={muted}>{e.summary}</div>}
             {place && <div style={muted}>{place}</div>}
             {status && <div>{status}</div>}
-            {!vaccine && e.document && (
+            {!noDetail && e.document && (
               <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
                 {e.document.short_code && <div>{`Código de conferência: ${e.document.short_code}`}</div>}
                 {e.document.verification_url && e.document.short_code && (

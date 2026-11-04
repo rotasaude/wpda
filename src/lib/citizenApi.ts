@@ -650,13 +650,13 @@ export interface CitizenTrip {
   boarding_label: string | null;
   destination_name: string;
   provider_name: string | null;
-  status: TripStatus | string;
+  status: TripStatus | (string & {});
   companion: boolean;
 }
 
 export interface CitizenTfdCase {
   id: string;
-  status: TfdStatus | string;
+  status: TfdStatus | (string & {});
   destination_name: string;
   appointment_at: string | null;
   allowance_total_cents: number | null;
