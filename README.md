@@ -126,6 +126,14 @@ embarque, ou que a viagem foi cancelada, nunca o destino nem o motivo; só sai
 com "Receber avisos por SMS" ligado, entre 8h e 20h, e não sai com o "Lembrete
 de horário por SMS" desligado nem com "Silenciar avisos" ligado.
 
+**Atenção psicossocial (módulo 31).** O CAPS não aparece no canal web: não há
+tela, aviso nem SMS. "Seus agendamentos" é a agenda do módulo 17, que o CAPS não
+usa. A linha do tempo, os documentos e o resumo não trazem nada do CAPS, porque
+o api filtra (contrato §10); por defesa, o cliente também descarta toda entrada
+de `kind` `psychosocial*` em `citizenApi.history()` (`isCapsOnlyKind`).
+`psychosocial_care` em `features` não muda nenhum botão. A condição declarada
+"saúde mental" do módulo 23 é do cidadão e continua.
+
 ### Relatório público (`src/modules/Report.tsx`)
 
 `/wpda/?token=<token>` busca o JSON congelado de `GET /r/:token`, sem login.
