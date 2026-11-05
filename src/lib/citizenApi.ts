@@ -452,6 +452,11 @@ type RawEntry = Partial<Omit<CitizenEntry, "document" | "unit">> & {
   id: string; unit?: { name?: string } | null; document?: Partial<CitizenDocumentRef> & { id: string } | null;
 };
 
+// Módulo 31 (ADR 0049, decisão 4): nada do CAPS chega ao cidadão; o api já filtra (contrato §10), isto é a defesa da borda.
+export function isCapsOnlyKind(kind: string): boolean {
+  return kind === "psychosocial" || kind.startsWith("psychosocial_");
+}
+
 function normalizeEntry(e: RawEntry): CitizenEntry {
   return {
     id: e.id, kind: e.kind ?? "", occurred_at: e.occurred_at ?? "",
@@ -834,7 +839,7 @@ export const citizenApi = {
       "GET", `/history?${params.toString()}`);
     return {
       verified: d.verified === true, partial: d.partial === true,
-      entries: (d.entries ?? []).map(normalizeEntry), next_before: d.next_before ?? null
+      entries: (d.entries ?? []).map(normalizeEntry).filter((e) => !isCapsOnlyKind(e.kind)), next_before: d.next_before ?? null
     };
   },
   // Só par validado com prontuário (403 not_verified; 404 not_available).
