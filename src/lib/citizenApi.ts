@@ -428,6 +428,8 @@ export interface CitizenEntry {
   // Módulo 21a (contrato §10, Divergência E5): situação já em palavras do
   // cidadão (entrada `exam`). Presente só quando o api manda; vence o `status`.
   status_label?: string | null;
+  // Módulo 32a (contrato §10, W1): orientação de retorno já em palavras do cidadão; presente só quando o api manda.
+  return_guidance?: string | null;
   document: CitizenDocumentRef | null;
 }
 export interface CitizenHistory { verified: boolean; partial: boolean; entries: CitizenEntry[]; next_before: string | null }
@@ -464,6 +466,7 @@ function normalizeEntry(e: RawEntry): CitizenEntry {
     professional_name: e.professional_name ?? null,
     title: e.title ?? "", summary: e.summary ?? null, status: e.status ?? null,
     ...(e.status_label ? { status_label: e.status_label } : {}),
+    ...(typeof e.return_guidance === "string" && e.return_guidance.trim() !== "" ? { return_guidance: e.return_guidance } : {}),
     document: e.document
       ? {
           id: e.document.id, short_code: e.document.short_code ?? null,

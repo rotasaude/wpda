@@ -98,3 +98,29 @@ describe("citizenApi — Meu histórico (módulo 20)", () => {
     expect(hasSessionFeature("patient_timeline")).toBe(false);
   });
 });
+
+describe("citizenApi — urgência (módulo 32a)", () => {
+  const RAW = { id: "urgency:e1", kind: "urgency", occurred_at: "2026-11-04T22:10:00-03:00", unit: { name: "UPA Boqueirão" },
+    title: "Atendimento de urgência — UPA Boqueirão", summary: "Alta, com orientação para procurar a sua UBS" };
+
+  it("history: entrada urgency guarda a orientação e descarta cor, CID e queixa", async () => {
+    mockJson(200, { verified: true, partial: false, next_before: null, entries: [ { ...RAW,
+      return_guidance: "Procure a sua UBS em até 7 dias.",
+      color: "yellow", current_color: "yellow", cid10: "I10", problems: [ "I10 Hipertensão essencial" ],
+      complaint: "dor de cabeça forte", vital_signs: { systolic: 190 } } ] });
+    const h = await citizenApi.history("p1");
+    expect(h.entries[0]).toEqual({
+      id: "urgency:e1", kind: "urgency", occurred_at: "2026-11-04T22:10:00-03:00", unit: { name: "UPA Boqueirão" },
+      professional_name: null, title: "Atendimento de urgência — UPA Boqueirão",
+      summary: "Alta, com orientação para procurar a sua UBS", status: null,
+      return_guidance: "Procure a sua UBS em até 7 dias.", document: null
+    });
+  });
+
+  it("history: orientação vazia, nula ou que não é texto não vira chave", async () => {
+    mockJson(200, { entries: [ { ...RAW, id: "urgency:a", return_guidance: "" }, { ...RAW, id: "urgency:b", return_guidance: null },
+      { ...RAW, id: "urgency:c", return_guidance: 7 }, { ...RAW, id: "urgency:d" } ] });
+    const h = await citizenApi.history("p1");
+    expect(h.entries.map((x) => "return_guidance" in x)).toEqual([ false, false, false, false ]);
+  });
+});

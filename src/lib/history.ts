@@ -19,6 +19,7 @@ export const DOCUMENT_GONE = "Este documento não está mais disponível. Ele po
 
 export const VACCINATION_KIND = "vaccination";
 export const TRANSPORT_KIND = "transport";
+export const URGENCY_KIND = "urgency";
 
 const KIND_LABEL: Record<string, string> = {
   triage: "Triagem",
@@ -35,7 +36,9 @@ const KIND_LABEL: Record<string, string> = {
   // Módulo 29, contrato §10.
   vaccination: "Vacina",
   // Módulo 30, contrato §9.
-  transport: "Viagem"
+  transport: "Viagem",
+  // Módulo 32a, contrato §10.
+  urgency: "Urgência"
 };
 
 // O cidadão não vê código de máquina: tipo novo do api vira "Registro".
@@ -80,6 +83,8 @@ export function entryPlace(entry: CitizenEntry): string | null {
   if (entry.kind === VACCINATION_KIND) return entry.unit?.name ?? null;
   // Nem o motorista nem o prestador da viagem (módulo 30, W7).
   if (entry.kind === TRANSPORT_KIND) return null;
+  // Nem o médico da urgência (módulo 32a, contrato §10): só a unidade.
+  if (entry.kind === URGENCY_KIND) return entry.unit?.name ?? null;
   const parts = [ entry.unit?.name, entry.professional_name ].filter((p): p is string => !!p);
   return parts.length > 0 ? parts.join(" · ") : null;
 }
@@ -116,7 +121,7 @@ export function documentFilename(doc: CitizenDocumentRef): string {
 // tradução do código da origem. Código desconhecido sem rótulo: nada. No
 // exame, só o rótulo do api (A40): o código dele não passa pela tradução.
 export function entryStatusText(entry: CitizenEntry): string | null {
-  if (entry.kind === VACCINATION_KIND || entry.kind === TRANSPORT_KIND) return null;
+  if (entry.kind === VACCINATION_KIND || entry.kind === TRANSPORT_KIND || entry.kind === URGENCY_KIND) return null;
   if (entry.kind === EXAM_KIND) return entry.status_label || null;
   return entry.status_label || citizenStatusLabel(entry.status);
 }

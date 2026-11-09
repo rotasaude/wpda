@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   NOT_VERIFIED_INVITE, PARTIAL_NOTICE, citizenKindLabel, citizenStatusLabel, documentFilename, entryPlace, entryStatusText, entryWhen, mergeEntries, sinceText,
-  vitalsLines
+  vitalsLines, URGENCY_KIND
 } from "./history";
 import type { CitizenEntry } from "./citizenApi";
 import { ApiError } from "./citizenApi";
@@ -122,5 +122,18 @@ describe("módulo 30", () => {
     expect(entryWhen(e("t3", { kind: "transport", title: "TFD para Londrina", occurred_at: at }))).toBe("09/09/2026");
     expect(entryWhen(e("t4", { kind: "transport", title: "Viagem para Curitiba", occurred_at: at }))).toBe("09/09/2026");
     expect(entryWhen(e("t5", { title: "TFD para algo", occurred_at: at }))).toMatch(/06:30/);
+  });
+});
+
+describe("módulo 32a", () => {
+  it("entrada urgency: rótulo Urgência, só a unidade, sem situação", () => {
+    const u = e("u1", { kind: URGENCY_KIND, title: "Atendimento de urgência — UPA Boqueirão", unit: { name: "UPA Boqueirão" },
+      professional_name: "Dr. Paulo Mendes", status: "closed", summary: "Alta, com orientação para procurar a sua UBS" });
+    expect(URGENCY_KIND).toBe("urgency");
+    expect(citizenKindLabel("urgency")).toBe("Urgência");
+    expect(entryPlace(u)).toBe("UPA Boqueirão");
+    expect(entryPlace(e("u2", { kind: URGENCY_KIND, professional_name: "Dr. Paulo Mendes" }))).toBeNull();
+    expect(entryStatusText(u)).toBeNull();
+    expect(entryStatusText({ ...u, status: "in_care", status_label: "amarela" })).toBeNull();
   });
 });
