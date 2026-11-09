@@ -134,6 +134,14 @@ de `kind` `psychosocial*` em `citizenApi.history()` (`isCapsOnlyKind`).
 `psychosocial_care` em `features` não muda nenhum botão. A condição declarada
 "saúde mental" do módulo 23 é do cidadão e continua.
 
+**Urgência (módulo 32a).** O atendimento na UPA aparece em "Meu histórico" como
+"Urgência", com a unidade, a data e a hora, o desfecho em palavras simples e,
+quando o médico deixa, a orientação de retorno. Nunca aparecem o CID, a cor da
+classificação, a queixa nem o médico (contrato §10), e o cliente se defende do
+lugar e da situação (`history.ts`). Quem chegou sem identificação só aparece
+depois de identificado, e aí no histórico da própria pessoa. Não há tela nova
+nem botão novo: a espera de cada UPA está fora (spec, "Fora desta entrega").
+
 ### Relatório público (`src/modules/Report.tsx`)
 
 `/wpda/?token=<token>` busca o JSON congelado de `GET /r/:token`, sem login.

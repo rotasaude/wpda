@@ -222,6 +222,7 @@ function EntryList({ entries, downloading, downloadError, onDownload }:
             {!noDetail && e.summary && e.summary !== status && <div style={muted}>{e.summary}</div>}
             {place && <div style={muted}>{place}</div>}
             {status && <div>{status}</div>}
+            {e.return_guidance && <div style={{ ...muted, overflowWrap: "anywhere" }}>{`Orientação de retorno: ${e.return_guidance}`}</div>}
             {!noDetail && e.document && (
               <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
                 {e.document.short_code && <div>{`Código de conferência: ${e.document.short_code}`}</div>}
