@@ -1,7 +1,8 @@
 // Máquina de telas do canal web do cidadão (spec §4). Sem biblioteca de rotas:
-// o estado mora aqui. Só a caixa de avisos e as preferências têm endereço
-// (<base>avisos, <base>preferencias; spec 2026-09-29 §8): o link do SMS passa
-// pelo login e volta para lá. Nas outras telas, um F5 volta ao começo.
+// o estado mora aqui. Só a caixa de avisos, as preferências e a Ouvidoria têm
+// endereço (<base>avisos, <base>preferencias, <base>ouvidoria; spec 2026-09-29
+// §8, módulo 33): o link do SMS passa pelo login e volta para lá. Nas outras
+// telas, um F5 volta ao começo; no detalhe de uma manifestação, à lista.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { citizenApi, ApiError, type Step } from "../../lib/citizenApi";
 import { pathFor, routeFromPath, type AppRoute } from "../../lib/route";
@@ -26,12 +27,19 @@ import { CounterCodeStep } from "./CounterCodeStep";
 import { NoticesLink } from "./NoticesLink";
 import { NoticesStep } from "./NoticesStep";
 import { PreferencesStep } from "./PreferencesStep";
+import { OmbudsmanEntry } from "./OmbudsmanEntry";
+import { AnonymousReportStep } from "./AnonymousReportStep";
+import { MyManifestationsStep } from "./MyManifestationsStep";
+import { NewManifestationStep } from "./NewManifestationStep";
+import { ManifestationDetailStep } from "./ManifestationDetailStep";
+import { ANONYMOUS_WEB_FEATURE, OMBUDSMAN_FEATURE } from "../../lib/ombudsman";
 import { BigButton, ErrorText, Screen, messageFor } from "./ui";
 
 type State =
   | { at: "boot" }
-  | { at: "phone" }
-  | { at: "code"; phone: string }
+  // purpose: o login a caminho da Ouvidoria (módulo 33); "Trocar número" volta à mesma tela.
+  | { at: "phone"; purpose?: "ombudsman" }
+  | { at: "code"; phone: string; purpose?: "ombudsman" }
   | { at: "consent" }
   | { at: "people"; consentVersion: string }
   | { at: "catalog"; consentVersion: string; citizenId: string; notice: string | null }
@@ -50,6 +58,12 @@ type State =
   | { at: "appointment-check-in-code"; appointmentId: string; citizenId: string; consentVersion: string | null }
   | { at: "notices"; consentVersion: string | null }
   | { at: "preferences"; consentVersion: string | null }
+  // Ouvidoria (módulo 33): não depende do termo da triagem (U1, Q39). O id da manifestação nunca vai à URL.
+  | { at: "ombudsman"; consentVersion: string | null }
+  | { at: "ombudsman-new"; consentVersion: string | null }
+  | { at: "ombudsman-detail"; consentVersion: string | null; manifestationId: string }
+  // session: false = aberta da tela inicial, sem login (sem o topo da conta).
+  | { at: "anonymous-report"; consentVersion: string | null; session: boolean }
   | { at: "declined" };
 
 // A pessoa escolhida por último, para voltar ao catálogo dela depois de um F5
@@ -82,12 +96,14 @@ export function Flow() {
   stateRef.current = state;
 
   // Depois da sessão confirmada: o destino pedido, ou o termo, como sempre.
-  // A caixa de avisos não depende do termo (ADR 0024).
+  // A caixa de avisos e a Ouvidoria não dependem do termo (ADR 0024; U1, Q39).
+  // Sem `ombudsman` na sessão, <base>ouvidoria segue para o termo, como antes.
   function enter() {
     const route = target.current;
     target.current = null;
     if (route === "avisos") setState({ at: "notices", consentVersion: null });
     else if (route === "preferencias") setState({ at: "preferences", consentVersion: null });
+    else if (route === "ouvidoria" && hasSessionFeature(OMBUDSMAN_FEATURE)) setState({ at: "ombudsman", consentVersion: null });
     else setState({ at: "consent" });
   }
 
@@ -109,6 +125,7 @@ export function Flow() {
       const s = stateRef.current;
       if (s.at === "notices") target.current = "avisos";
       else if (s.at === "preferences") target.current = "preferencias";
+      else if (s.at === "ombudsman" || s.at === "ombudsman-new" || s.at === "ombudsman-detail") target.current = "ouvidoria";
       setState({ at: "phone" });
     }
     window.addEventListener("citizen:unauthenticated", onUnauthenticated);
@@ -125,7 +142,10 @@ export function Flow() {
   // URL em dia fora do login (no login, a URL pedida fica para o F5).
   useEffect(() => {
     if (state.at === "boot" || state.at === "phone" || state.at === "code") return;
-    const route: AppRoute | null = state.at === "notices" ? "avisos" : state.at === "preferences" ? "preferencias" : null;
+    // A denúncia sem login fica de fora, como o celular.
+    if (state.at === "anonymous-report" && !state.session) return;
+    const route: AppRoute | null = state.at === "notices" ? "avisos" : state.at === "preferences" ? "preferencias"
+      : state.at === "ombudsman" || state.at === "ombudsman-new" || state.at === "ombudsman-detail" ? "ouvidoria" : null;
     const path = pathFor(route, import.meta.env.BASE_URL);
     if (window.location.pathname !== path) window.history.replaceState(null, "", path);
   }, [state.at]);
@@ -239,7 +259,12 @@ export function Flow() {
 
   // Topo de toda tela logada (decisão do usuário, 2026-09-29): "Avisos" com o
   // selo e "Sair". A key relê o selo a cada troca de tela e a cada refreshBadge.
-  const signedIn = state.at !== "boot" && state.at !== "phone" && state.at !== "code";
+  // Sem sessão (denúncia anônima da tela inicial), sem topo: nada pede /citizen/notices.
+  const signedIn = state.at === "anonymous-report" ? state.session
+    : state.at !== "boot" && state.at !== "phone" && state.at !== "code";
+  // Interruptores da Ouvidoria, lidos no render como os outros (módulo 33).
+  const ombudsman = hasSessionFeature(OMBUDSMAN_FEATURE);
+  const anonymousWeb = hasSessionFeature(ANONYMOUS_WEB_FEATURE);
   const consentVersion = "consentVersion" in state ? state.consentVersion : null;
   const top = signedIn && (
     <nav aria-label="Conta"
@@ -257,10 +282,20 @@ export function Flow() {
   let view;
   switch (state.at) {
     case "boot": view = <Screen title="Triagem de saúde"><p>Carregando…</p></Screen>; break;
-    case "phone": view = <PhoneStep onSent={phone => setState({ at: "code", phone })} />; break;
+    case "phone": {
+      const purpose = state.purpose;
+      view = <PhoneStep key={purpose ?? "start"} purpose={purpose}
+        onSent={phone => setState({ at: "code", phone, purpose })}
+        onCancel={() => { target.current = null; setState({ at: "phone" }); }}>
+        {!purpose && <OmbudsmanEntry
+          onManifest={() => { target.current = "ouvidoria"; setState({ at: "phone", purpose: "ombudsman" }); }}
+          onAnonymous={() => setState({ at: "anonymous-report", consentVersion: null, session: false })} />}
+      </PhoneStep>;
+      break;
+    }
     case "code":
       view = <CodeStep phone={state.phone} onVerified={enter}
-        onChangePhone={() => setState({ at: "phone" })} />;
+        onChangePhone={() => setState({ at: "phone", purpose: state.purpose })} />;
       break;
     case "consent":
       view = <ConsentStep onAccept={v => {
@@ -273,7 +308,8 @@ export function Flow() {
       view = <>
         {error && <ErrorText>{error}</ErrorText>}
         <PeopleStep onChoose={c => choose(state.consentVersion, c)}
-          onHistory={id => setState({ at: "history", consentVersion: state.consentVersion, citizenId: id })} />
+          onHistory={id => setState({ at: "history", consentVersion: state.consentVersion, citizenId: id })}
+          onOmbudsman={ombudsman ? () => setState({ at: "ombudsman", consentVersion: state.consentVersion }) : undefined} />
       </>;
       break;
     case "catalog":
@@ -393,8 +429,40 @@ export function Flow() {
       view = <PreferencesStep onSaved={refreshBadge}
         onBack={() => setState({ at: "notices", consentVersion: state.consentVersion })} />;
       break;
+    case "ombudsman":
+      // Voltar: como a caixa de avisos, a "Para quem é?" com a versão, ou o termo sem ela.
+      view = <MyManifestationsStep
+        onNew={() => setState({ at: "ombudsman-new", consentVersion: state.consentVersion })}
+        onOpen={id => setState({ at: "ombudsman-detail", consentVersion: state.consentVersion, manifestationId: id })}
+        onAnonymous={anonymousWeb
+          ? () => setState({ at: "anonymous-report", consentVersion: state.consentVersion, session: true })
+          : undefined}
+        onBack={() => setState(state.consentVersion ? { at: "people", consentVersion: state.consentVersion } : { at: "consent" })} />;
+      break;
+    case "ombudsman-new":
+      view = <NewManifestationStep
+        onBack={() => setState({ at: "ombudsman", consentVersion: state.consentVersion })}
+        onDone={id => setState({ at: "ombudsman-detail", consentVersion: state.consentVersion, manifestationId: id })}
+        onAnonymous={anonymousWeb
+          ? () => setState({ at: "anonymous-report", consentVersion: state.consentVersion, session: true })
+          : undefined} />;
+      break;
+    case "ombudsman-detail":
+      // Q45: o GET do detalhe marca os avisos dela como lidos; o selo do topo é relido.
+      view = <ManifestationDetailStep key={state.manifestationId} manifestationId={state.manifestationId} onRead={refreshBadge}
+        onBack={() => setState({ at: "ombudsman", consentVersion: state.consentVersion })} />;
+      break;
+    case "anonymous-report":
+      view = <AnonymousReportStep onBack={() => setState(state.session
+        ? { at: "ombudsman", consentVersion: state.consentVersion }
+        : { at: "phone" })} />;
+      break;
     case "declined":
-      view = <Screen title="Tudo bem" footer={<BigButton onClick={() => setState({ at: "consent" })}>Ler o termo de novo</BigButton>}>
+      // Quem recusa a triagem ainda pode falar com a Ouvidoria.
+      view = <Screen title="Tudo bem" footer={<>
+        <BigButton onClick={() => setState({ at: "consent" })}>Ler o termo de novo</BigButton>
+        {ombudsman && <BigButton variant="secondary" onClick={() => setState({ at: "ombudsman", consentVersion: null })}>Ouvidoria</BigButton>}
+      </>}>
         <p>Sem o seu consentimento não fazemos a triagem, e nenhum CPF ou resposta sua foi guardado.</p>
       </Screen>;
       break;

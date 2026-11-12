@@ -10,6 +10,8 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-09-29T10:00:00-03:00"));
 });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); window.history.replaceState(null, "", "/"); });
+// A tela inicial pede a configuração da Ouvidoria (módulo 33): desligada aqui (403, Q1), a tela fica a de antes.
+beforeEach(() => { vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockRejectedValue(new ApiError(403, "feature_disabled")); });
 
 const notice: Notice = {
   id: "r1", title: "Vacinação contra a gripe", body: "Leve a carteirinha.",

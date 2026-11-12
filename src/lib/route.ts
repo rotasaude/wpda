@@ -1,9 +1,11 @@
 // src/lib/route.ts
 // Endereços próprios do wpda (spec 2026-09-29 §8): o link do SMS é
-// <base>/avisos. O resto do canal segue sem URL: é a máquina de telas do Flow.
-export type AppRoute = "avisos" | "preferencias";
+// <base>/avisos. A Ouvidoria (módulo 33) tem <base>/ouvidoria, só a lista: o id
+// da manifestação nunca vai à URL. O resto do canal segue sem URL: é a máquina
+// de telas do Flow.
+export type AppRoute = "avisos" | "preferencias" | "ouvidoria";
 
-const ROUTES: readonly string[] = [ "avisos", "preferencias" ];
+const ROUTES: readonly string[] = [ "avisos", "preferencias", "ouvidoria" ];
 
 function withSlash(base: string): string {
   return base.endsWith("/") ? base : `${base}/`;

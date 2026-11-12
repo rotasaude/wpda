@@ -10,7 +10,8 @@ describe("routeFromPath", () => {
     [ "/avisos", "/", "avisos" ],
     [ "/wpda/avisos", "/wpda", "avisos" ],
     [ "/wpda//avisos", "/wpda/", "avisos" ],
-    [ "/wpda//preferencias/", "/wpda/", "preferencias" ]
+    [ "/wpda//preferencias/", "/wpda/", "preferencias" ],
+    [ "/wpda/ouvidoria", "/wpda/", "ouvidoria" ]
   ])("%s com base %s → %s", (path, base, route) => expect(routeFromPath(path, base)).toBe(route));
 
   it.each([
@@ -18,6 +19,7 @@ describe("routeFromPath", () => {
     [ "/wpda", "/wpda/" ],
     [ "/wpda/avisosx", "/wpda/" ],
     [ "/wpda/avisos/r1", "/wpda/" ],
+    [ "/wpda/ouvidoria/m1", "/wpda/" ],
     [ "/avisos", "/wpda/" ],
     [ "/wpda/qualquer", "/wpda/" ],
     [ "/", "/" ]
@@ -28,6 +30,7 @@ describe("pathFor", () => {
   it("monta o caminho sob a base", () => {
     expect(pathFor("avisos", "/wpda/")).toBe("/wpda/avisos");
     expect(pathFor("preferencias", "/wpda")).toBe("/wpda/preferencias");
+    expect(pathFor("ouvidoria", "/wpda/")).toBe("/wpda/ouvidoria");
     expect(pathFor(null, "/wpda/")).toBe("/wpda/");
     expect(pathFor(null, "/")).toBe("/");
   });

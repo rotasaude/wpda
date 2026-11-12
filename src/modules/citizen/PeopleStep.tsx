@@ -35,8 +35,10 @@ export function personLine(p: Person): string {
 
 export const FIRST_CPF_LABEL = "Digite o seu CPF (ou o da pessoa que vai ser atendida)";
 
-export function PeopleStep({ onChoose, onHistory }:
-  { onChoose: (c: PersonChoice) => Promise<ChooseOutcome>; onHistory: (citizenId: string) => void }) {
+// `onOmbudsman` (módulo 33): só com a Ouvidoria ligada na sessão.
+export function PeopleStep({ onChoose, onHistory, onOmbudsman }: {
+  onChoose: (c: PersonChoice) => Promise<ChooseOutcome>; onHistory: (citizenId: string) => void; onOmbudsman?: () => void;
+}) {
   const [people, setPeople] = useState<Person[] | null>(null);
   const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([]);
   const listRef = useRef<Promise<Neighborhood[]> | null>(null);
@@ -208,6 +210,7 @@ export function PeopleStep({ onChoose, onHistory }:
         onChange={e => setCpf(maskCpf(e.target.value))} />
       {error && <ErrorText>{error}</ErrorText>}
       <BigButton disabled={busy} onClick={submitNew}>Continuar com este CPF</BigButton>
+      {onOmbudsman && <div style={{ marginTop: 12 }}><BigButton variant="secondary" onClick={onOmbudsman}>Ouvidoria</BigButton></div>}
     </Screen>
   );
 }

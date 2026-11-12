@@ -9,6 +9,8 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-05T10:00:00-03:00"));
 });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
+// A tela inicial pede a configuração da Ouvidoria (módulo 33): desligada aqui (403, Q1), a tela fica a de antes.
+beforeEach(() => { vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockRejectedValue(new ApiError(403, "feature_disabled")); });
 
 const PROFILE_IN = { birth_date: "1963-04-02", sex: "female" as const, gender_identity: null };
 const avo: Person = {

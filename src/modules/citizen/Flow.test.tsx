@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { useState } from "react";
 import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -6,6 +6,8 @@ import { Flow } from "./Flow";
 import { citizenApi, ApiError, type Step } from "../../lib/citizenApi";
 
 afterEach(() => vi.restoreAllMocks());
+// A tela inicial pede a configuração da Ouvidoria (módulo 33): desligada aqui (403, Q1), a tela fica a de antes.
+beforeEach(() => { vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockRejectedValue(new ApiError(403, "feature_disabled")); });
 
 const boolStep: Step = {
   triage_id: "t1", step_id: "tosse", prompt: "Você está com tosse?", answer_type: "boolean",

@@ -142,6 +142,24 @@ lugar e da situação (`history.ts`). Quem chegou sem identificação só aparec
 depois de identificado, e aí no histórico da própria pessoa. Não há tela nova
 nem botão novo: a espera de cada UPA está fora (spec, "Fora desta entrega").
 
+**Ouvidoria (módulo 33).** Com `ombudsman` ligado na cidade, a tela inicial
+mostra "Ouvidoria", com "Fazer uma manifestação" (entra com o celular e vai
+direto à Ouvidoria, sem o termo da triagem) e, com `ombudsman_anonymous_web`,
+"Denúncia anônima". Com `public_config` recusado (403 `feature_disabled`) ou sem
+rede, a entrada só some. Logado, "Ouvidoria" aparece também em "Para quem é esta
+triagem?" e na tela de quem recusou o termo. A denúncia anônima não pede login,
+não leva o cookie (`publicCall`, `credentials: "omit"`), não tem anexo nem
+protocolo, e avisa disso antes do envio; ela abre também no computador (U2). A
+manifestação identificada ou preservada escolhe a pessoa do celular, o tipo, o
+modo, a unidade, o texto e até 3 anexos com nome genérico, que aparecem como
+"Anexo N"; sem pessoa na sessão, aceita o CPF e o nome sem o termo da triagem
+(U1). "Minhas manifestações" mostra o protocolo, o estado ("Em análise" também
+para o que foi encaminhado), o prazo, as respostas, o complemento, o pedido de
+reabertura e a pesquisa; abrir uma manifestação relê o selo de "Avisos". O
+endereço `<base>ouvidoria` abre a Ouvidoria depois do login; o id da
+manifestação nunca vai à URL (um F5 no detalhe volta à lista). Tudo, menos a
+denúncia anônima, segue o bloqueio por dispositivo da decisão 9.
+
 ### Relatório público (`src/modules/Report.tsx`)
 
 `/wpda/?token=<token>` busca o JSON congelado de `GET /r/:token`, sem login.

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Flow } from "./Flow";
-import { citizenApi } from "../../lib/citizenApi";
+import { citizenApi, ApiError } from "../../lib/citizenApi";
 import { setSessionFeatures, hasSessionFeature } from "../../lib/sessionFeatures";
 
 beforeEach(() => {
@@ -10,6 +10,8 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-11T10:00:00-03:00"));
 });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); setSessionFeatures(null); window.history.replaceState(null, "", "/"); });
+// A tela inicial pede a configuração da Ouvidoria (módulo 33): desligada aqui (403, Q1), a tela fica a de antes.
+beforeEach(() => { vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockRejectedValue(new ApiError(403, "feature_disabled")); });
 
 function signedIn(features?: string[]) {
   // O spy não passa pelo withCityTimeZone do cliente: instala os interruptores como ele faria.
