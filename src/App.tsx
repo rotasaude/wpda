@@ -28,7 +28,7 @@ export function App() {
   const content = token
     ? <Report token={token}><BackHomeLink /></Report>
     : isPhone() || testEnv ? <Flow />
-    : anonymous ? <AnonymousReportStep onBack={() => setAnonymous(false)} />
+    : anonymous ? <AnonymousReportStep offPhone onBack={() => setAnonymous(false)} />
     : <PhoneOnly><OmbudsmanEntry onAnonymous={() => setAnonymous(true)} /></PhoneOnly>;
   return (
     <>

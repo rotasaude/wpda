@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { stubDevice } from "./test/setup";
 import { ApiError, citizenApi } from "./lib/citizenApi";
@@ -57,6 +57,7 @@ describe("denúncia anônima fora do celular (U2)", () => {
     expect(screen.queryByRole("button", { name: "Fazer uma manifestação" })).toBeNull();
     expect(await screen.findByRole("heading", { level: 1, name: "Denúncia anônima" })).toBeInTheDocument();
     expect(await screen.findByRole("textbox", { name: "O que você quer denunciar?" })).toBeInTheDocument();
+    expect(screen.getByText(/faça uma manifestação na tela inicial do celular\./)).toBeInTheDocument();
     expect(screen.queryByText("FLUXO")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Voltar" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Abra no celular" })).toBeInTheDocument();
@@ -71,7 +72,8 @@ describe("denúncia anônima fora do celular (U2)", () => {
     render(<App />);
     expect(screen.getByRole("heading", { level: 1, name: "Abra no celular" })).toBeInTheDocument();
     await vi.waitFor(() => expect(spy).toHaveBeenCalled());
-    await Promise.resolve();
+    // A leitura termina e o React desenha o resultado antes de afirmar ausência.
+    await act(async () => { await Promise.allSettled(spy.mock.results.map(r => r.value)); });
     expect(screen.queryByRole("button", { name: "Denúncia anônima" })).toBeNull();
     expect(screen.queryByRole("heading", { level: 2, name: "Ouvidoria" })).toBeNull();
   });

@@ -1,6 +1,6 @@
 // Módulo 33 (contrato §4, §14; spec decisão 6): entrada da Ouvidoria e denúncia anônima sem login.
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AnonymousReportStep } from "./AnonymousReportStep";
 import { OmbudsmanEntry } from "./OmbudsmanEntry";
@@ -11,6 +11,15 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const CONFIG = { anonymous_web: true, units: [ { id: "u1", name: "UBS Centro" } ] };
 const TEXT = "Na UBS Centro cobraram consulta, o que é proibido no SUS.";
 const WARNING = "Sem identificação, você não recebe protocolo nem acompanha a resposta.";
+const PHONE_LINE = "Reclamações, denúncias, elogios, sugestões e pedidos à Secretaria de Saúde.";
+const DESKTOP_LINE = "Denúncias à Secretaria de Saúde, sem se identificar. Reclamações, elogios, sugestões e pedidos são feitos pelo celular.";
+const PHONE_ONLY_REPORTS = "Use este caminho só para denúncias. Para reclamar, elogiar, sugerir ou pedir, faça uma manifestação.";
+const DESKTOP_ONLY_REPORTS = "Use este caminho só para denúncias. Para reclamar, elogiar, sugerir ou pedir, faça uma manifestação na tela inicial do celular.";
+
+// Espera a leitura do public_config terminar e o React desenhar o resultado, antes de afirmar ausência.
+async function settled(spy: { mock: { results: { value: unknown }[] } }) {
+  await act(async () => { await Promise.allSettled(spy.mock.results.map(r => r.value)); });
+}
 
 describe("OmbudsmanEntry", () => {
   it("com anonymous_web: os dois caminhos", async () => {
@@ -20,7 +29,8 @@ describe("OmbudsmanEntry", () => {
     render(<OmbudsmanEntry onManifest={onManifest} onAnonymous={onAnonymous} />);
     expect(await screen.findByRole("heading", { level: 2, name: "Ouvidoria" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Ouvidoria" }))
-      .toHaveTextContent("Reclamações, denúncias, elogios, sugestões e pedidos à Secretaria de Saúde.");
+      .toHaveTextContent(PHONE_LINE);
+    expect(screen.queryByText(DESKTOP_LINE)).toBeNull();
     await user.click(screen.getByRole("button", { name: "Fazer uma manifestação" }));
     await user.click(screen.getByRole("button", { name: "Denúncia anônima" }));
     expect(onManifest).toHaveBeenCalledOnce(); expect(onAnonymous).toHaveBeenCalledOnce();
@@ -36,8 +46,7 @@ describe("OmbudsmanEntry", () => {
   it("public_config 403: nada", async () => {
     const spy = vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockRejectedValue(new ApiError(403, "feature_disabled"));
     const { container } = render(<OmbudsmanEntry onManifest={vi.fn()} onAnonymous={vi.fn()} />);
-    await vi.waitFor(() => expect(spy).toHaveBeenCalled());
-    await Promise.resolve();
+    await settled(spy);
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -47,13 +56,14 @@ describe("OmbudsmanEntry", () => {
     render(<OmbudsmanEntry onAnonymous={vi.fn()} />);
     expect(await screen.findByRole("button", { name: "Denúncia anônima" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Fazer uma manifestação" })).toBeNull();
+    expect(screen.getByText(DESKTOP_LINE)).toBeInTheDocument();
+    expect(screen.queryByText(PHONE_LINE)).toBeNull();
   });
 
   it("sem onManifest e sem anonymous_web: nada", async () => {
     const spy = vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue({ ...CONFIG, anonymous_web: false });
     const { container } = render(<OmbudsmanEntry onAnonymous={vi.fn()} />);
-    await vi.waitFor(() => expect(spy).toHaveBeenCalled());
-    await Promise.resolve();
+    await settled(spy);
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -69,9 +79,8 @@ describe("OmbudsmanEntry", () => {
 describe("AnonymousReportStep", () => {
   it("denúncia anônima: aviso antes do envio; enviada sem protocolo", async () => {
     vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG);
-    // Defesa: mesmo que o api devolvesse um protocolo, a tela não lê a resposta.
     const send = vi.spyOn(citizenApi, "sendAnonymousReport")
-      .mockResolvedValue({ ok: true, protocol: "2026-000999" } as unknown as void);
+      .mockResolvedValue(undefined);
     const user = userEvent.setup();
     render(<AnonymousReportStep onBack={vi.fn()} />);
     expect(await screen.findByRole("heading", { level: 1, name: "Denúncia anônima" })).toBeInTheDocument();
@@ -79,7 +88,7 @@ describe("AnonymousReportStep", () => {
     const warnings = screen.getAllByText(WARNING);
     expect(warnings.length).toBeGreaterThan(0);
     for (const w of warnings) expect(w.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText(/Use este caminho só para denúncias/)).toBeInTheDocument();
+    expect(screen.getByText(PHONE_ONLY_REPORTS)).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "O que você quer denunciar?" }))
       .toHaveAccessibleDescription(/Conte o que aconteceu, onde e quando\. Não escreva seu nome, CPF ou telefone\./);
     await user.selectOptions(screen.getByRole("combobox", { name: "Unidade de saúde (opcional)" }), "u1");
@@ -190,6 +199,8 @@ describe("AnonymousReportStep", () => {
     expect(screen.getByRole("option", { name: "Nenhuma unidade específica" })).toHaveProperty("selected", true);
     expect(config).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("textbox")).toHaveValue(TEXT);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Unidade de saúde (opcional)" }), "u2");
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("422 body: erro no campo, com foco, e o texto continua", async () => {
@@ -230,6 +241,23 @@ describe("AnonymousReportStep", () => {
     await user.paste(TEXT);
     await user.click(screen.getByRole("button", { name: "Enviar denúncia" }));
     await user.click(await screen.findByRole("button", { name: "Voltar ao início" }));
+    expect(onBack).toHaveBeenCalledOnce();
+  });
+
+  it("fora do celular (U2): a manifestação fica na tela inicial do celular", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG);
+    render(<AnonymousReportStep offPhone onBack={vi.fn()} />);
+    expect(await screen.findByText(DESKTOP_ONLY_REPORTS)).toBeInTheDocument();
+    expect(screen.queryByText(PHONE_ONLY_REPORTS)).toBeNull();
+  });
+
+  it("carregando: 'Voltar' já está lá", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockReturnValue(new Promise(() => {}));
+    const onBack = vi.fn();
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={onBack} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Carregando…");
+    await user.click(screen.getByRole("button", { name: "Voltar" }));
     expect(onBack).toHaveBeenCalledOnce();
   });
 });

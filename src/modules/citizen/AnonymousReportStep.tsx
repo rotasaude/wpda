@@ -14,7 +14,8 @@ const warnNote = { background: "var(--warn-bg)", padding: 12, borderRadius: 12, 
 
 const invalidPath = (e: unknown, path: string) => e instanceof ApiError && e.code === "invalid_request" && e.path === path;
 
-export function AnonymousReportStep({ onBack }: { onBack: () => void }) {
+// `offPhone`: aberta fora do celular (desktop de produção, U2), onde não há manifestação.
+export function AnonymousReportStep({ onBack, offPhone = false }: { onBack: () => void; offPhone?: boolean }) {
   const [ mode, setMode ] = useState<Mode>("loading");
   const [ units, setUnits ] = useState<Unit[]>([]);
   const [ unitId, setUnitId ] = useState<string | null>(null);
@@ -83,7 +84,7 @@ export function AnonymousReportStep({ onBack }: { onBack: () => void }) {
 
   if (mode !== "form") {
     return (
-      <Screen title="Denúncia anônima" footer={mode === "disabled" && <BigButton variant="secondary" onClick={onBack}>Voltar</BigButton>}>
+      <Screen title="Denúncia anônima" footer={<BigButton variant="secondary" onClick={onBack}>Voltar</BigButton>}>
         {mode === "loading" ? <p role="status">Carregando…</p> : <p>{ANONYMOUS_DISABLED}</p>}
       </Screen>
     );
@@ -98,9 +99,10 @@ export function AnonymousReportStep({ onBack }: { onBack: () => void }) {
       </>}>
       <div style={{ display: "grid", gap: 12, marginBottom: 16 }}>
         <p style={warnNote}>{ANONYMOUS_WARNING}</p>
-        <p style={{ margin: 0 }}>Use este caminho só para denúncias. Para reclamar, elogiar, sugerir ou pedir, faça uma manifestação.</p>
+        <p style={{ margin: 0 }}>{`Use este caminho só para denúncias. Para reclamar, elogiar, sugerir ou pedir, faça uma manifestação${
+          offPhone ? " na tela inicial do celular" : ""}.`}</p>
       </div>
-      <UnitSelect units={units} value={unitId} onChange={setUnitId} />
+      <UnitSelect units={units} value={unitId} onChange={id => { setUnitId(id); setUnitError(null); }} />
       {unitError && <div style={{ marginBottom: 12 }}><ErrorText>{unitError}</ErrorText></div>}
       <TextArea ref={field} label="O que você quer denunciar?" hint={REPORT_HINT} max={BODY_MAX} value={text}
         error={fieldError ?? undefined} onChange={setText} />

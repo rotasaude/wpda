@@ -18,7 +18,9 @@ export function OmbudsmanEntry({ onManifest, onAnonymous }: { onManifest?: () =>
   return (
     <section aria-labelledby={headingId} style={{ display: "grid", gap: 12, margin: "24px 0" }}>
       <h2 id={headingId} style={{ fontSize: 20, margin: 0 }}>Ouvidoria</h2>
-      <p style={{ margin: 0 }}>Reclamações, denúncias, elogios, sugestões e pedidos à Secretaria de Saúde.</p>
+      <p style={{ margin: 0 }}>{onManifest
+        ? "Reclamações, denúncias, elogios, sugestões e pedidos à Secretaria de Saúde."
+        : "Denúncias à Secretaria de Saúde, sem se identificar. Reclamações, elogios, sugestões e pedidos são feitos pelo celular."}</p>
       {onManifest && <BigButton variant="secondary" onClick={onManifest}>Fazer uma manifestação</BigButton>}
       {config.anonymous_web && <BigButton variant="secondary" onClick={onAnonymous}>Denúncia anônima</BigButton>}
     </section>
