@@ -14,7 +14,8 @@ const linkStyle = { minHeight: 48, background: "none", border: "none", textDecor
 // `ref` chega ao textarea: a tela foca o campo depois de um erro dele (WP-07).
 export const TextArea = forwardRef<HTMLTextAreaElement, {
   label: string; hint?: string; error?: string; value: string; onChange: (v: string) => void; max: number; disabled?: boolean;
-}>(function TextArea({ label, hint, error, value, onChange, max, disabled }, ref) {
+  readOnly?: boolean; // durante o envio: o texto não muda, mas o campo ainda recebe o foco de um erro dele
+}>(function TextArea({ label, hint, error, value, onChange, max, disabled, readOnly }, ref) {
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
@@ -22,7 +23,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, {
   return (
     <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
       <label htmlFor={id} style={{ fontWeight: 600 }}>{label}</label>
-      <textarea id={id} ref={ref} rows={6} value={value} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={describedBy}
+      <textarea id={id} ref={ref} rows={6} value={value} disabled={disabled} readOnly={readOnly} aria-invalid={Boolean(error)} aria-describedby={describedBy}
         onChange={e => onChange(e.target.value)}
         style={{ minHeight: 160, fontSize: 18, padding: 12, borderRadius: 12, resize: "vertical",
           border: `2px solid ${error ? "var(--down)" : "var(--rule2)"}` }} />

@@ -8,7 +8,7 @@ import { ManifestationDetailStep } from "./ManifestationDetailStep";
 import { citizenApi, ApiError, type CitizenManifestation, type CitizenManifestationSummary } from "../../lib/citizenApi";
 
 beforeEach(() => { vi.useFakeTimers({ toFake: [ "Date" ] }); vi.setSystemTime(new Date("2026-11-12T10:00:00-03:00")); });
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 const ITEM: CitizenManifestationSummary = { id: "m1", protocol: "2026-000123", kind: "complaint", identification_mode: "preserved", state: "forwarded",
   received_at: "2026-11-10T09:00:00-03:00", due_on: "2026-12-10", color: "green", cpf_masked: "***.982.247-**", has_unread: true };
@@ -37,7 +37,8 @@ describe("MyManifestationsStep", () => {
     const user = opts();
     render(<MyManifestationsStep onBack={vi.fn()} onNew={vi.fn()} onOpen={onOpen} />);
     expect(screen.getByRole("heading", { level: 1, name: "Minhas manifestações" })).toBeInTheDocument();
-    const item = await screen.findByRole("button", { name: "Reclamação — protocolo 2026-000123" });
+    const item = await screen.findByRole("button", { name: "Reclamação — protocolo 2026-000123, novo, recebida em 10/11/2026, Em análise, "
+      + "Resposta prevista até 10/12/2026, Identidade preservada, Para o CPF ***.982.247-**" });
     for (const t of [ "Reclamação", "Protocolo 2026-000123", "Recebida em 10/11/2026", "Em análise", "Resposta prevista até 10/12/2026",
       "Identidade preservada", "Para o CPF ***.982.247-**", "novo" ])
       expect(within(item).getByText(t)).toBeInTheDocument();
@@ -52,7 +53,7 @@ describe("MyManifestationsStep", () => {
       { ...ITEM, identification_mode: "identified", cpf_masked: null, has_unread: false, state: "answered", color: null }
     ]);
     render(<MyManifestationsStep onBack={vi.fn()} onNew={vi.fn()} onOpen={vi.fn()} />);
-    const item = await screen.findByRole("button", { name: "Reclamação — protocolo 2026-000123" });
+    const item = await screen.findByRole("button", { name: "Reclamação — protocolo 2026-000123, recebida em 10/11/2026, Respondida" });
     expect(within(item).getByText("Respondida")).toBeInTheDocument();
     for (const t of [ /Identidade preservada/, /Para o CPF/, /^novo$/, /Resposta prevista/ ]) expect(within(item).queryByText(t)).toBeNull();
   });
@@ -116,6 +117,42 @@ describe("ManifestationDetailStep", () => {
     expect(document.body.textContent).not.toMatch(/anexo-\d/);
   });
 
+  it("injeção: texto de kind sem texto ao cidadão nunca chega à tela, nem o que o cliente já descarta", async () => {
+    vi.spyOn(citizenApi, "manifestation").mockResolvedValue({ ...DETAIL, timeline: [
+      { kind: "received", at: "2026-11-10T09:00:00-03:00", text: "Nota interna: ligar para a unidade" },
+      { kind: "forwarded", at: "2026-11-10T10:00:00-03:00", text: "Encaminhada à Secretaria X" },
+      { kind: "complement_requested", at: "2026-11-11T09:00:00-03:00", text: "Em que horário foi?" } ] });
+    render(<ManifestationDetailStep manifestationId="m1" onBack={vi.fn()} />);
+    await screen.findByRole("heading", { level: 1, name: "Manifestação 2026-000123" });
+    const steps = within(screen.getByRole("list", { name: "Andamento" })).getAllByRole("listitem");
+    expect(steps.map(li => li.querySelector("strong")?.textContent)).toEqual([
+      "Manifestação recebida", "Atualização da Ouvidoria", "A Ouvidoria pediu um complemento" ]);
+    expect(screen.getByText("10/11/2026, 10:00")).toBeInTheDocument();
+    expect(screen.getByText("Em que horário foi?")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/[Ee]ncaminha|Secretaria X|Nota interna/);
+  });
+
+  it("injeção pelo cliente real: chaves internas e linha do tempo encaminhada não aparecem", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      ...DETAIL, state: "forwarded", color: "green", can_complement: false,
+      forwarded_to: "Secretaria X", internal_subject: "Atendimento", answered_by: "Carlos", extract: "Encaminhamento interno",
+      timeline: [ { kind: "received", at: "2026-11-10T09:00:00-03:00" },
+        { kind: "forwarded", at: "2026-11-10T10:00:00-03:00", text: "Encaminhada à Secretaria X", actor_name: "Carlos" } ]
+    }), { status: 200, headers: { "Content-Type": "application/json" } })));
+    render(<ManifestationDetailStep manifestationId="m1" onBack={vi.fn()} />);
+    await screen.findByRole("heading", { level: 1, name: "Manifestação 2026-000123" });
+    expect(screen.getByText("Em análise")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/[Ee]ncaminha|Secretaria X|Carlos|Atendimento/);
+  });
+
+  it("forwarded: o detalhe lê Em análise (Q40)", async () => {
+    vi.spyOn(citizenApi, "manifestation").mockResolvedValue({ ...DETAIL, state: "forwarded", color: "green", can_complement: false });
+    render(<ManifestationDetailStep manifestationId="m1" onBack={vi.fn()} />);
+    expect(await screen.findByText("Em análise")).toBeInTheDocument();
+    expect(screen.getByText("Resposta prevista até 10/12/2026")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/[Ee]ncaminha/);
+  });
+
   it("prazo: usa a cor do detalhe (Q42) e o estado final não tem prazo", async () => {
     const get = vi.spyOn(citizenApi, "manifestation").mockResolvedValue({ ...DETAIL, state: "in_analysis", color: "red", can_complement: false });
     const { unmount } = render(<ManifestationDetailStep manifestationId="m1" onBack={vi.fn()} />);
@@ -176,6 +213,35 @@ describe("ManifestationDetailStep", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Complemento enviado.");
     expect(get).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("button", { name: "Enviar complemento" })).toBeNull();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toContainElement(screen.getByRole("status"));
+  });
+
+  it("releitura falha depois do envio aceito: frase de sucesso, a da falha, e a ação feita não é oferecida de novo", async () => {
+    vi.spyOn(citizenApi, "manifestation").mockResolvedValueOnce({ ...DETAIL, can_request_reopen: true })
+      .mockRejectedValueOnce(new TypeError("fetch failed"));
+    vi.spyOn(citizenApi, "complementManifestation").mockResolvedValue(undefined);
+    const user = opts();
+    render(<ManifestationDetailStep manifestationId="m1" onBack={vi.fn()} />);
+    await openAndType(user, "Enviar complemento", "Seu complemento", "Foi às 7h, na recepção.");
+    await user.click(screen.getByRole("button", { name: "Enviar o complemento" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Complemento enviado.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Sem conexão. Verifique a internet e tente de novo.");
+    expect(screen.queryByRole("button", { name: "Enviar complemento" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Pedir reabertura" })).toBeEnabled();
+  });
+
+  it("resposta da ação depois de sair da tela é ignorada: nada relê", async () => {
+    const get = vi.spyOn(citizenApi, "manifestation").mockResolvedValue(DETAIL);
+    let resolve!: () => void;
+    vi.spyOn(citizenApi, "complementManifestation").mockReturnValue(new Promise<void>((r) => { resolve = r; }));
+    const user = opts();
+    const { unmount } = render(<ManifestationDetailStep manifestationId="m1" onBack={vi.fn()} />);
+    await openAndType(user, "Enviar complemento", "Seu complemento", "Foi às 7h, na recepção.");
+    await user.click(screen.getByRole("button", { name: "Enviar o complemento" }));
+    unmount();
+    await act(async () => { resolve(); });
+    expect(get).toHaveBeenCalledTimes(1);
   });
 
   it("complemento: de 10 a 4.000 (não 20); curto não envia", async () => {
@@ -223,6 +289,21 @@ describe("ManifestationDetailStep", () => {
     expect(send).toHaveBeenCalledWith("m1", { body: "Foi às 7h, na recepção.", attachmentIds: [ "a2" ] });
   });
 
+  it("reabertura: enquanto envia, o motivo fica só para leitura; depois do erro de campo volta a editar, com foco", async () => {
+    vi.spyOn(citizenApi, "manifestation").mockResolvedValue({ ...DETAIL, state: "answered", color: null, can_complement: false, can_request_reopen: true });
+    let reject!: (e: unknown) => void;
+    vi.spyOn(citizenApi, "requestReopen").mockReturnValue(new Promise<void>((_, r) => { reject = r; }));
+    const user = opts();
+    render(<ManifestationDetailStep manifestationId="m1" onBack={vi.fn()} />);
+    await openAndType(user, "Pedir reabertura", "Por que você quer reabrir?", LONG);
+    await user.click(screen.getByRole("button", { name: "Enviar o pedido" }));
+    const box = screen.getByRole("textbox", { name: "Por que você quer reabrir?" });
+    expect(box).toHaveAttribute("readonly");
+    await act(async () => { reject(new ApiError(422, "invalid_request", "reason")); });
+    expect(box).not.toHaveAttribute("readonly");
+    expect(box).toHaveFocus();
+  });
+
   it("complemento: enquanto envia, nada sai de novo e Cancelar fica desligado", async () => {
     vi.spyOn(citizenApi, "manifestation").mockResolvedValue(DETAIL);
     let resolve!: () => void;
@@ -233,6 +314,7 @@ describe("ManifestationDetailStep", () => {
     await user.click(screen.getByRole("button", { name: "Enviar o complemento" }));
     expect(screen.getByRole("button", { name: "Enviar o complemento" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Seu complemento" })).toHaveAttribute("readonly");
     await user.click(screen.getByRole("button", { name: "Enviar o complemento" }));
     expect(send).toHaveBeenCalledTimes(1);
     await act(async () => { resolve(); });
@@ -320,12 +402,15 @@ describe("ManifestationDetailStep", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(text);
     expect(get).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("textbox")).toBeNull();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toContainElement(screen.getByRole("alert"));
   });
 
   it.each([
-    [ new ApiError(409, "already_answered"), "Você já respondeu a pesquisa desta manifestação." ],
-    [ new ApiError(422, "satisfaction_window_closed"), "O prazo para responder a pesquisa terminou." ]
-  ] as const)("pesquisa recusada pelo estado: frase fora do formulário e releitura (%s)", async (err, text) => {
+    [ 409, "already_answered", "Você já respondeu a pesquisa desta manifestação." ],
+    [ 422, "satisfaction_window_closed", "O prazo para responder a pesquisa terminou." ]
+  ] as const)("pesquisa recusada pelo estado: frase fora do formulário e releitura (%i %s)", async (status, code, text) => {
+    const err = new ApiError(status, code);
     const get = vi.spyOn(citizenApi, "manifestation").mockResolvedValue({ ...DETAIL, state: "answered", color: null, can_complement: false, can_answer_satisfaction: true });
     vi.spyOn(citizenApi, "answerSatisfaction").mockRejectedValue(err);
     const user = opts();
@@ -370,10 +455,11 @@ describe("ManifestationDetailStep", () => {
   });
 
   it.each([
-    [ new ApiError(422, "invalid_request", "attachment_ids"), "Um dos anexos não vale mais. Remova e anexe de novo." ],
-    [ new ApiError(422, "too_many_attachments"), "No máximo 3 anexos." ],
-    [ new ApiError(429, "too_many_requests"), "Muitos envios em pouco tempo. Tente mais tarde." ]
-  ] as const)("complemento recusado sem mudar de estado: fica aberto, com o texto (%s)", async (err, text) => {
+    [ 422, "invalid_request", "attachment_ids", "Um dos anexos não vale mais. Remova e anexe de novo." ],
+    [ 422, "too_many_attachments", undefined, "No máximo 3 anexos." ],
+    [ 429, "too_many_requests", undefined, "Muitos envios em pouco tempo. Tente mais tarde." ]
+  ] as const)("complemento recusado sem mudar de estado: fica aberto, com o texto (%i %s %s)", async (status, code, path, text) => {
+    const err = new ApiError(status, code, path);
     const get = vi.spyOn(citizenApi, "manifestation").mockResolvedValue(DETAIL);
     vi.spyOn(citizenApi, "complementManifestation").mockRejectedValue(err);
     const user = opts();

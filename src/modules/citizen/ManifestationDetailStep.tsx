@@ -3,7 +3,7 @@
 // Ações uma de cada vez: complemento, pedido de reabertura, pesquisa. Cada envio aceito relê o detalhe; sem polling.
 // O texto digitado mora só no estado do React.
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from "react";
-import { ApiError, citizenApi, type CitizenManifestation } from "../../lib/citizenApi";
+import { ApiError, TIMELINE_TEXT_KINDS, citizenApi, type CitizenManifestation } from "../../lib/citizenApi";
 import { fmtDateTime } from "../../lib/format";
 import {
   PRESERVED_HINT, REASON_MAX, SATISFACTION, TEXT_MAX, complementError, deadlineText, kindLabel, ombudsmanMessage, reasonError,
@@ -19,6 +19,7 @@ type ReadResult = { status: "ok" } | { status: "stale" } | { status: "failed"; e
 
 const UPLOAD_WAIT = "Aguarde o anexo terminar de subir.";
 const ANSWER_ALL = "Responda as três perguntas.";
+const FLAG = { complement: "can_complement", reopen: "can_request_reopen", satisfaction: "can_answer_satisfaction" } as const;
 const DONE: Record<Action, string> = {
   complement: "Complemento enviado.",
   reopen: "Pedido de reabertura enviado.",
@@ -54,6 +55,7 @@ export function ManifestationDetailStep({ manifestationId, onBack, onRead }: {
   const [ missing, setMissing ] = useState<Question | null>(null);
   const [ busy, setBusy ] = useState(false);
   const [ uploading, setUploading ] = useState(false); // anexo ainda subindo: enviar agora o deixaria de fora
+  const [ settled, setSettled ] = useState(0); // conta as ações encerradas (aceitas ou em conflito): leva o foco ao resultado
 
   const alive = useRef(true);
   const seq = useRef(0); // só a leitura mais recente escreve
@@ -62,7 +64,8 @@ export function ManifestationDetailStep({ manifestationId, onBack, onRead }: {
   const field = useRef<HTMLTextAreaElement>(null);
   const surveyHeading = useRef<HTMLHeadingElement>(null);
   const triggers = useRef<Partial<Record<Action, HTMLButtonElement | null>>>({});
-  const lastOpen = useRef<Action | null>(null);
+  const refocus = useRef<Action | null>(null); // a ação cancelada: o foco volta ao botão dela
+  const result = useRef<HTMLDivElement>(null);
   const uid = useId(); // prefixo dos ids da tela
 
   useEffect(() => { onReadRef.current = onRead; });
@@ -90,20 +93,26 @@ export function ManifestationDetailStep({ manifestationId, onBack, onRead }: {
     return () => { alive.current = false; };
   }, [ read ]);
 
-  // Foco: o campo (ou a pergunta) ao abrir; o botão que abriu ao fechar.
+  // Foco: o campo (ou a pergunta) ao abrir; o botão que abriu, ao cancelar.
   useEffect(() => {
     if (open === "satisfaction") surveyHeading.current?.focus();
     else if (open) field.current?.focus();
-    else if (lastOpen.current) triggers.current[lastOpen.current]?.focus();
-    lastOpen.current = open;
+    else if (refocus.current) triggers.current[refocus.current]?.focus();
+    refocus.current = null;
   }, [ open ]);
 
+  // Depois de uma ação aceita ou em conflito o formulário some (e o botão que o abriu, em geral, também): o foco vai à frase
+  // do resultado. Se a manifestação sumiu (404), a tela troca de título e o Screen põe o foco no h1.
+  useEffect(() => { if (settled > 0) result.current?.focus(); }, [ settled ]);
+
   // Relê depois de uma ação. Sumiu (404, Q19): só Voltar. Outra falha: a frase fica fora do formulário, se não houver outra.
-  async function reread(keepError: boolean) {
+  // Devolve true quando a releitura falhou e o detalhe na tela ficou o antigo.
+  async function reread(keepError: boolean): Promise<boolean> {
     const r = await read();
-    if (r.status !== "failed") return;
-    if (isCode(r.error, "not_found")) setFailure(ombudsmanMessage(r.error));
-    else if (!keepError) setError(ombudsmanMessage(r.error));
+    if (r.status !== "failed") return false;
+    if (isCode(r.error, "not_found")) { setFailure(ombudsmanMessage(r.error)); return false; }
+    if (!keepError) setError(ombudsmanMessage(r.error));
+    return true;
   }
 
   function clearMessages() {
@@ -118,6 +127,7 @@ export function ManifestationDetailStep({ manifestationId, onBack, onRead }: {
 
   function cancel() {
     clearMessages();
+    refocus.current = open;
     setOpen(null);
   }
 
@@ -134,14 +144,19 @@ export function ManifestationDetailStep({ manifestationId, onBack, onRead }: {
       await send();
       if (!alive.current) return;
       setOpen(null);
-      await reread(false);
-      if (alive.current) setNotice(DONE[action]);
+      const stale = await reread(false);
+      if (!alive.current) return;
+      // O detalhe na tela é o de antes do envio: a ação já feita não pode ser oferecida de novo.
+      if (stale) setDetail(d => d && { ...d, [FLAG[action]]: false });
+      setNotice(DONE[action]);
+      setSettled(n => n + 1);
     } catch (e) {
       if (!alive.current) return;
       if (isConflict(e)) {
         setOpen(null);
         setError(ombudsmanMessage(e));
         await reread(true);
+        if (alive.current) setSettled(n => n + 1);
       } else if (!fieldFailure(e)) setFormError(ombudsmanMessage(e));
     } finally {
       inFlight.current = false;
@@ -246,15 +261,20 @@ export function ManifestationDetailStep({ manifestationId, onBack, onRead }: {
             <li key={`${t.kind}-${t.at}-${i}`} style={step}>
               <strong style={block}>{timelineTitle(t.kind)}</strong>
               <span style={{ ...block, color: "var(--ink2)" }}>{fmtDateTime(t.at)}</span>
-              {t.text && <p style={{ ...p, ...longText }}>{t.text}</p>}
+              {/* Texto só nos kinds que o levam ao cidadão (o cliente já descarta; aqui é a segunda trava). */}
+              {t.text && TIMELINE_TEXT_KINDS.has(t.kind) && <p style={{ ...p, ...longText }}>{t.text}</p>}
             </li>
           ))}
         </ol>
       </section>
 
       <div style={{ display: "grid", gap: 12 }}>
-        {notice && <p role="status" style={p}>{notice}</p>}
-        {error && <ErrorText>{error}</ErrorText>}
+        {(notice || error) && (
+          <div ref={result} tabIndex={-1} style={{ display: "grid", gap: 12 }}>
+            {notice && <p role="status" style={p}>{notice}</p>}
+            {error && <ErrorText>{error}</ErrorText>}
+          </div>
+        )}
 
         {!open && m.can_complement && trigger("complement", "Enviar complemento")}
         {!open && m.can_request_reopen && trigger("reopen", "Pedir reabertura")}
@@ -263,7 +283,7 @@ export function ManifestationDetailStep({ manifestationId, onBack, onRead }: {
         {open === "complement" && (
           <section aria-label="Enviar complemento">
             <TextArea ref={field} label="Seu complemento" hint={textHint} max={TEXT_MAX} value={text} error={fieldError ?? undefined}
-              onChange={v => { setText(v); setFieldError(null); }} />
+              readOnly={busy} onChange={v => { setText(v); setFieldError(null); }} />
             {/* Desligado enquanto um upload corre: um só por vez, e o envio espera o anexo (padrão da Task 5). */}
             <AttachmentPicker items={attachments} disabled={busy || uploading} onBusy={setUploading}
               onChange={items => { setAttachments(items); setAttachError(null); }} />
@@ -276,7 +296,7 @@ export function ManifestationDetailStep({ manifestationId, onBack, onRead }: {
         {open === "reopen" && (
           <section aria-label="Pedir reabertura">
             <TextArea ref={field} label="Por que você quer reabrir?" hint={textHint} max={REASON_MAX} value={reason}
-              error={fieldError ?? undefined} onChange={v => { setReason(v); setFieldError(null); }} />
+              error={fieldError ?? undefined} readOnly={busy} onChange={v => { setReason(v); setFieldError(null); }} />
             {formButtons("Enviar o pedido", sendReopen)}
           </section>
         )}

@@ -126,6 +126,16 @@ describe("citizenApi — minhas manifestações (módulo 33, §3)", () => {
     expect(JSON.stringify(d)).not.toMatch(/extract|Atendimento|Carlos|Ana|forwardings|anexo-1/);
   });
 
+  it("manifestation: o texto da linha do tempo só passa nos kinds que levam texto ao cidadão (api-shapes §2.2)", async () => {
+    const at = "2026-11-11T09:00:00-03:00";
+    const withText = [ "complement_requested", "extended", "interim_response", "final_response", "reopen_rejected", "archived" ];
+    const withoutText = [ "received", "complement_received", "reopen_requested", "reopened", "forwarded", "internal_note" ];
+    stubFetch(200, { id: "m1", timeline: [ ...withText, ...withoutText ].map(kind => ({ kind, at, text: `Encaminhada à Secretaria X (${kind})` })) });
+    const d = await citizenApi.manifestation("m1");
+    expect(d.timeline.filter(t => t.text !== null).map(t => t.kind)).toEqual(withText);
+    expect(d.timeline.map(t => t.kind)).toEqual([ ...withText, ...withoutText ]);
+  });
+
   it("manifestation: sem unidade, cor desconhecida e id na URL codificado", async () => {
     const m = stubFetch(200, { id: "m/1", protocol: "2026-000123", kind: "praise", identification_mode: "identified", state: "answered",
       received_at: "2026-11-10T09:00:00-03:00", due_on: "2026-12-10", color: null, body: "Fui muito bem atendido.", health_unit: null,

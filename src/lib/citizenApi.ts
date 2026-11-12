@@ -790,6 +790,12 @@ export interface CitizenManifestationSummary {
 // `text` só nos eventos com texto da equipe (ou rótulo do arquivamento, Q4).
 export interface ManifestationTimelineItem { kind: string; at: string; text: string | null }
 
+// Os únicos kinds que levam texto ao cidadão (api-shapes §2.2; timeline.rb:21-26). Em qualquer outro, inclusive um kind
+// desconhecido, o texto é descartado: nem um encaminhamento injetado chega à tela.
+export const TIMELINE_TEXT_KINDS: ReadonlySet<string> = new Set([
+  "complement_requested", "extended", "interim_response", "final_response", "reopen_rejected", "archived"
+]);
+
 export interface CitizenManifestation {
   id: string;
   protocol: string;
@@ -862,7 +868,8 @@ function normalizeManifestation(raw: unknown): CitizenManifestation {
     attachments,
     timeline: (Array.isArray(m.timeline) ? m.timeline : []).map(t => {
       const e = rec(t);
-      return { kind: str(e.kind), at: str(e.at), text: strOrNull(e.text) };
+      const kind = str(e.kind);
+      return { kind, at: str(e.at), text: TIMELINE_TEXT_KINDS.has(kind) ? strOrNull(e.text) : null };
     }),
     can_complement: m.can_complement === true,
     can_request_reopen: m.can_request_reopen === true,

@@ -20,9 +20,15 @@ export function StatePill({ state }: { state: string }) {
 function Item({ m, onOpen }: { m: CitizenManifestationSummary; onOpen: (id: string) => void }) {
   const kind = kindLabel(m.kind);
   const deadline = deadlineText(m); // a cor da lista (Q42)
+  const preserved = m.identification_mode === "preserved";
+  // O nome acessível leva tudo o que o cartão mostra, na mesma ordem: o aria-label substitui o conteúdo para o leitor de tela.
+  const label = [
+    `${kind} — protocolo ${m.protocol}`, m.has_unread ? "novo" : null, `recebida em ${fmtDate(m.received_at)}`, stateLabel(m.state),
+    deadline, preserved ? "Identidade preservada" : null, m.cpf_masked ? `Para o CPF ${m.cpf_masked}` : null
+  ].filter(Boolean).join(", ");
   return (
     <li>
-      <button type="button" aria-label={`${kind} — protocolo ${m.protocol}`} onClick={() => onOpen(m.id)} style={card}>
+      <button type="button" aria-label={label} onClick={() => onOpen(m.id)} style={card}>
         <span style={row}>
           <strong>{kind}</strong>
           {m.has_unread && <span style={newStyle}>novo</span>}
@@ -31,7 +37,7 @@ function Item({ m, onOpen }: { m: CitizenManifestationSummary; onOpen: (id: stri
         <span style={block}>Recebida em {fmtDate(m.received_at)}</span>
         <span style={block}><StatePill state={m.state} /></span>
         {deadline && <span style={block}>{deadline}</span>}
-        {m.identification_mode === "preserved" && <span style={block}>Identidade preservada</span>}
+        {preserved && <span style={block}>Identidade preservada</span>}
         {m.cpf_masked && <span style={block}>Para o CPF {m.cpf_masked}</span>}
       </button>
     </li>
