@@ -61,15 +61,17 @@ export function AttachmentPicker({ items, onChange, disabled }: {
   const id = useId();
   const hintId = `${id}-hint`;
   const alive = useRef(true);
+  const lock = useRef(false); // o estado só vale no próximo render; o ref fecha a porta no mesmo tick
   const [ busy, setBusy ] = useState(false);
   const [ error, setError ] = useState<string | null>(null);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   async function pick(file: File | undefined) {
-    if (!file || busy) return;
+    if (!file || lock.current) return;
     const refused = attachmentError(file, items.length);
     if (refused) { setError(refused); return; }
     setError(null);
+    lock.current = true;
     setBusy(true);
     try {
       const data = await readAsBase64(file);
@@ -83,6 +85,7 @@ export function AttachmentPicker({ items, onChange, disabled }: {
       if (!alive.current) return;
       setError(e instanceof ApiError && UPLOAD_CODES.has(e.code) ? UPLOAD_REFUSED : ombudsmanMessage(e));
     } finally {
+      lock.current = false;
       if (alive.current) setBusy(false);
     }
   }
@@ -106,7 +109,7 @@ export function AttachmentPicker({ items, onChange, disabled }: {
             <li key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, minHeight: 48 }}>
               <span>{`Anexo ${i + 1}`}</span>
               <button type="button" disabled={disabled || busy} style={linkStyle} aria-label={`Remover Anexo ${i + 1}`}
-                onClick={() => onChange(items.filter(x => x.id !== a.id))}>Remover</button>
+                onClick={() => { setError(null); onChange(items.filter(x => x.id !== a.id)); }}>Remover</button>
             </li>
           ))}
         </ul>

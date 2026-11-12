@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { AttachmentPicker, TextArea, UnitSelect, type PickedAttachment } from "./OmbudsmanFields";
@@ -116,5 +116,29 @@ describe("OmbudsmanFields", () => {
     resolve({ id: "late" });
     await new Promise((r) => setTimeout(r, 0));
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("AttachmentPicker: dois change no mesmo tick sobem um arquivo só", async () => {
+    const upload = vi.spyOn(citizenApi, "uploadOmbudsmanAttachment").mockResolvedValue({ id: "a1" });
+    render(<Picker />);
+    const input = screen.getByLabelText(LABEL);
+    act(() => {
+      for (const f of [ pdf(), pdf("b.pdf") ]) {
+        Object.defineProperty(input, "files", { value: [ f ], configurable: true });
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+    await screen.findByText("Anexo 1");
+    await new Promise((r) => setTimeout(r, 50)); // deixa a leitura do segundo arquivo, se houve, chegar ao upload
+    expect(upload).toHaveBeenCalledTimes(1);
+  });
+
+  it("AttachmentPicker: Remover limpa o erro do seletor", async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    render(<Picker initial={[ { id: "a0" } ]} />);
+    await user.upload(screen.getByLabelText(LABEL), new File([ "x" ], "a.gif", { type: "image/gif" }));
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remover Anexo 1" }));
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
