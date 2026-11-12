@@ -379,6 +379,34 @@ describe("NewManifestationStep", () => {
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ attachmentIds: [ "a2" ] }));
   });
 
+  it("resposta do POST depois de sair da tela é ignorada: nada relê nem desenha", async () => {
+    const { create, peopleSpy, configSpy } = stub([ P1 ]);
+    let resolve!: (v: { id: string; protocol: string; due_on: string | null }) => void;
+    let reject!: (e: unknown) => void;
+    create.mockReturnValueOnce(new Promise((r) => { resolve = r; }))
+      .mockImplementation(() => new Promise((_r, j) => { reject = j; }));
+    const user = userEvent.setup();
+
+    let view = renderStep();
+    await fillAndSend(user);
+    await send(user);
+    view.unmount();
+    await act(async () => { resolve({ id: "m9", protocol: "2026-000124", due_on: "2026-12-12" }); });
+    expect(screen.queryByText(/Protocolo/)).toBeNull();
+
+    for (const err of [ new ApiError(403, "not_own_citizen"), new ApiError(422, "invalid_request", "health_unit_id") ]) {
+      view = renderStep();
+      await fillAndSend(user);
+      await send(user);
+      const [ people, config ] = [ peopleSpy.mock.calls.length, configSpy.mock.calls.length ];
+      view.unmount();
+      await act(async () => { reject(err); });
+      expect(peopleSpy).toHaveBeenCalledTimes(people);
+      expect(configSpy).toHaveBeenCalledTimes(config);
+    }
+    expect(create).toHaveBeenCalledTimes(3);
+  });
+
   it("enquanto o POST corre, Voltar fica desligado", async () => {
     const { create } = stub([ P1 ]);
     let resolve!: (v: { id: string; protocol: string; due_on: string | null }) => void;
