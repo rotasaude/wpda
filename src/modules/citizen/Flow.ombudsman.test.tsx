@@ -255,6 +255,31 @@ describe("Flow — Ouvidoria (módulo 33)", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Minhas manifestações" })).toBeInTheDocument();
   });
 
+  it.each([
+    [ "com ombudsman", [ "ombudsman", "ombudsman_anonymous_web" ], true ],
+    [ "sem ombudsman", [ "ombudsman_anonymous_web" ], false ]
+  ])("aviso da Ouvidoria (%s): Ver minhas manifestações leva à lista, e só existe com o interruptor", async (_n, features, offered) => {
+    window.history.replaceState(null, "", "/wpda/avisos");
+    const { notices, list } = api({ session: true, features });
+    notices.mockResolvedValue({ unread_count: 1, notices: [ { kind: "ombudsman", id: "o1", event: "final_response", protocol: "2026-000123",
+      created_at: "2026-11-11T14:00:00-03:00", read: false, cpf_masked: null } ] });
+    vi.spyOn(citizenApi, "readNotice").mockResolvedValue({ ok: true });
+    list.mockResolvedValue([ ITEM ]);
+    const user = opts();
+    render(<Flow />);
+    await user.click(await screen.findByRole("button", { name: /Sua manifestação foi respondida/ }));
+    await screen.findByRole("heading", { level: 1, name: "Sua manifestação foi respondida" });
+    if (!offered) {
+      expect(screen.queryByRole("button", { name: "Ver minhas manifestações" })).toBeNull();
+      expect(list).not.toHaveBeenCalled();
+      return;
+    }
+    await user.click(screen.getByRole("button", { name: "Ver minhas manifestações" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Minhas manifestações" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /protocolo 2026-000123/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/wpda/ouvidoria");
+  });
+
   it("sessão cai na Ouvidoria: volta ao celular e, ao entrar, à Ouvidoria", async () => {
     const { list } = api({ session: true });
     list.mockRejectedValueOnce(new ApiError(401, "unauthenticated"));
