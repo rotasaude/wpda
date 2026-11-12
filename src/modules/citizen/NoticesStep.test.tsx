@@ -243,3 +243,16 @@ describe("NoticesStep — lembrete de horário", () => {
     expect(within(await item(/Lembrete de horário/)).getByText("Para o CPF ***.982.247-**")).toBeInTheDocument();
   });
 });
+
+// Módulo 33: enquanto a caixa não tem item nem detalhe da Ouvidoria, o aviso
+// normalizado pelo cliente fica fora da lista (como antes), em vez de cair no
+// ramo de campanha com título vazio.
+describe("NoticesStep — aviso da Ouvidoria ainda fora da lista", () => {
+  it("o aviso ombudsman não vira item vazio; o resto da lista segue", async () => {
+    setup([ unread, { kind: "ombudsman", id: "o1", event: "final_response", protocol: "2026-000123",
+      created_at: "2026-11-11T14:00:00-03:00", read: false, cpf_masked: null } ]);
+    expect(await item(/Vacinação contra a gripe/)).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(document.body.textContent).not.toMatch(/2026-000123|undefined/);
+  });
+});

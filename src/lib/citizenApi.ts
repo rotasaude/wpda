@@ -4,11 +4,18 @@
 import { setCityTimeZone } from "./format";
 import { setSessionFeatures } from "./sessionFeatures";
 
+// Módulo 33 (F-4): `path` = nome do campo recusado no 422 `invalid_request`
+// (ou `invalid_cpf`); ausente nas outras recusas. Nunca traz o valor digitado.
 export class ApiError extends Error {
-  constructor(public status: number, public code: string) {
+  constructor(public status: number, public code: string, public path?: string) {
     super(code);
   }
 }
+
+const str = (v: unknown): string => (typeof v === "string" ? v : "");
+const strOrNull = (v: unknown): string | null => (typeof v === "string" ? v : null);
+const rec = (v: unknown): Record<string, unknown> =>
+  (v !== null && typeof v === "object" ? (v as Record<string, unknown>) : {});
 
 export interface Option { id: string; title: string }
 
@@ -134,7 +141,19 @@ export interface TripNotice {
   cpf_masked: string | null;
 }
 
-export type Notice = CampaignNotice | ReminderNotice | TripNotice;
+// Aviso da ouvidoria (módulo 33; contrato §3, Q16): só o evento, o protocolo e
+// a data. Nunca o texto da resposta: a pessoa lê no detalhe da manifestação.
+export interface OmbudsmanNotice {
+  kind: "ombudsman";
+  id: string;
+  event: string; // interim_response | complement_requested | final_response | archived | reopen_decided
+  protocol: string | null;
+  created_at: string;
+  read: boolean;
+  cpf_masked: string | null;
+}
+
+export type Notice = CampaignNotice | ReminderNotice | TripNotice | OmbudsmanNotice;
 
 // Forma crua de GET /citizen/notices: tudo pode faltar, menos o id.
 interface RawNotice {
@@ -155,6 +174,8 @@ interface RawNotice {
   date?: string;
   departure_at?: string | null;
   boarding?: { label?: string | null } | null;
+  protocol?: string | null;
+  created_at?: string;
 }
 
 // Tipo desconhecido (api mais nova) ou lembrete sem horário: fora da lista,
@@ -176,6 +197,13 @@ function normalizeNotice(n: RawNotice): Notice | null {
     return {
       kind: "trip", id: n.id, event: n.event ?? "", date: n.date, departure_at: n.departure_at ?? null,
       boarding_label: n.boarding?.label ?? null, read, cpf_masked
+    };
+  }
+  if (n.kind === "ombudsman") {
+    if (typeof n.created_at !== "string") return null;
+    return {
+      kind: "ombudsman", id: n.id, event: str(n.event), protocol: strOrNull(n.protocol),
+      created_at: n.created_at, read, cpf_masked
     };
   }
   if (n.kind !== undefined && n.kind !== "campaign") return null;
@@ -337,7 +365,30 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401) window.dispatchEvent(new Event("citizen:unauthenticated"));
-    throw new ApiError(res.status, (data as { error?: string }).error ?? `http_${res.status}`);
+    const d = data as { error?: string; path?: unknown };
+    throw new ApiError(res.status, d.error ?? `http_${res.status}`, typeof d.path === "string" ? d.path : undefined);
+  }
+  return data as T;
+}
+
+// Módulo 33 (contrato §4; W7): rotas públicas da ouvidoria. Nunca levam o cookie da sessão (a denúncia anônima não se liga a ninguém) e um 401 não derruba a sessão.
+async function publicCall<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const write = method !== "GET";
+  const res = await fetch(`/citizen${path}`, {
+    method,
+    credentials: "omit",
+    headers: { Accept: "application/json", ...(write ? { "Content-Type": "application/json" } : {}) },
+    body: write ? JSON.stringify(body ?? {}) : undefined
+  });
+  if (res.status === 204) return undefined as T;
+  const text = await res.text().catch(() => "");
+  if (text === "" && res.ok) return undefined as T;
+  let data: unknown = {};
+  if (text !== "") { try { data = JSON.parse(text); } catch { /* corpo sem JSON (413 do proxy, 502): http_<status> */ } }
+  if (!res.ok) {
+    const d = rec(data);
+    throw new ApiError(res.status, typeof d.error === "string" ? d.error : `http_${res.status}`,
+      typeof d.path === "string" ? d.path : undefined);
   }
   return data as T;
 }
@@ -618,9 +669,6 @@ interface RawVaccinations {
   upcoming?: Array<Record<string, unknown>> | null;
 }
 
-const str = (v: unknown): string => (typeof v === "string" ? v : "");
-const strOrNull = (v: unknown): string | null => (typeof v === "string" ? v : null);
-
 function normalizeVaccinations(raw: RawVaccinations): CitizenVaccinations {
   const checked = raw?.checked === true;
   return {
@@ -681,9 +729,6 @@ interface RawTrips {
   tfd?: Array<Record<string, unknown>> | null;
 }
 
-const rec = (v: unknown): Record<string, unknown> =>
-  (v !== null && typeof v === "object" ? (v as Record<string, unknown>) : {});
-
 function normalizeTrips(raw: RawTrips): CitizenTrips {
   const items: CitizenTrip[] = [];
   for (const i of Array.isArray(raw?.items) ? raw.items : []) {
@@ -715,6 +760,114 @@ function normalizeTrips(raw: RawTrips): CitizenTrips {
     });
   }
   return { items, tfd };
+}
+
+// ─── Ouvidoria (módulo 33, ADR 0051; contrato §3 e §4) ───
+// Por telefone da sessão (todas as pessoas dele); só o id da manifestação vai na
+// URL, todo o resto no corpo. A denúncia anônima é pública (publicCall) e nunca
+// devolve protocolo. `forwarded` já chega como `in_analysis` (Q40); o tipo
+// guarda o valor só por defesa.
+export type ManifestationKind = "complaint" | "report" | "praise" | "suggestion" | "request";
+export type IdentificationMode = "identified" | "preserved";
+export type ManifestationState = "received" | "in_analysis" | "forwarded" | "awaiting_complement" | "answered" | "archived";
+export type DeadlineColor = "green" | "yellow" | "red" | "paused";
+
+export interface OmbudsmanPublicConfig { anonymous_web: boolean; units: { id: string; name: string }[] }
+
+export interface CitizenManifestationSummary {
+  id: string;
+  protocol: string;
+  kind: string;
+  identification_mode: string;
+  state: string;
+  received_at: string;
+  due_on: string | null; // AAAA-MM-DD, data de calendário
+  color: DeadlineColor | null;
+  cpf_masked: string | null; // null quando o telefone tem uma pessoa só
+  has_unread: boolean;
+}
+
+// `text` só nos eventos com texto da equipe (ou rótulo do arquivamento, Q4).
+export interface ManifestationTimelineItem { kind: string; at: string; text: string | null }
+
+export interface CitizenManifestation {
+  id: string;
+  protocol: string;
+  kind: string;
+  identification_mode: string;
+  state: string;
+  received_at: string;
+  due_on: string | null;
+  color: DeadlineColor | null; // Q42
+  body: string;
+  health_unit: { id: string; name: string } | null;
+  attachments: { id: string }[]; // Q2: sem nome; a tela mostra "Anexo N" pela posição
+  timeline: ManifestationTimelineItem[];
+  can_complement: boolean;
+  can_request_reopen: boolean;
+  can_answer_satisfaction: boolean;
+}
+
+// U1 (Q46): pessoa da sessão (`people()`), ou CPF e nome de quem não está nela.
+export type ManifestationAuthor = { citizenId: string } | { cpf: string; fullName: string };
+
+// O extrato, o encaminhamento, o assunto e quem respondeu nunca passam da borda: cada normalização monta campo a campo.
+const DEADLINE_COLORS: readonly string[] = [ "green", "yellow", "red", "paused" ];
+const deadlineColor = (v: unknown): DeadlineColor | null =>
+  (typeof v === "string" && DEADLINE_COLORS.includes(v) ? (v as DeadlineColor) : null);
+
+// Q2/W8: só o nome genérico sai do aparelho (o do arquivo pode trazer o nome de quem pediu sigilo).
+const GENERIC_ATTACHMENT_NAME = /^anexo-[1-9]\d*\.(pdf|jpg|png)$/;
+
+function normalizePublicConfig(raw: unknown): OmbudsmanPublicConfig {
+  const d = rec(raw);
+  const units: { id: string; name: string }[] = [];
+  for (const u of Array.isArray(d.units) ? d.units : []) {
+    const unit = rec(u);
+    if (typeof unit.id === "string" && typeof unit.name === "string") units.push({ id: unit.id, name: unit.name });
+  }
+  return { anonymous_web: d.anonymous_web === true, units };
+}
+
+// Campos comuns à lista e ao detalhe.
+function manifestationHead(m: Record<string, unknown>) {
+  return {
+    id: str(m.id),
+    protocol: str(m.protocol),
+    kind: str(m.kind),
+    identification_mode: str(m.identification_mode),
+    state: str(m.state),
+    received_at: str(m.received_at),
+    due_on: strOrNull(m.due_on),
+    color: deadlineColor(m.color)
+  };
+}
+
+function normalizeManifestationSummary(m: Record<string, unknown>): CitizenManifestationSummary {
+  return { ...manifestationHead(m), cpf_masked: strOrNull(m.cpf_masked), has_unread: m.has_unread === true };
+}
+
+function normalizeManifestation(raw: unknown): CitizenManifestation {
+  const m = rec(raw);
+  const unit = rec(m.health_unit);
+  const attachments: { id: string }[] = [];
+  for (const a of Array.isArray(m.attachments) ? m.attachments : []) {
+    const id = rec(a).id;
+    if (typeof id === "string") attachments.push({ id });
+  }
+  return {
+    ...manifestationHead(m),
+    body: str(m.body),
+    health_unit: typeof unit.id === "string" && typeof unit.name === "string" ? { id: unit.id, name: unit.name } : null,
+    attachments,
+    timeline: (Array.isArray(m.timeline) ? m.timeline : []).map(t => {
+      const e = rec(t);
+      return { kind: str(e.kind), at: str(e.at), text: strOrNull(e.text) };
+    }),
+    can_complement: m.can_complement === true,
+    can_request_reopen: m.can_request_reopen === true,
+    can_answer_satisfaction: m.can_answer_satisfaction === true
+  };
 }
 
 export interface CitizenSession {
@@ -890,5 +1043,59 @@ export const citizenApi = {
   // "Minhas viagens" (módulo 30): só par validado (403 not_verified); 403
   // feature_disabled se a cidade não ligou o transporte sanitário.
   trips: async (citizenId: string): Promise<CitizenTrips> =>
-    normalizeTrips(await call<RawTrips>("GET", `/trips?citizen_id=${encodeURIComponent(citizenId)}`))
+    normalizeTrips(await call<RawTrips>("GET", `/trips?citizen_id=${encodeURIComponent(citizenId)}`)),
+  // Ouvidoria (módulo 33). Públicas: sem cookie (publicCall); 403 feature_disabled com o interruptor desligado (Q1).
+  ombudsmanPublicConfig: async (): Promise<OmbudsmanPublicConfig> =>
+    normalizePublicConfig(await publicCall<unknown>("GET", "/ombudsman/public_config")),
+  // Corpo exatamente { body } ou { body, health_unit_id }; a resposta é descartada (nunca há protocolo).
+  sendAnonymousReport: async (r: { body: string; healthUnitId: string | null }): Promise<void> => {
+    await publicCall<unknown>("POST", "/ombudsman/anonymous_reports",
+      { body: r.body, ...(r.healthUnitId ? { health_unit_id: r.healthUnitId } : {}) });
+  },
+  manifestations: async (): Promise<CitizenManifestationSummary[]> => {
+    const d = rec(await call<unknown>("GET", "/ombudsman/manifestations"));
+    return (Array.isArray(d.manifestations) ? d.manifestations : [])
+      .map(rec).filter(m => typeof m.id === "string").map(normalizeManifestationSummary);
+  },
+  // Q45: ler o detalhe marca como lidos os avisos desta manifestação.
+  manifestation: async (id: string): Promise<CitizenManifestation> =>
+    normalizeManifestation(await call<unknown>("GET", `/ombudsman/manifestations/${encodeURIComponent(id)}`)),
+  // U1: `citizen_id` ou `{ cpf, full_name }`, nunca os dois; tudo só no corpo.
+  createManifestation: async (m: {
+    who: ManifestationAuthor; kind: ManifestationKind; mode: IdentificationMode; body: string;
+    healthUnitId: string | null; attachmentIds: string[];
+  }): Promise<{ id: string; protocol: string; due_on: string | null }> => {
+    const who = "citizenId" in m.who
+      ? { citizen_id: m.who.citizenId }
+      : { cpf: m.who.cpf.replace(/\D/g, ""), full_name: m.who.fullName.trim() };
+    const d = rec(await call<unknown>("POST", "/ombudsman/manifestations", {
+      ...who,
+      kind: m.kind,
+      identification_mode: m.mode,
+      body: m.body,
+      ...(m.healthUnitId ? { health_unit_id: m.healthUnitId } : {}),
+      ...(m.attachmentIds.length > 0 ? { attachment_ids: m.attachmentIds } : {})
+    }));
+    return { id: str(d.id), protocol: str(d.protocol), due_on: strOrNull(d.due_on) };
+  },
+  // As três ações respondem o detalhe novo; a tela relê, então o corpo é descartado.
+  complementManifestation: async (id: string, c: { body: string; attachmentIds: string[] }): Promise<void> => {
+    await call<unknown>("POST", `/ombudsman/manifestations/${encodeURIComponent(id)}/complement`,
+      { body: c.body, ...(c.attachmentIds.length > 0 ? { attachment_ids: c.attachmentIds } : {}) });
+  },
+  requestReopen: async (id: string, reason: string): Promise<void> => {
+    await call<unknown>("POST", `/ombudsman/manifestations/${encodeURIComponent(id)}/reopen_request`, { reason });
+  },
+  // `clear` boolean e `score` número no JSON (string vira 422 path score).
+  answerSatisfaction: async (id: string, a: { met: "yes" | "partly" | "no"; clear: boolean; score: number }): Promise<void> => {
+    await call<unknown>("POST", `/ombudsman/manifestations/${encodeURIComponent(id)}/satisfaction`,
+      { met: a.met, clear: a.clear, score: a.score });
+  },
+  // Nasce órfão, dono = a sessão (some em 24 h se não for ligado). Não há rota de leitura (Q14).
+  uploadOmbudsmanAttachment: async (f: { filename: string; contentType: string; data: string }): Promise<{ id: string }> => {
+    if (!GENERIC_ATTACHMENT_NAME.test(f.filename)) throw new Error("ombudsman attachment needs a generic name");
+    const d = rec(await call<unknown>("POST", "/ombudsman/attachments",
+      { filename: f.filename, content_type: f.contentType, data: f.data }));
+    return { id: str(d.id) };
+  }
 };

@@ -7,7 +7,7 @@
 // lido. O texto é simples: o React escapa tudo e o pre-wrap preserva as
 // quebras de linha.
 import { useEffect, useRef, useState } from "react";
-import { citizenApi, type Notice, type ReminderNotice, type TripNotice } from "../../lib/citizenApi";
+import { citizenApi, type Notice, type OmbudsmanNotice, type ReminderNotice, type TripNotice } from "../../lib/citizenApi";
 import { fmtCalendarDate, fmtDate, fmtWeekdayDateTime } from "../../lib/format";
 import { hasSessionFeature } from "../../lib/sessionFeatures";
 import { formatAddress } from "../../lib/territory";
@@ -44,6 +44,11 @@ export function tripNoticeWhen(n: TripNotice): { kind: "departure" | "day"; text
     ? { kind: "day", text: `Viagem de ${fmtCalendarDate(n.date)}` }
     : { kind: "departure", text: when };
 }
+
+// Módulo 33: o aviso da Ouvidoria ainda não tem item nem detalhe nesta tela;
+// até ter, fica fora da lista, como antes de o cliente normalizá-lo.
+type ListedNotice = Exclude<Notice, OmbudsmanNotice>;
+const listed = (n: Notice): n is ListedNotice => n.kind !== "ombudsman";
 
 const itemStyle = {
   display: "grid", gap: 4, width: "100%", minHeight: 56, padding: 12, textAlign: "left",
@@ -87,7 +92,7 @@ function TripDetail({ notice, onBack }: { notice: TripNotice; onBack: () => void
   );
 }
 
-function ItemContent({ notice }: { notice: Notice }) {
+function ItemContent({ notice }: { notice: ListedNotice }) {
   const badge = !notice.read && <span style={newStyle}>novo</span>;
   const cpf = notice.cpf_masked && <span>Para o CPF {notice.cpf_masked}</span>;
   if (notice.kind === "appointment_reminder") {
@@ -126,7 +131,7 @@ function ItemContent({ notice }: { notice: Notice }) {
 
 export function NoticesStep({ onBack, onPreferences, onRead }:
   { onBack: () => void; onPreferences?: () => void; onRead?: () => void }) {
-  const [notices, setNotices] = useState<Notice[] | null>(null);
+  const [notices, setNotices] = useState<ListedNotice[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   // Um POST por aviso: a abertura repetida antes da resposta não manda outro.
@@ -134,7 +139,7 @@ export function NoticesStep({ onBack, onPreferences, onRead }:
 
   function load() {
     setError(null);
-    citizenApi.notices().then(r => setNotices(r.notices)).catch(e => setError(messageFor(e)));
+    citizenApi.notices().then(r => setNotices(r.notices.filter(listed))).catch(e => setError(messageFor(e)));
   }
 
   useEffect(() => { load(); }, []);
