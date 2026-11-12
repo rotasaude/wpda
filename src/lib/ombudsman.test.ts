@@ -206,6 +206,24 @@ describe("ombudsmanMessage", () => {
     }
   });
 
+  // api-shapes.md §5: os 20 códigos do api. json_required (415) não chega às telas.
+  const API_CODES = [
+    "json_required", "unauthenticated", "feature_disabled", "too_many_requests", "daily_cap_reached", "payload_too_large",
+    "invalid_request", "invalid_cpf", "too_many_people", "not_own_citizen", "too_many_attachments", "invalid_file", "not_found",
+    "manifestation_changed", "invalid_transition", "reopen_window_closed", "reopen_pending", "reopen_already_requested",
+    "already_answered", "satisfaction_window_closed"
+  ];
+  const GENERIC = "Algo deu errado. Tente de novo.";
+  it("os 20 códigos do api têm frase própria (json_required cai na genérica)", () => {
+    expect(API_CODES).toHaveLength(20);
+    for (const code of API_CODES) {
+      const msg = ombudsmanMessage(new ApiError(422, code, code === "invalid_request" ? "body" : undefined));
+      expect(msg, code).not.toBe("");
+      if (code === "json_required") expect(msg).toBe(GENERIC);
+      else expect(msg, code).not.toBe(GENERIC);
+    }
+  });
+
   it("sem rede cai em messageFor", () => {
     expect(ombudsmanMessage(new TypeError("offline"))).toBe("Sem conexão. Verifique a internet e tente de novo.");
   });
