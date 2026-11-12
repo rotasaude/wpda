@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PeopleStep, type ChooseOutcome } from "./PeopleStep";
 import { ApiError, citizenApi, type Person } from "../../lib/citizenApi";
@@ -361,5 +361,29 @@ describe("PeopleStep — usabilidade (6e)", () => {
     expect(btn).toHaveTextContent("Nascido(a) em 10/05/1958 · Batel");
     expect(screen.getByRole("button", { name: "Trocar bairro de ***.982.247-**" })).toHaveTextContent(/^Trocar bairro$/);
     expect(screen.getByRole("button", { name: "Ver triagens de ***.982.247-**" })).toHaveTextContent(/^Ver triagens$/);
+  });
+});
+
+describe("PeopleStep — Ouvidoria (módulo 33)", () => {
+  it("sem onOmbudsman, sem o botão; com ele, Ouvidoria depois de Continuar, travado enquanto a pessoa é escolhida", async () => {
+    vi.spyOn(citizenApi, "people").mockResolvedValue({ people: [ comBairro ] });
+    vi.spyOn(citizenApi, "appointments").mockResolvedValue({ appointments: [] });
+    vi.spyOn(citizenApi, "neighborhoods").mockResolvedValue(LIST);
+    let settle: (o: ChooseOutcome) => void = () => {};
+    const onChoose = vi.fn(() => new Promise<ChooseOutcome>(r => { settle = r; }));
+    const onOmbudsman = vi.fn();
+    const { rerender } = render(<PeopleStep onChoose={onChoose} onHistory={vi.fn()} />);
+    await screen.findByRole("button", { name: "CPF ***.982.247-**" });
+    expect(screen.queryByRole("button", { name: "Ouvidoria" })).toBeNull();
+    rerender(<PeopleStep onChoose={onChoose} onHistory={vi.fn()} onOmbudsman={onOmbudsman} />);
+    const ombudsman = screen.getByRole("button", { name: "Ouvidoria" });
+    expect(screen.getByRole("button", { name: "Continuar com este CPF" }).compareDocumentPosition(ombudsman) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(ombudsman).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "CPF ***.982.247-**" }));
+    expect(onChoose).toHaveBeenCalled();
+    // A escolha ainda pendente levaria ao catálogo depois: a Ouvidoria não abre no meio dela.
+    expect(ombudsman).toBeDisabled();
+    await act(async () => { settle("done"); });
+    expect(ombudsman).toBeEnabled();
   });
 });

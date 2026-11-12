@@ -194,6 +194,44 @@ describe("Flow — Ouvidoria (módulo 33)", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Minhas manifestações" })).toBeInTheDocument();
   });
 
+  it("Denúncia anônima logada fica no endereço da Ouvidoria: um F5 volta à lista", async () => {
+    window.history.replaceState(null, "", "/wpda/ouvidoria");
+    api({ session: true });
+    const user = opts();
+    render(<Flow />);
+    await user.click(await screen.findByRole("button", { name: "Denúncia anônima" }));
+    await screen.findByRole("heading", { level: 1, name: "Denúncia anônima" });
+    expect(window.location.pathname).toBe("/wpda/ouvidoria");
+  });
+
+  it("sessão cai na denúncia anônima logada: ao entrar de novo, a Ouvidoria", async () => {
+    window.history.replaceState(null, "", "/wpda/ouvidoria");
+    api({ session: true });
+    const user = opts();
+    render(<Flow />);
+    await user.click(await screen.findByRole("button", { name: "Denúncia anônima" }));
+    await screen.findByRole("heading", { level: 1, name: "Denúncia anônima" });
+    act(() => { window.dispatchEvent(new Event("citizen:unauthenticated")); });
+    expect(await screen.findByRole("heading", { level: 1, name: "Triagem de saúde" })).toBeInTheDocument();
+    await logIn(user);
+    expect(await screen.findByRole("heading", { level: 1, name: "Minhas manifestações" })).toBeInTheDocument();
+    expect(citizenApi.consentTerm).not.toHaveBeenCalled();
+  });
+
+  it("Voltar no celular da Ouvidoria devolve o destino do link do SMS (avisos)", async () => {
+    window.history.replaceState(null, "", "/wpda/avisos");
+    api({ session: false });
+    const user = opts();
+    render(<Flow />);
+    await user.click(await screen.findByRole("button", { name: "Fazer uma manifestação" }));
+    await screen.findByRole("heading", { level: 1, name: "Ouvidoria" });
+    await user.click(screen.getByRole("button", { name: "Voltar" }));
+    await screen.findByRole("heading", { level: 1, name: "Triagem de saúde" });
+    await logIn(user);
+    expect(await screen.findByRole("heading", { level: 1, name: "Avisos" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/wpda/avisos");
+  });
+
   it("detalhe: o id fica fora da URL, e a leitura relê o selo do topo (Q45)", async () => {
     window.history.replaceState(null, "", "/wpda/ouvidoria");
     const { notices, list } = api({ session: true });

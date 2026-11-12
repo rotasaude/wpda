@@ -210,7 +210,8 @@ export function PeopleStep({ onChoose, onHistory, onOmbudsman }: {
         onChange={e => setCpf(maskCpf(e.target.value))} />
       {error && <ErrorText>{error}</ErrorText>}
       <BigButton disabled={busy} onClick={submitNew}>Continuar com este CPF</BigButton>
-      {onOmbudsman && <div style={{ marginTop: 12 }}><BigButton variant="secondary" onClick={onOmbudsman}>Ouvidoria</BigButton></div>}
+      {/* Travado durante a escolha: o catálogo que chega depois tiraria o cidadão da Ouvidoria. */}
+      {onOmbudsman && <BigButton variant="secondary" disabled={busy} style={{ marginTop: 12 }} onClick={onOmbudsman}>Ouvidoria</BigButton>}
     </Screen>
   );
 }

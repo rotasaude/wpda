@@ -81,6 +81,13 @@ function remembered(): string | null {
   try { return sessionStorage.getItem(RESUME_KEY); } catch { return null; }
 }
 
+// Telas da Ouvidoria com sessão (a denúncia aberta dela também): endereço <base>ouvidoria, e a sessão
+// que cai numa delas volta à lista depois do login.
+function inOmbudsman(s: State): boolean {
+  return s.at === "ombudsman" || s.at === "ombudsman-new" || s.at === "ombudsman-detail"
+    || (s.at === "anonymous-report" && s.session);
+}
+
 export function Flow() {
   const [state, setState] = useState<State>({ at: "boot" });
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +99,8 @@ export function Flow() {
   // Destino pedido pela URL no carregamento (link do SMS). Vale uma vez; a
   // sessão que cai numa dessas telas o guarda de novo; "Sair" o esquece.
   const target = useRef<AppRoute | null>(routeFromPath(window.location.pathname, import.meta.env.BASE_URL));
+  // O destino de antes de "Fazer uma manifestação" (ex.: avisos, do link do SMS): "Voltar" o devolve.
+  const targetBeforeOmbudsman = useRef<AppRoute | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -125,7 +134,7 @@ export function Flow() {
       const s = stateRef.current;
       if (s.at === "notices") target.current = "avisos";
       else if (s.at === "preferences") target.current = "preferencias";
-      else if (s.at === "ombudsman" || s.at === "ombudsman-new" || s.at === "ombudsman-detail") target.current = "ouvidoria";
+      else if (inOmbudsman(s)) target.current = "ouvidoria";
       setState({ at: "phone" });
     }
     window.addEventListener("citizen:unauthenticated", onUnauthenticated);
@@ -145,7 +154,7 @@ export function Flow() {
     // A denúncia sem login fica de fora, como o celular.
     if (state.at === "anonymous-report" && !state.session) return;
     const route: AppRoute | null = state.at === "notices" ? "avisos" : state.at === "preferences" ? "preferencias"
-      : state.at === "ombudsman" || state.at === "ombudsman-new" || state.at === "ombudsman-detail" ? "ouvidoria" : null;
+      : inOmbudsman(state) ? "ouvidoria" : null;
     const path = pathFor(route, import.meta.env.BASE_URL);
     if (window.location.pathname !== path) window.history.replaceState(null, "", path);
   }, [state.at]);
@@ -286,9 +295,13 @@ export function Flow() {
       const purpose = state.purpose;
       view = <PhoneStep key={purpose ?? "start"} purpose={purpose}
         onSent={phone => setState({ at: "code", phone, purpose })}
-        onCancel={() => { target.current = null; setState({ at: "phone" }); }}>
+        onCancel={() => { target.current = targetBeforeOmbudsman.current; targetBeforeOmbudsman.current = null; setState({ at: "phone" }); }}>
         {!purpose && <OmbudsmanEntry
-          onManifest={() => { target.current = "ouvidoria"; setState({ at: "phone", purpose: "ombudsman" }); }}
+          onManifest={() => {
+            targetBeforeOmbudsman.current = target.current;
+            target.current = "ouvidoria";
+            setState({ at: "phone", purpose: "ombudsman" });
+          }}
           onAnonymous={() => setState({ at: "anonymous-report", consentVersion: null, session: false })} />}
       </PhoneStep>;
       break;
