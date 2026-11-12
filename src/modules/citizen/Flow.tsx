@@ -134,7 +134,13 @@ export function Flow() {
       const s = stateRef.current;
       if (s.at === "notices") target.current = "avisos";
       else if (s.at === "preferences") target.current = "preferencias";
-      else if (inOmbudsman(s)) target.current = "ouvidoria";
+      else if (inOmbudsman(s)) {
+        // O login volta à Ouvidoria: o celular tem o título dela. "Voltar" ali leva à tela inicial, sem destino.
+        target.current = "ouvidoria";
+        targetBeforeOmbudsman.current = null;
+        setState({ at: "phone", purpose: "ombudsman" });
+        return;
+      }
       setState({ at: "phone" });
     }
     window.addEventListener("citizen:unauthenticated", onUnauthenticated);

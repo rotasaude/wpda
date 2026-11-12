@@ -212,7 +212,8 @@ describe("Flow — Ouvidoria (módulo 33)", () => {
     await user.click(await screen.findByRole("button", { name: "Denúncia anônima" }));
     await screen.findByRole("heading", { level: 1, name: "Denúncia anônima" });
     act(() => { window.dispatchEvent(new Event("citizen:unauthenticated")); });
-    expect(await screen.findByRole("heading", { level: 1, name: "Triagem de saúde" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Ouvidoria" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Triagem de saúde" })).toBeNull();
     await logIn(user);
     expect(await screen.findByRole("heading", { level: 1, name: "Minhas manifestações" })).toBeInTheDocument();
     expect(citizenApi.consentTerm).not.toHaveBeenCalled();
@@ -262,9 +263,26 @@ describe("Flow — Ouvidoria (módulo 33)", () => {
     // F-13: o evento só depois do enter(), senão a sessão que resolve depois leva de volta à lista.
     await screen.findByRole("heading", { level: 1, name: "Minhas manifestações" });
     act(() => { window.dispatchEvent(new Event("citizen:unauthenticated")); });
-    expect(await screen.findByRole("heading", { level: 1, name: "Triagem de saúde" })).toBeInTheDocument();
+    // O login leva de volta à Ouvidoria: o título é o dela, não o da triagem.
+    expect(await screen.findByRole("heading", { level: 1, name: "Ouvidoria" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Triagem de saúde" })).toBeNull();
+    expect(screen.getByText("Para fazer uma manifestação, entre com o seu celular. Vamos mandar um código por SMS.")).toBeInTheDocument();
     const user = opts();
     await logIn(user);
     expect(await screen.findByRole("heading", { level: 1, name: "Minhas manifestações" })).toBeInTheDocument();
+  });
+
+  it("sessão cai na Ouvidoria e a pessoa desiste: Voltar leva à tela inicial e o login segue para o termo", async () => {
+    window.history.replaceState(null, "", "/wpda/ouvidoria");
+    api({ session: true });
+    render(<Flow />);
+    await screen.findByRole("heading", { level: 1, name: "Minhas manifestações" });
+    act(() => { window.dispatchEvent(new Event("citizen:unauthenticated")); });
+    await screen.findByRole("heading", { level: 1, name: "Ouvidoria" });
+    const user = opts();
+    await user.click(screen.getByRole("button", { name: "Voltar" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Triagem de saúde" })).toBeInTheDocument();
+    await logIn(user);
+    expect(await screen.findByRole("heading", { level: 1, name: "Antes de começar" })).toBeInTheDocument();
   });
 });
