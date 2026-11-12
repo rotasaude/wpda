@@ -1,7 +1,7 @@
 // Nova manifestação (módulo 33; contrato §3, §14): uma pergunta por tela. O texto mora só no estado (nunca em storage, URL ou console).
 // Quem manifesta (Q62): sem pessoa na sessão, CPF e nome (U1, sem o termo da triagem); com uma, ela mesma, sem tela de escolha;
 // com várias, a escolha é obrigatória. Nunca "Outra pessoa".
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   ApiError, citizenApi, type IdentificationMode, type ManifestationAuthor, type ManifestationKind, type Person
 } from "../../lib/citizenApi";
@@ -18,6 +18,7 @@ type Result = { id: string; protocol: string; due_on: string | null };
 
 const WHO_TITLE = "Quem está fazendo a manifestação?";
 const BAD_CPF = "CPF inválido. Confira os números.";
+const UPLOAD_WAIT = "Aguarde o anexo terminar de subir.";
 const linkStyle = { minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 18, padding: 0,
   textAlign: "left", color: "var(--ink)" } as const;
 
@@ -58,12 +59,14 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
   const [ attachError, setAttachError ] = useState<string | null>(null);
   const [ error, setError ] = useState<string | null>(null);
   const [ busy, setBusy ] = useState(false);
+  const [ uploading, setUploading ] = useState(false); // anexo ainda subindo: enviar agora o deixaria de fora
 
   const inFlight = useRef(false); // o estado só vale no próximo render; o ref fecha a porta no mesmo tick
   const alive = useRef(true);
   const field = useRef<HTMLTextAreaElement>(null);
   const cpfInput = useRef<HTMLInputElement>(null);
   const nameInput = useRef<HTMLInputElement>(null);
+  const waitId = useId();
 
   useEffect(() => {
     alive.current = true;
@@ -148,7 +151,7 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
   }
 
   async function submit() {
-    if (inFlight.current) return;
+    if (inFlight.current || uploading) return;
     setError(null); setFieldError(null); setUnitError(null); setAttachError(null);
     const local = bodyError(text);
     if (local) return failField(local);
@@ -257,14 +260,18 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
   return (
     <Screen title="Sua manifestação"
       footer={<>
-        <BigButton onClick={submit} disabled={busy}>Enviar manifestação</BigButton>
+        {uploading && <p id={waitId} style={{ margin: 0 }}>{UPLOAD_WAIT}</p>}
+        <BigButton onClick={submit} disabled={busy || uploading} aria-describedby={uploading ? waitId : undefined}>
+          Enviar manifestação
+        </BigButton>
         <BigButton variant="secondary" onClick={() => go("mode")}>Voltar</BigButton>
       </>}>
       <UnitSelect units={units} value={healthUnitId} onChange={id => { setHealthUnitId(id); setUnitError(null); }} />
       {unitError && <div style={{ marginBottom: 12 }}><ErrorText>{unitError}</ErrorText></div>}
       <TextArea ref={field} label="Conte o que aconteceu" hint={idMode === "preserved" ? PRESERVED_HINT : FROZEN_TEXT_NOTICE}
         max={BODY_MAX} value={text} error={fieldError ?? undefined} onChange={setText} />
-      <AttachmentPicker items={attachments} disabled={busy} onChange={items => { setAttachments(items); setAttachError(null); }} />
+      <AttachmentPicker items={attachments} disabled={busy} onBusy={setUploading}
+        onChange={items => { setAttachments(items); setAttachError(null); }} />
       {attachError && <div style={{ marginBottom: 12 }}><ErrorText>{attachError}</ErrorText></div>}
       {error && <ErrorText>{error}</ErrorText>}
     </Screen>

@@ -56,8 +56,9 @@ export interface PickedAttachment { id: string }
 const UPLOAD_REFUSED = "Envie um PDF, uma foto JPEG ou PNG, de até 10 MB.";
 const UPLOAD_CODES = new Set([ "http_413", "payload_too_large", "invalid_file", "invalid_request" ]);
 
-export function AttachmentPicker({ items, onChange, disabled }: {
-  items: PickedAttachment[]; onChange: (items: PickedAttachment[]) => void; disabled?: boolean;
+// `onBusy`: avisa quando um upload começa e termina, para a tela não enviar sem o anexo que ainda sobe.
+export function AttachmentPicker({ items, onChange, disabled, onBusy }: {
+  items: PickedAttachment[]; onChange: (items: PickedAttachment[]) => void; disabled?: boolean; onBusy?: (busy: boolean) => void;
 }) {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -74,6 +75,7 @@ export function AttachmentPicker({ items, onChange, disabled }: {
     setError(null);
     lock.current = true;
     setBusy(true);
+    onBusy?.(true);
     try {
       const data = await readAsBase64(file);
       if (!alive.current) return;
@@ -87,6 +89,7 @@ export function AttachmentPicker({ items, onChange, disabled }: {
       setError(e instanceof ApiError && UPLOAD_CODES.has(e.code) ? UPLOAD_REFUSED : ombudsmanMessage(e));
     } finally {
       lock.current = false;
+      onBusy?.(false); // também depois do desmonte: a tela segue montada e não pode ficar presa
       if (alive.current) setBusy(false);
     }
   }

@@ -1,6 +1,6 @@
 // Módulo 33 (contrato §3, §14; spec decisões 3, 5, 12; U1, Q46, Q62): nova manifestação identificada ou preservada.
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NewManifestationStep } from "./NewManifestationStep";
 import { citizenApi, ApiError, type Person } from "../../lib/citizenApi";
@@ -325,6 +325,26 @@ describe("NewManifestationStep", () => {
     expect(textbox()).toHaveAccessibleDescription(/Confira o tamanho do texto./);
     expect(textbox()).toHaveFocus();
     expect(textbox()).toHaveValue(TEXT);
+  });
+
+  it("anexo subindo: Enviar fica desligado com o motivo e não manda sem ele; depois manda com o id", async () => {
+    const { create } = stub([ P1 ]);
+    let resolve!: (v: { id: string }) => void;
+    vi.spyOn(citizenApi, "uploadOmbudsmanAttachment").mockReturnValueOnce(new Promise((r) => { resolve = r; }));
+    const user = userEvent.setup();
+    renderStep();
+    await fillAndSend(user);
+    await user.upload(screen.getByLabelText("Anexar arquivo (opcional)"), new File([ "%PDF-1" ], "laudo.pdf", { type: "application/pdf" }));
+    await screen.findByText("Aguarde o anexo terminar de subir.");
+    expect(screen.getByRole("button", { name: "Enviar manifestação" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Enviar manifestação" })).toHaveAccessibleDescription("Aguarde o anexo terminar de subir.");
+    await send(user);
+    expect(create).not.toHaveBeenCalled();
+    await act(async () => { resolve({ id: "a1" }); });
+    expect(await screen.findByText("Anexo 1")).toBeInTheDocument();
+    expect(screen.queryByText("Aguarde o anexo terminar de subir.")).toBeNull();
+    await send(user);
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ attachmentIds: [ "a1" ], body: TEXT }));
   });
 
   it.each([

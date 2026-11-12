@@ -104,6 +104,24 @@ describe("OmbudsmanFields", () => {
     expect(errors).not.toHaveBeenCalled();
   });
 
+  it("AttachmentPicker: onBusy avisa o início e o fim do upload, também na recusa", async () => {
+    let resolve!: (v: { id: string }) => void;
+    vi.spyOn(citizenApi, "uploadOmbudsmanAttachment")
+      .mockReturnValueOnce(new Promise((r) => { resolve = r; }))
+      .mockRejectedValueOnce(new ApiError(422, "invalid_file"));
+    const onBusy = vi.fn();
+    const user = userEvent.setup();
+    function T() { const [ items, setItems ] = useState<PickedAttachment[]>([]); return <AttachmentPicker items={items} onChange={setItems} onBusy={onBusy} />; }
+    render(<T />);
+    await user.upload(screen.getByLabelText(LABEL), pdf());
+    await waitFor(() => expect(onBusy).toHaveBeenLastCalledWith(true));
+    await act(async () => { resolve({ id: "a1" }); });
+    expect(onBusy).toHaveBeenLastCalledWith(false);
+    await user.upload(screen.getByLabelText(LABEL), pdf());
+    await screen.findByRole("alert");
+    expect(onBusy.mock.calls).toEqual([ [ true ], [ false ], [ true ], [ false ] ]);
+  });
+
   it("AttachmentPicker: onChange não é chamado se desmontou durante o upload", async () => {
     let resolve!: (v: { id: string }) => void;
     vi.spyOn(citizenApi, "uploadOmbudsmanAttachment").mockReturnValueOnce(new Promise((r) => { resolve = r; }));
