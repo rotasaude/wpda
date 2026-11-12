@@ -1,8 +1,10 @@
-// Fora do celular, o fluxo do cidadão não abre (decisão 9 do ciclo).
+// Fora do celular, o fluxo do cidadão não abre (decisão 9 do ciclo). `children`
+// (a entrada da denúncia anônima, U2) vem antes do 192.
+import type { ReactNode } from "react";
 import { CityHeader } from "./CityHeader";
 import { EmergencyCall } from "./EmergencyCall";
 
-export function PhoneOnly() {
+export function PhoneOnly({ children }: { children?: ReactNode }) {
   const address = window.location.origin + window.location.pathname;
   return (
     <main id="conteudo" style={{ maxWidth: 520, margin: "0 auto", padding: "16px" }}>
@@ -12,6 +14,7 @@ export function PhoneOnly() {
       </header>
       <p>Este serviço foi feito para ser usado no celular. Abra este endereço no seu celular.</p>
       <p><code style={{ fontSize: 18, userSelect: "all", overflowWrap: "anywhere" }}>{address}</code></p>
+      {children}
       <EmergencyCall />
     </main>
   );

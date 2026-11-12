@@ -1,5 +1,5 @@
 // Campos da Ouvidoria (módulo 33): texto longo, unidade opcional e anexos. Peças locais: nenhum componente comum de ui.tsx muda.
-import { useEffect, useId, useRef, useState } from "react";
+import { forwardRef, useEffect, useId, useRef, useState } from "react";
 import { ErrorText } from "./ui";
 import { ApiError, citizenApi } from "../../lib/citizenApi";
 import {
@@ -11,9 +11,10 @@ const hintStyle = { margin: 0, fontSize: 15, color: "var(--ink2)" } as const;
 const linkStyle = { minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 18 } as const;
 
 // Sem `maxLength` nativo: ele conta UTF-16, o api conta code points depois do strip (W9).
-export function TextArea({ label, hint, error, value, onChange, max, disabled }: {
+// `ref` chega ao textarea: a tela foca o campo depois de um erro dele (WP-07).
+export const TextArea = forwardRef<HTMLTextAreaElement, {
   label: string; hint?: string; error?: string; value: string; onChange: (v: string) => void; max: number; disabled?: boolean;
-}) {
+}>(function TextArea({ label, hint, error, value, onChange, max, disabled }, ref) {
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
@@ -21,7 +22,7 @@ export function TextArea({ label, hint, error, value, onChange, max, disabled }:
   return (
     <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
       <label htmlFor={id} style={{ fontWeight: 600 }}>{label}</label>
-      <textarea id={id} rows={6} value={value} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={describedBy}
+      <textarea id={id} ref={ref} rows={6} value={value} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={describedBy}
         onChange={e => onChange(e.target.value)}
         style={{ minHeight: 160, fontSize: 18, padding: 12, borderRadius: 12, resize: "vertical",
           border: `2px solid ${error ? "var(--down)" : "var(--rule2)"}` }} />
@@ -30,7 +31,7 @@ export function TextArea({ label, hint, error, value, onChange, max, disabled }:
       {error && <ErrorText id={errorId}>{error}</ErrorText>}
     </div>
   );
-}
+});
 
 export function UnitSelect({ units, value, onChange }: {
   units: { id: string; name: string }[]; value: string | null; onChange: (id: string | null) => void;

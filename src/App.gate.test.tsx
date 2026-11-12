@@ -1,12 +1,16 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { stubDevice } from "./test/setup";
+import { ApiError, citizenApi } from "./lib/citizenApi";
 
 vi.mock("./modules/citizen/Flow", () => ({ Flow: () => <main>FLUXO</main> }));
 vi.mock("./modules/Report", () => ({ Report: () => <main>RELATORIO</main> }));
 import { App } from "./App";
 
-afterEach(() => window.history.replaceState(null, "", "/wpda/"));
+// A tela "Abra no celular" pede o public_config da Ouvidoria (U2); por padrão, desligada (403, Q1).
+beforeEach(() => { vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockRejectedValue(new ApiError(403, "feature_disabled")); });
+afterEach(() => { vi.restoreAllMocks(); window.history.replaceState(null, "", "/wpda/"); });
 
 describe("bloqueio fora do celular", () => {
   it("celular vê o fluxo", () => {
@@ -36,6 +40,40 @@ describe("bloqueio fora do celular", () => {
     render(<App />);
     expect(screen.getByText("RELATORIO")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Abra no celular" })).toBeNull();
+  });
+});
+
+// U2: a denúncia anônima abre também no desktop de produção, sem sessão; o resto segue só no celular.
+describe("denúncia anônima fora do celular (U2)", () => {
+  const CONFIG = { anonymous_web: true, units: [ { id: "u1", name: "UBS Centro" } ] };
+
+  it("desktop de produção com anonymous_web: 'Abra no celular' e 'Denúncia anônima', que abre o formulário", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG);
+    stubDevice({ width: 1920, height: 1080, coarse: false });
+    const user = userEvent.setup();
+    render(<App />);
+    expect(screen.getByRole("heading", { level: 1, name: "Abra no celular" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Denúncia anônima" }));
+    expect(screen.queryByRole("button", { name: "Fazer uma manifestação" })).toBeNull();
+    expect(await screen.findByRole("heading", { level: 1, name: "Denúncia anônima" })).toBeInTheDocument();
+    expect(await screen.findByRole("textbox", { name: "O que você quer denunciar?" })).toBeInTheDocument();
+    expect(screen.queryByText("FLUXO")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Voltar" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Abra no celular" })).toBeInTheDocument();
+  });
+
+  it.each([
+    [ "anonymous_web desligado", () => vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue({ ...CONFIG, anonymous_web: false }) ],
+    [ "public_config 403", () => vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockRejectedValue(new ApiError(403, "feature_disabled")) ]
+  ])("desktop de produção com %s: só 'Abra no celular'", async (_name, arrange) => {
+    const spy = arrange();
+    stubDevice({ width: 1920, height: 1080, coarse: false });
+    render(<App />);
+    expect(screen.getByRole("heading", { level: 1, name: "Abra no celular" })).toBeInTheDocument();
+    await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(screen.queryByRole("button", { name: "Denúncia anônima" })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: "Ouvidoria" })).toBeNull();
   });
 });
 
