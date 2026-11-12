@@ -808,7 +808,7 @@ export interface CitizenManifestation {
   can_answer_satisfaction: boolean;
 }
 
-// U1 (Q46): pessoa da sessão (`people()`), ou CPF e nome de quem não está nela.
+// U1 (Q46, Q62): pessoa da sessão (`people()`), ou CPF e nome só quando a sessão não tem nenhuma pessoa.
 export type ManifestationAuthor = { citizenId: string } | { cpf: string; fullName: string };
 
 // O extrato, o encaminhamento, o assunto e quem respondeu nunca passam da borda: cada normalização monta campo a campo.
