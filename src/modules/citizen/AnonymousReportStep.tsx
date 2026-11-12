@@ -102,10 +102,10 @@ export function AnonymousReportStep({ onBack, offPhone = false }: { onBack: () =
         <p style={{ margin: 0 }}>{`Use este caminho só para denúncias. Para reclamar, elogiar, sugerir ou pedir, faça uma manifestação${
           offPhone ? " na tela inicial do celular" : ""}.`}</p>
       </div>
-      <UnitSelect units={units} value={unitId} onChange={id => { setUnitId(id); setUnitError(null); }} />
+      <UnitSelect units={units} value={unitId} disabled={busy} onChange={id => { setUnitId(id); setUnitError(null); }} />
       {unitError && <div style={{ marginBottom: 12 }}><ErrorText>{unitError}</ErrorText></div>}
       <TextArea ref={field} label="O que você quer denunciar?" hint={REPORT_HINT} max={BODY_MAX} value={text}
-        error={fieldError ?? undefined} onChange={setText} />
+        readOnly={busy} error={fieldError ?? undefined} onChange={setText} />
       {error && <ErrorText>{error}</ErrorText>}
     </Screen>
   );

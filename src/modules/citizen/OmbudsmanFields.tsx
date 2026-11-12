@@ -34,15 +34,16 @@ export const TextArea = forwardRef<HTMLTextAreaElement, {
   );
 });
 
-export function UnitSelect({ units, value, onChange }: {
-  units: { id: string; name: string }[]; value: string | null; onChange: (id: string | null) => void;
+// `disabled`: durante o envio, a unidade não muda (o envio já levou a escolhida).
+export function UnitSelect({ units, value, onChange, disabled }: {
+  units: { id: string; name: string }[]; value: string | null; onChange: (id: string | null) => void; disabled?: boolean;
 }) {
   const id = useId();
   if (units.length === 0) return null;
   return (
     <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
       <label htmlFor={id} style={{ fontWeight: 600 }}>Unidade de saúde (opcional)</label>
-      <select id={id} value={value ?? ""} onChange={e => onChange(e.target.value || null)}
+      <select id={id} value={value ?? ""} disabled={disabled} onChange={e => onChange(e.target.value || null)}
         style={{ minHeight: 56, fontSize: 18, padding: "0 12px", borderRadius: 12, border: "2px solid var(--rule2)" }}>
         <option value="">Nenhuma unidade específica</option>
         {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}

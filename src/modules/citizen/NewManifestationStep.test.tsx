@@ -396,6 +396,27 @@ describe("NewManifestationStep", () => {
     expect(onBack).not.toHaveBeenCalled();
   });
 
+  it("enquanto o POST corre, o texto fica só para leitura e a unidade desligada; depois de uma recusa voltam", async () => {
+    const { create } = stub([ P1 ]);
+    let reject!: (e: unknown) => void;
+    create.mockReturnValueOnce(new Promise((_r, j) => { reject = j; }));
+    const user = userEvent.setup();
+    renderStep();
+    await fillAndSend(user);
+    const unit = screen.getByRole("combobox", { name: "Unidade de saúde (opcional)" });
+    expect(textbox()).not.toHaveAttribute("readonly");
+    expect(unit).toBeEnabled();
+    await send(user);
+    expect(textbox()).toHaveAttribute("readonly");
+    expect(unit).toBeDisabled();
+    await user.type(textbox(), " mais");
+    expect(textbox()).toHaveValue(TEXT);
+    await act(async () => { reject(new ApiError(429, "too_many_requests")); });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Muitos envios em pouco tempo. Tente mais tarde.");
+    expect(textbox()).not.toHaveAttribute("readonly");
+    expect(unit).toBeEnabled();
+  });
+
   it.each([
     [ "path attachment_ids", new ApiError(422, "invalid_request", "attachment_ids"), "Um dos anexos não vale mais. Remova e anexe de novo." ],
     [ "too_many_attachments", new ApiError(422, "too_many_attachments"), "No máximo 3 anexos." ],

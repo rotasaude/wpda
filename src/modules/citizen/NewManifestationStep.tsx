@@ -270,10 +270,10 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
         </BigButton>
         <BigButton variant="secondary" disabled={busy} onClick={() => go("mode")}>Voltar</BigButton>
       </>}>
-      <UnitSelect units={units} value={healthUnitId} onChange={id => { setHealthUnitId(id); setUnitError(null); }} />
+      <UnitSelect units={units} value={healthUnitId} disabled={busy} onChange={id => { setHealthUnitId(id); setUnitError(null); }} />
       {unitError && <div style={{ marginBottom: 12 }}><ErrorText>{unitError}</ErrorText></div>}
       <TextArea ref={field} label="Conte o que aconteceu" hint={idMode === "preserved" ? PRESERVED_HINT : FROZEN_TEXT_NOTICE}
-        max={BODY_MAX} value={text} error={fieldError ?? undefined} onChange={setText} />
+        max={BODY_MAX} value={text} readOnly={busy} error={fieldError ?? undefined} onChange={setText} />
       {/* Desligado enquanto um upload corre, mesmo o de antes de um Voltar: um só por vez, e o onBusy(false) dele não libera o Enviar antes da hora. */}
       <AttachmentPicker items={attachments} disabled={busy || uploading} onBusy={setUploading}
         onChange={items => { setAttachments(items); setAttachError(null); }} />

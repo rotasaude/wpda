@@ -165,6 +165,28 @@ describe("AnonymousReportStep", () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  it("enquanto envia, o texto fica só para leitura e a unidade desligada; depois de uma recusa voltam", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG);
+    let reject!: (e: unknown) => void;
+    vi.spyOn(citizenApi, "sendAnonymousReport").mockReturnValue(new Promise<void>((_r, j) => { reject = j; }));
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    const box = await screen.findByRole("textbox", { name: "O que você quer denunciar?" });
+    const unit = screen.getByRole("combobox", { name: "Unidade de saúde (opcional)" });
+    await user.click(box);
+    await user.paste(TEXT);
+    expect(box).not.toHaveAttribute("readonly");
+    await user.click(screen.getByRole("button", { name: "Enviar denúncia" }));
+    expect(box).toHaveAttribute("readonly");
+    expect(unit).toBeDisabled();
+    await user.type(box, " mais");
+    expect(box).toHaveValue(TEXT);
+    await act(async () => { reject(new ApiError(429, "too_many_requests")); });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Muitos envios em pouco tempo. Tente mais tarde.");
+    expect(box).not.toHaveAttribute("readonly");
+    expect(unit).toBeEnabled();
+  });
+
   it.each([
     [ new ApiError(429, "too_many_requests"), "Muitos envios em pouco tempo. Tente mais tarde." ],
     [ new ApiError(429, "daily_cap_reached"), "O canal de denúncias recebeu muitas mensagens hoje. Tente mais tarde." ],
