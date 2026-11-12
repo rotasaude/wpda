@@ -21,7 +21,7 @@ async function mockApi(page: Page, opts: { anonymous: boolean; configStatus?: nu
         return json({ error: "unauthenticated" }, 401);
       case "/ombudsman/public_config":
         return opts.configStatus === 403 ? json({ error: "feature_disabled", feature: "ombudsman" }, 403)
-          : json({ anonymous_web: opts.anonymous, units: [ { id: "u1", name: "UBS Centro" } ] });
+          : json({ anonymous_web: opts.anonymous, units: [ { id: "u1", name: "UBS Centro" }, { id: "u2", name: "Centro Municipal de Especialidades Odontológicas Vila Hauer e Boqueirão" } ] });
       case "/ombudsman/anonymous_reports":
         reports.push(route.request());
         // O api real manda só { ok: true }; o protocolo falso é defesa: a tela deve ignorá-lo.

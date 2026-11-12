@@ -44,7 +44,8 @@ export function UnitSelect({ units, value, onChange, disabled }: {
     <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
       <label htmlFor={id} style={{ fontWeight: 600 }}>Unidade de saúde (opcional)</label>
       <select id={id} value={value ?? ""} disabled={disabled} onChange={e => onChange(e.target.value || null)}
-        style={{ minHeight: 56, fontSize: 18, padding: "0 12px", borderRadius: 12, border: "2px solid var(--rule2)" }}>
+        style={{ minHeight: 56, fontSize: 18, padding: "0 12px", borderRadius: 12, border: "2px solid var(--rule2)",
+          width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", textOverflow: "ellipsis" }}>
         <option value="">Nenhuma unidade específica</option>
         {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
       </select>
