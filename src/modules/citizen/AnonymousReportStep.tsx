@@ -3,7 +3,9 @@
 // Sem anexo e sem contato. O texto vive só no estado do React.
 import { useEffect, useRef, useState } from "react";
 import { ApiError, citizenApi } from "../../lib/citizenApi";
-import { ANONYMOUS_DISABLED, ANONYMOUS_WARNING, BODY_MAX, REPORT_HINT, bodyError, ombudsmanMessage } from "../../lib/ombudsman";
+import {
+  ANONYMOUS_DISABLED, ANONYMOUS_WARNING, ANONYMOUS_WEB_FEATURE, BODY_MAX, REPORT_HINT, bodyError, ombudsmanMessage
+} from "../../lib/ombudsman";
 import { BigButton, ErrorText, Screen } from "./ui";
 import { TextArea, UnitSelect } from "./OmbudsmanFields";
 
@@ -13,6 +15,8 @@ type Mode = "loading" | "disabled" | "form" | "sent";
 const warnNote = { background: "var(--warn-bg)", padding: 12, borderRadius: 12, margin: 0 } as const;
 
 const invalidPath = (e: unknown, path: string) => e instanceof ApiError && e.code === "invalid_request" && e.path === path;
+// Só a denúncia anônima foi desligada (a Ouvidoria segue): o 403 diz qual interruptor recusou.
+const anonymousOff = (e: unknown) => e instanceof ApiError && e.code === "feature_disabled" && e.feature === ANONYMOUS_WEB_FEATURE;
 
 // `offPhone`: aberta fora do celular (desktop de produção, U2), onde não há manifestação.
 export function AnonymousReportStep({ onBack, offPhone = false }: { onBack: () => void; offPhone?: boolean }) {
@@ -66,7 +70,7 @@ export function AnonymousReportStep({ onBack, offPhone = false }: { onBack: () =
       if (!alive.current) return;
       if (invalidPath(e, "body")) failField(bodyError(text) ?? ombudsmanMessage(e));
       else if (invalidPath(e, "health_unit_id")) { setUnitError(ombudsmanMessage(e)); refreshUnits(); }
-      else setError(ombudsmanMessage(e));
+      else setError(anonymousOff(e) ? ANONYMOUS_DISABLED : ombudsmanMessage(e));
     } finally {
       inFlight.current = false;
       if (alive.current) setBusy(false);

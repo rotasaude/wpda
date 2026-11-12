@@ -6,8 +6,9 @@ import { setSessionFeatures } from "./sessionFeatures";
 
 // Módulo 33 (F-4): `path` = nome do campo recusado no 422 `invalid_request`
 // (ou `invalid_cpf`); ausente nas outras recusas. Nunca traz o valor digitado.
+// `feature`: no 403 feature_disabled, qual interruptor recusou (ex.: "ombudsman_anonymous_web").
 export class ApiError extends Error {
-  constructor(public status: number, public code: string, public path?: string) {
+  constructor(public status: number, public code: string, public path?: string, public feature?: string) {
     super(code);
   }
 }
@@ -388,7 +389,7 @@ async function publicCall<T>(method: string, path: string, body?: unknown): Prom
   if (!res.ok) {
     const d = rec(data);
     throw new ApiError(res.status, typeof d.error === "string" ? d.error : `http_${res.status}`,
-      typeof d.path === "string" ? d.path : undefined);
+      typeof d.path === "string" ? d.path : undefined, typeof d.feature === "string" ? d.feature : undefined);
   }
   return data as T;
 }

@@ -203,6 +203,21 @@ describe("AnonymousReportStep", () => {
     expect(screen.getByRole("textbox")).toHaveValue(TEXT);
   });
 
+  it.each([
+    [ "ombudsman_anonymous_web", "A denúncia anônima não está disponível agora nesta cidade." ],
+    [ "ombudsman", "A Ouvidoria não está disponível agora nesta cidade." ]
+  ])("403 feature_disabled no envio (feature %s): a frase diz o que foi desligado, e o texto continua", async (feature, message) => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG);
+    vi.spyOn(citizenApi, "sendAnonymousReport").mockRejectedValue(new ApiError(403, "feature_disabled", undefined, feature));
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    await user.click(await screen.findByRole("textbox", { name: "O que você quer denunciar?" }));
+    await user.paste(TEXT);
+    await user.click(screen.getByRole("button", { name: "Enviar denúncia" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(screen.getByRole("textbox")).toHaveValue(TEXT);
+  });
+
   it("422 health_unit_id: erro na unidade, relê a lista e volta a 'Nenhuma unidade específica'", async () => {
     const config = vi.spyOn(citizenApi, "ombudsmanPublicConfig")
       .mockResolvedValueOnce(CONFIG)

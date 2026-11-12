@@ -73,7 +73,12 @@ describe("citizenApi — ouvidoria pública (módulo 33, §4)", () => {
     stubFetch(429, { error: "daily_cap_reached" });
     await expect(citizenApi.sendAnonymousReport({ body: "x".repeat(20), healthUnitId: null })).rejects.toMatchObject({ status: 429, code: "daily_cap_reached" });
     stubFetch(403, { error: "feature_disabled", feature: "ombudsman" });
-    await expect(citizenApi.ombudsmanPublicConfig()).rejects.toMatchObject({ status: 403, code: "feature_disabled" });
+    await expect(citizenApi.ombudsmanPublicConfig()).rejects.toMatchObject({ status: 403, code: "feature_disabled", feature: "ombudsman" });
+    stubFetch(403, { error: "feature_disabled", feature: "ombudsman_anonymous_web" });
+    await expect(citizenApi.sendAnonymousReport({ body: "x".repeat(20), healthUnitId: null }))
+      .rejects.toMatchObject({ status: 403, code: "feature_disabled", feature: "ombudsman_anonymous_web" });
+    stubFetch(403, { error: "feature_disabled", feature: 7 });
+    expect((await citizenApi.ombudsmanPublicConfig().catch(e => e)).feature).toBeUndefined();
     stubRaw(413, "<html>413 Request Entity Too Large</html>");
     await expect(citizenApi.sendAnonymousReport({ body: "x".repeat(20), healthUnitId: null })).rejects.toMatchObject({ status: 413, code: "http_413" });
   });
@@ -258,6 +263,8 @@ describe("citizenApi — minhas manifestações (módulo 33, §3)", () => {
     expect(a).toMatchObject({ status: 404, code: "not_found", message: "not_found" });
     expect(a.path).toBeUndefined();
     expect(new ApiError(422, "invalid_request", "reason")).toMatchObject({ status: 422, code: "invalid_request", message: "invalid_request", path: "reason" });
+    expect(a.feature).toBeUndefined();
+    expect(new ApiError(403, "feature_disabled", undefined, "ombudsman")).toMatchObject({ code: "feature_disabled", feature: "ombudsman" });
   });
 
   it("notices: aviso ombudsman com evento, protocolo e data; sem texto", async () => {
