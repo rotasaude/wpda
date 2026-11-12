@@ -7,7 +7,9 @@ import {
 } from "../../lib/citizenApi";
 import { fmtCalendarDate } from "../../lib/format";
 import { isValidCpf, maskCpf, onlyDigits } from "../../lib/masks";
-import { BODY_MAX, KIND_OPTIONS, MODE_OPTIONS, PRESERVED_HINT, bodyError, nameError, ombudsmanMessage } from "../../lib/ombudsman";
+import {
+  BAD_CPF, BODY_MAX, GENERIC_MESSAGE, KIND_OPTIONS, MODE_OPTIONS, PRESERVED_HINT, bodyError, nameError, ombudsmanMessage
+} from "../../lib/ombudsman";
 import { AttachmentPicker, TextArea, UnitSelect, type PickedAttachment } from "./OmbudsmanFields";
 import { personLine } from "./PeopleStep";
 import { BigButton, ErrorText, FROZEN_TEXT_NOTICE, Field, RadioGroup, Screen } from "./ui";
@@ -17,7 +19,6 @@ type Mode = "loading" | "failed" | "identity" | "who" | "kind" | "mode" | "text"
 type Result = { id: string; protocol: string; due_on: string | null };
 
 const WHO_TITLE = "Quem está fazendo a manifestação?";
-const BAD_CPF = "CPF inválido. Confira os números.";
 const UPLOAD_WAIT = "Aguarde o anexo terminar de subir.";
 const linkStyle = { minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 18, padding: 0,
   textAlign: "left", color: "var(--ink)" } as const;
@@ -129,7 +130,8 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
       ({ people: list }) => {
         if (!alive.current) return;
         setPeople(list);
-        if (list.length === 1) { setCitizenId(list[0].id); setError(message); return; }
+        // Uma pessoa só: não há o que escolher, então a frase é a genérica (Q62).
+        if (list.length === 1) { setCitizenId(list[0].id); setError(GENERIC_MESSAGE); return; }
         setCitizenId(undefined);
         if (list.length === 0) { setMode("identity"); setError(message); return; }
         setWhoError(message);
@@ -155,9 +157,11 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
     setError(null); setFieldError(null); setUnitError(null); setAttachError(null);
     const local = bodyError(text);
     if (local) return failField(local);
-    const who: ManifestationAuthor = people.length === 0
+    // Com pessoa na sessão, só vai uma delas: sem escolha, nada sai (nunca um citizen_id vazio).
+    const who: ManifestationAuthor | null = people.length === 0
       ? { cpf: onlyDigits(cpf), fullName: fullName.trim() }
-      : { citizenId: citizenId ?? "" };
+      : citizenId ? { citizenId } : null;
+    if (!who) return;
     inFlight.current = true;
     setBusy(true);
     try {
@@ -264,13 +268,14 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
         <BigButton onClick={submit} disabled={busy || uploading} aria-describedby={uploading ? waitId : undefined}>
           Enviar manifestação
         </BigButton>
-        <BigButton variant="secondary" onClick={() => go("mode")}>Voltar</BigButton>
+        <BigButton variant="secondary" disabled={busy} onClick={() => go("mode")}>Voltar</BigButton>
       </>}>
       <UnitSelect units={units} value={healthUnitId} onChange={id => { setHealthUnitId(id); setUnitError(null); }} />
       {unitError && <div style={{ marginBottom: 12 }}><ErrorText>{unitError}</ErrorText></div>}
       <TextArea ref={field} label="Conte o que aconteceu" hint={idMode === "preserved" ? PRESERVED_HINT : FROZEN_TEXT_NOTICE}
         max={BODY_MAX} value={text} error={fieldError ?? undefined} onChange={setText} />
-      <AttachmentPicker items={attachments} disabled={busy} onBusy={setUploading}
+      {/* Desligado enquanto um upload corre, mesmo o de antes de um Voltar: um só por vez, e o onBusy(false) dele não libera o Enviar antes da hora. */}
+      <AttachmentPicker items={attachments} disabled={busy || uploading} onBusy={setUploading}
         onChange={items => { setAttachments(items); setAttachError(null); }} />
       {attachError && <div style={{ marginBottom: 12 }}><ErrorText>{attachError}</ErrorText></div>}
       {error && <ErrorText>{error}</ErrorText>}

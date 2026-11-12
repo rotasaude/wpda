@@ -162,7 +162,7 @@ export function readAsBase64(file: File): Promise<string> {
 const TOO_MANY = "Você já pediu a reabertura desta manifestação.";
 const CHANGED = "A manifestação mudou. Veja como ela está agora.";
 const ONE_OF_PEOPLE = "Escolha uma das pessoas deste celular.";
-const BAD_CPF = "CPF inválido. Confira os números.";
+export const BAD_CPF = "CPF inválido. Confira os números.";
 const TOO_BIG = "O texto ficou grande demais. Encurte e tente de novo.";
 
 // Os 20 códigos reais do api (api-shapes.md §5); o que falta (invalid_cpf, too_many_people, 401...) vem de messageFor.
@@ -196,15 +196,15 @@ const PATH_MESSAGE: Record<string, string> = {
   attachment_ids: "Um dos anexos não vale mais. Remova e anexe de novo."
 };
 
-const GENERIC = "Algo deu errado. Tente de novo.";
+export const GENERIC_MESSAGE = "Algo deu errado. Tente de novo.";
 
 // Código desconhecido: frase genérica, nunca o texto que veio do servidor.
 export function ombudsmanMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.code === "invalid_request") return error.path && has(PATH_MESSAGE, error.path) ? PATH_MESSAGE[error.path] : GENERIC;
+    if (error.code === "invalid_request") return error.path && has(PATH_MESSAGE, error.path) ? PATH_MESSAGE[error.path] : GENERIC_MESSAGE;
     if (has(CODE_MESSAGE, error.code)) return CODE_MESSAGE[error.code];
     const common = messageFor(error);
-    return typeof common === "string" ? common : GENERIC;
+    return typeof common === "string" ? common : GENERIC_MESSAGE;
   }
   return messageFor(error);
 }

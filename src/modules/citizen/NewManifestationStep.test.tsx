@@ -228,6 +228,7 @@ describe("NewManifestationStep", () => {
     expect(onBack).toHaveBeenCalledOnce();
   });
 
+  // Uma pessoa só (Q62): não há o que escolher, então a frase é a genérica, não "Escolha uma das pessoas".
   it("dois toques: uma manifestação; recusa do api mantém o texto", async () => {
     const { create } = stub([ P1 ]);
     create.mockRejectedValueOnce(new ApiError(403, "not_own_citizen"));
@@ -235,7 +236,8 @@ describe("NewManifestationStep", () => {
     renderStep();
     await fillAndSend(user);
     await send(user);
-    expect(await screen.findByRole("alert")).toHaveTextContent("Escolha uma das pessoas deste celular.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Algo deu errado. Tente de novo.");
+    expect(screen.queryByText("Escolha uma das pessoas deste celular.")).toBeNull();
     expect(screen.getByRole("textbox")).toHaveValue(TEXT);
     await user.dblClick(screen.getByRole("button", { name: "Enviar manifestação" }));
     await screen.findByRole("heading", { level: 1, name: "Manifestação registrada" });
@@ -345,6 +347,53 @@ describe("NewManifestationStep", () => {
     expect(screen.queryByText("Aguarde o anexo terminar de subir.")).toBeNull();
     await send(user);
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ attachmentIds: [ "a1" ], body: TEXT }));
+  });
+
+  it("Voltar no meio do upload: outro anexo só sobe depois do primeiro, e Enviar não liga antes da hora", async () => {
+    const { create } = stub([ P1 ]);
+    let first!: (v: { id: string }) => void;
+    let second!: (v: { id: string }) => void;
+    const upload = vi.spyOn(citizenApi, "uploadOmbudsmanAttachment")
+      .mockReturnValueOnce(new Promise((r) => { first = r; }))
+      .mockReturnValueOnce(new Promise((r) => { second = r; }));
+    const file = () => new File([ "%PDF-1" ], "laudo.pdf", { type: "application/pdf" });
+    const picker = () => screen.getByLabelText("Anexar arquivo (opcional)");
+    const user = userEvent.setup();
+    renderStep();
+    await fillAndSend(user);
+    await user.upload(picker(), file());
+    await screen.findByText("Aguarde o anexo terminar de subir.");
+    await user.click(screen.getByRole("button", { name: "Voltar" }));
+    await next(user);
+    expect(picker()).toBeDisabled();
+    await user.upload(picker(), file());
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Enviar manifestação" })).toBeDisabled();
+    await act(async () => { first({ id: "a1" }); });
+    expect(picker()).toBeEnabled();
+    await user.upload(picker(), file());
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: "Enviar manifestação" })).toBeDisabled();
+    await act(async () => { second({ id: "a2" }); });
+    await send(user);
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ attachmentIds: [ "a2" ] }));
+  });
+
+  it("enquanto o POST corre, Voltar fica desligado", async () => {
+    const { create } = stub([ P1 ]);
+    let resolve!: (v: { id: string; protocol: string; due_on: string | null }) => void;
+    create.mockReturnValueOnce(new Promise((r) => { resolve = r; }));
+    const onBack = vi.fn();
+    const user = userEvent.setup();
+    renderStep({ onBack });
+    await fillAndSend(user);
+    await send(user);
+    expect(screen.getByRole("button", { name: "Voltar" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Voltar" }));
+    expect(screen.getByRole("textbox", { name: "Conte o que aconteceu" })).toBeInTheDocument();
+    await act(async () => { resolve({ id: "m9", protocol: "2026-000124", due_on: "2026-12-12" }); });
+    expect(await screen.findByRole("heading", { level: 1, name: "Manifestação registrada" })).toBeInTheDocument();
+    expect(onBack).not.toHaveBeenCalled();
   });
 
   it.each([
