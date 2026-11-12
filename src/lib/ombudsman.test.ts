@@ -148,6 +148,10 @@ describe("anexos", () => {
     expect(attachmentError(file("application/pdf"), 3)).toBe("No máximo 3 anexos.");
     expect(attachmentError(file("image/gif", 99999999), 3)).toBe("No máximo 3 anexos.");
   });
+  it("attachmentError: arquivo vazio (0 byte) é recusado aqui, com a frase do anexo", () => {
+    expect(attachmentError(file("application/pdf", 0), 0)).toBe("Envie um PDF, uma foto JPEG ou PNG, de até 10 MB.");
+    expect(attachmentError(file("image/png", 1), 0)).toBeNull();
+  });
   it("ATTACHMENT_TYPES e attachmentFilename: genérico, pela ordem e pelo tipo", () => {
     expect(ATTACHMENT_TYPES).toEqual({ "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" });
     expect(attachmentFilename(0, "application/pdf")).toBe("anexo-1.pdf");

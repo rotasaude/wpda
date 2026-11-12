@@ -136,10 +136,13 @@ export function nameError(s: string): string | null {
   return null;
 }
 
+const INVALID_FILE = "Envie um PDF, uma foto JPEG ou PNG, de até 10 MB.";
+
 export function attachmentError(file: File, count: number): string | null {
   if (count >= MAX_ATTACHMENTS) return `No máximo ${MAX_ATTACHMENTS} anexos.`;
   if (!has(ATTACHMENT_TYPES, file.type)) return "Envie um PDF, uma foto JPEG ou PNG.";
   if (file.size > MAX_ATTACHMENT_BYTES) return "O arquivo passa de 10 MB.";
+  if (file.size === 0) return INVALID_FILE; // o api recusaria com invalid_file: a mesma frase, sem subir nada
   return null;
 }
 
@@ -173,7 +176,7 @@ const CODE_MESSAGE: Record<string, string> = {
   payload_too_large: TOO_BIG,
   http_413: TOO_BIG,
   not_own_citizen: ONE_OF_PEOPLE,
-  invalid_file: "Envie um PDF, uma foto JPEG ou PNG, de até 10 MB.",
+  invalid_file: INVALID_FILE,
   too_many_attachments: `No máximo ${MAX_ATTACHMENTS} anexos.`,
   manifestation_changed: CHANGED,
   invalid_transition: CHANGED,

@@ -73,6 +73,17 @@ describe("OmbudsmanFields", () => {
     expect(upload).toHaveBeenCalledTimes(2); // remover só tira da lista
   });
 
+  it("AttachmentPicker: arquivo vazio é recusado no aparelho, com a frase do anexo, e nada sobe", async () => {
+    const upload = vi.spyOn(citizenApi, "uploadOmbudsmanAttachment");
+    const onBusy = vi.fn();
+    const user = userEvent.setup();
+    render(<AttachmentPicker items={[]} onChange={vi.fn()} onBusy={onBusy} />);
+    await user.upload(screen.getByLabelText(LABEL), new File([], "vazio.pdf", { type: "application/pdf" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Envie um PDF, uma foto JPEG ou PNG, de até 10 MB.");
+    expect(upload).not.toHaveBeenCalled();
+    expect(onBusy).not.toHaveBeenCalled();
+  });
+
   it.each([
     [ new ApiError(413, "http_413") ],
     [ new ApiError(413, "payload_too_large") ],
