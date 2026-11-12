@@ -1,10 +1,10 @@
 // "Minhas manifestações" (módulo 33; contrato §3, §14): as manifestações de todas as pessoas do celular.
 // Mostra só o que o cidadão pode ver: tipo, protocolo, recebimento, estado (`forwarded` = "Em análise", Q40), prazo,
 // identidade preservada, CPF mascarado e "novo". Lê uma vez ao abrir; sem polling. A denúncia anônima nunca aparece.
-import { useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { citizenApi, type CitizenManifestationSummary } from "../../lib/citizenApi";
 import { fmtDate } from "../../lib/format";
-import { deadlineText, kindLabel, ombudsmanMessage, stateLabel } from "../../lib/ombudsman";
+import { deadlineText, isTerminalReadError, kindLabel, ombudsmanMessage, stateLabel } from "../../lib/ombudsman";
 import { BigButton, ErrorText, Screen } from "./ui";
 
 export const ANONYMOUS_NOT_LISTED = "Denúncias anônimas não aparecem aqui, porque não ficam ligadas a ninguém.";
@@ -49,16 +49,24 @@ export function MyManifestationsStep({ onBack, onNew, onOpen, onAnonymous }: {
 }) {
   const [ items, setItems ] = useState<CitizenManifestationSummary[] | null>(null);
   const [ error, setError ] = useState<string | null>(null);
+  const [ retry, setRetry ] = useState(false);
+  // A resposta que chega depois do desmonte (ou da montagem desfeita do StrictMode) não escreve.
+  const alive = useRef(true);
+
+  const load = useCallback(() => {
+    setError(null);
+    setRetry(false);
+    citizenApi.manifestations().then(
+      list => { if (alive.current) setItems(list); },
+      e => { if (alive.current) { setError(ombudsmanMessage(e)); setRetry(!isTerminalReadError(e)); } }
+    );
+  }, []);
 
   useEffect(() => {
-    // A resposta que chega depois do desmonte (ou da montagem desfeita do StrictMode) não escreve.
-    let alive = true;
-    citizenApi.manifestations().then(
-      list => { if (alive) setItems(list); },
-      e => { if (alive) setError(ombudsmanMessage(e)); }
-    );
-    return () => { alive = false; };
-  }, []);
+    alive.current = true;
+    load();
+    return () => { alive.current = false; };
+  }, [ load ]);
 
   return (
     <Screen title="Minhas manifestações"
@@ -68,6 +76,7 @@ export function MyManifestationsStep({ onBack, onNew, onOpen, onAnonymous }: {
         <BigButton variant="secondary" onClick={onBack}>Voltar</BigButton>
       </>}>
       {error && <ErrorText>{error}</ErrorText>}
+      {retry && <BigButton style={{ marginTop: 12 }} onClick={load}>Tentar de novo</BigButton>}
       {!items && !error && <p role="status">Carregando…</p>}
       {items && items.length === 0 && <p>{EMPTY}</p>}
       {items && items.length > 0 && <ul style={list}>{items.map(m => <Item key={m.id} m={m} onOpen={onOpen} />)}</ul>}

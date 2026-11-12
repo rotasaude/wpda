@@ -83,10 +83,26 @@ describe("MyManifestationsStep", () => {
     expect(onBack).toHaveBeenCalled();
   });
 
-  it("feature_disabled: frase da Ouvidoria, não a do histórico", async () => {
+  it("feature_disabled: frase da Ouvidoria, não a do histórico, e sem Tentar de novo", async () => {
     vi.spyOn(citizenApi, "manifestations").mockRejectedValue(new ApiError(403, "feature_disabled"));
     render(<MyManifestationsStep onBack={vi.fn()} onNew={vi.fn()} onOpen={vi.fn()} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("A Ouvidoria não está disponível agora nesta cidade.");
+    expect(screen.queryByRole("button", { name: "Tentar de novo" })).toBeNull();
+  });
+
+  it.each([
+    [ "sem conexão", new TypeError("Failed to fetch"), "Sem conexão. Verifique a internet e tente de novo." ],
+    [ "500", new ApiError(500, "http_500"), "Algo deu errado. Tente de novo." ]
+  ])("leitura falha (%s): frase e Tentar de novo, que relê", async (_n, err, message) => {
+    const list = vi.spyOn(citizenApi, "manifestations").mockRejectedValueOnce(err).mockResolvedValueOnce([ ITEM ]);
+    const user = opts();
+    render(<MyManifestationsStep onBack={vi.fn()} onNew={vi.fn()} onOpen={vi.fn()} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    await user.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    expect(await screen.findByRole("button", { name: /protocolo 2026-000123/ })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Tentar de novo" })).toBeNull();
+    expect(list).toHaveBeenCalledTimes(2);
   });
 
   it("resposta depois de sair da tela é ignorada", async () => {
@@ -189,6 +205,30 @@ describe("ManifestationDetailStep", () => {
     await user.click(screen.getByRole("button", { name: "Voltar às manifestações" }));
     expect(onBack).toHaveBeenCalled();
     expect(onRead).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [ "sem conexão", new TypeError("Failed to fetch"), "Sem conexão. Verifique a internet e tente de novo." ],
+    [ "500", new ApiError(500, "http_500"), "Algo deu errado. Tente de novo." ]
+  ])("leitura falha (%s): frase e Tentar de novo, que relê; onRead só depois da leitura que deu certo", async (_n, err, message) => {
+    const read = vi.spyOn(citizenApi, "manifestation").mockRejectedValueOnce(err).mockResolvedValueOnce(DETAIL);
+    const onRead = vi.fn();
+    const user = opts();
+    render(<ManifestationDetailStep manifestationId="m1" onBack={vi.fn()} onRead={onRead} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(onRead).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    expect(await screen.findByText("Esperei quatro horas.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tentar de novo" })).toBeNull();
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(onRead).toHaveBeenCalledTimes(1);
+  });
+
+  it("leitura com feature_disabled: sem Tentar de novo", async () => {
+    vi.spyOn(citizenApi, "manifestation").mockRejectedValue(new ApiError(403, "feature_disabled"));
+    render(<ManifestationDetailStep manifestationId="m1" onBack={vi.fn()} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("A Ouvidoria não está disponível agora nesta cidade.");
+    expect(screen.getAllByRole("button").map(b => b.textContent)).toEqual([ "Voltar às manifestações" ]);
   });
 
   it("resposta depois de sair da tela é ignorada", async () => {

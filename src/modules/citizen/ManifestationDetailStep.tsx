@@ -6,8 +6,8 @@ import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } f
 import { ApiError, TIMELINE_TEXT_KINDS, citizenApi, type CitizenManifestation } from "../../lib/citizenApi";
 import { fmtDateTime } from "../../lib/format";
 import {
-  PRESERVED_HINT, REASON_MAX, SATISFACTION, TEXT_MAX, complementError, deadlineText, kindLabel, ombudsmanMessage, reasonError,
-  timelineTitle
+  PRESERVED_HINT, REASON_MAX, SATISFACTION, TEXT_MAX, complementError, deadlineText, isTerminalReadError, kindLabel, ombudsmanMessage,
+  reasonError, timelineTitle
 } from "../../lib/ombudsman";
 import { AttachmentPicker, TextArea, type PickedAttachment } from "./OmbudsmanFields";
 import { StatePill } from "./MyManifestationsStep";
@@ -41,7 +41,8 @@ export function ManifestationDetailStep({ manifestationId, onBack, onRead }: {
   manifestationId: string; onBack: () => void; onRead?: () => void;
 }) {
   const [ detail, setDetail ] = useState<CitizenManifestation | null>(null);
-  const [ failure, setFailure ] = useState<string | null>(null); // sem detalhe para mostrar (404, 403, rede): só Voltar
+  const [ failure, setFailure ] = useState<string | null>(null); // sem detalhe para mostrar (404, 403, rede): Voltar
+  const [ retry, setRetry ] = useState(false); // a primeira leitura falhou por rede ou 5xx: "Tentar de novo"
   const [ open, setOpen ] = useState<Action | null>(null);
   const [ notice, setNotice ] = useState<string | null>(null);
   const [ error, setError ] = useState<string | null>(null); // fora do formulário
@@ -83,15 +84,22 @@ export function ManifestationDetailStep({ manifestationId, onBack, onRead }: {
     }
   }, [ manifestationId ]);
 
-  useEffect(() => {
-    alive.current = true;
+  // A primeira leitura (e a de "Tentar de novo"): só ela chama onRead, uma vez, quando dá certo.
+  const load = useCallback(() => {
+    setFailure(null);
+    setRetry(false);
     void read().then(r => {
       // Q45: o GET do detalhe marcou os avisos como lidos; quem chamou atualiza o selo do topo.
       if (r.status === "ok") onReadRef.current?.();
-      else if (r.status === "failed") setFailure(ombudsmanMessage(r.error));
+      else if (r.status === "failed") { setFailure(ombudsmanMessage(r.error)); setRetry(!isTerminalReadError(r.error)); }
     });
-    return () => { alive.current = false; };
   }, [ read ]);
+
+  useEffect(() => {
+    alive.current = true;
+    load();
+    return () => { alive.current = false; };
+  }, [ load ]);
 
   // Foco: o campo (ou a pergunta) ao abrir; o botão que abriu, ao cancelar.
   useEffect(() => {
@@ -215,6 +223,7 @@ export function ManifestationDetailStep({ manifestationId, onBack, onRead }: {
     return (
       <Screen title="Manifestação" footer={back}>
         {failure ? <ErrorText>{failure}</ErrorText> : <p role="status">Carregando…</p>}
+        {failure && retry && <BigButton style={{ marginTop: 12 }} onClick={load}>Tentar de novo</BigButton>}
       </Screen>
     );
   }

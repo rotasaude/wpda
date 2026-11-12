@@ -201,6 +201,10 @@ const PATH_MESSAGE: Record<string, string> = {
 
 export const GENERIC_MESSAGE = "Algo deu errado. Tente de novo.";
 
+// Leitura que não adianta repetir: a manifestação não está aqui (404) ou a Ouvidoria está desligada. O resto (rede, 5xx) tem "Tentar de novo".
+export const isTerminalReadError = (error: unknown): boolean =>
+  error instanceof ApiError && (error.code === "not_found" || error.code === "feature_disabled");
+
 // Código desconhecido: frase genérica, nunca o texto que veio do servidor.
 export function ombudsmanMessage(error: unknown): string {
   if (error instanceof ApiError) {
