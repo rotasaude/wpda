@@ -3,6 +3,7 @@
 // as rotas públicas nunca levam o cookie nem derrubam a sessão.
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { citizenApi, ApiError } from "./citizenApi";
+import { GENERIC_MESSAGE, ombudsmanMessage } from "./ombudsman";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
@@ -197,6 +198,26 @@ describe("citizenApi — minhas manifestações (módulo 33, §3)", () => {
     expect(sent(m).body).not.toHaveProperty("citizen_id");
     expect(sent(m).url).toBe("/citizen/ombudsman/manifestations");
     expect(sent(m).url).not.toMatch(/52998224725|Maria/);
+  });
+
+  it("createManifestation e uploadOmbudsmanAttachment: resposta sem id é recusada, nunca vira \"\"", async () => {
+    const create = () => citizenApi.createManifestation({ who: { citizenId: "p2" }, kind: "report", mode: "preserved",
+      body: "Texto com mais de vinte letras.", healthUnitId: null, attachmentIds: [] });
+    const upload = () => citizenApi.uploadOmbudsmanAttachment({ filename: "anexo-1.pdf", contentType: "application/pdf", data: "JVBERi0=" });
+    for (const body of [ { protocol: "2026-000124", due_on: null }, { id: "", protocol: "2026-000124" }, { id: 9, protocol: "2026-000124" } ]) {
+      stubFetch(201, body);
+      const err = await create().catch(e => e);
+      expect(err).toBeInstanceOf(ApiError);
+      expect(err.code).toBe("invalid_response");
+      expect(ombudsmanMessage(err)).toBe(GENERIC_MESSAGE);
+    }
+    for (const body of [ {}, { id: "" }, { id: 7 } ]) {
+      stubFetch(201, body);
+      const err = await upload().catch(e => e);
+      expect(err).toBeInstanceOf(ApiError);
+      expect(err.code).toBe("invalid_response");
+      expect(ombudsmanMessage(err)).toBe(GENERIC_MESSAGE);
+    }
   });
 
   it("uploadOmbudsmanAttachment: nome que não é anexo-N.ext não sai do aparelho", async () => {

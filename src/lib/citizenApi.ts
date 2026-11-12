@@ -824,6 +824,11 @@ const deadlineColor = (v: unknown): DeadlineColor | null =>
 
 // Q2/W8: só o nome genérico sai do aparelho (o do arquivo pode trazer o nome de quem pediu sigilo).
 const GENERIC_ATTACHMENT_NAME = /^anexo-[1-9]\d*\.(pdf|jpg|png)$/;
+// Um id que faltou nunca vira "": a manifestação abriria sem id e o anexo voltaria como { id: "" } (recusado só no POST).
+function requiredId(d: Record<string, unknown>): string {
+  if (typeof d.id !== "string" || d.id === "") throw new ApiError(502, "invalid_response");
+  return d.id;
+}
 
 function normalizePublicConfig(raw: unknown): OmbudsmanPublicConfig {
   const d = rec(raw);
@@ -1083,7 +1088,7 @@ export const citizenApi = {
       ...(m.healthUnitId ? { health_unit_id: m.healthUnitId } : {}),
       ...(m.attachmentIds.length > 0 ? { attachment_ids: m.attachmentIds } : {})
     }));
-    return { id: str(d.id), protocol: str(d.protocol), due_on: strOrNull(d.due_on) };
+    return { id: requiredId(d), protocol: str(d.protocol), due_on: strOrNull(d.due_on) };
   },
   // As três ações respondem o detalhe novo; a tela relê, então o corpo é descartado.
   complementManifestation: async (id: string, c: { body: string; attachmentIds: string[] }): Promise<void> => {
@@ -1103,6 +1108,6 @@ export const citizenApi = {
     if (!GENERIC_ATTACHMENT_NAME.test(f.filename)) throw new Error("ombudsman attachment needs a generic name");
     const d = rec(await call<unknown>("POST", "/ombudsman/attachments",
       { filename: f.filename, content_type: f.contentType, data: f.data }));
-    return { id: str(d.id) };
+    return { id: requiredId(d) };
   }
 };
