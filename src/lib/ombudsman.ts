@@ -2,7 +2,7 @@
 import { ApiError } from "./citizenApi";
 import type { DeadlineColor, ManifestationState } from "./citizenApi";
 import { cityToday, fmtCalendarDate } from "./format";
-import { FROZEN_TEXT_NOTICE, messageFor } from "../modules/citizen/ui";
+import { messageFor } from "../modules/citizen/ui";
 
 export const OMBUDSMAN_FEATURE = "ombudsman";
 export const ANONYMOUS_WEB_FEATURE = "ombudsman_anonymous_web";
@@ -11,7 +11,7 @@ export const ANONYMOUS_WARNING = "Sem identificação, você não recebe protoco
 export const ANONYMOUS_DISABLED = "A denúncia anônima não está disponível agora nesta cidade.";
 export const REPORT_HINT = "Conte o que aconteceu, onde e quando. Não escreva seu nome, CPF ou telefone.";
 export const PRESERVED_HINT = "Para manter sua identidade preservada, não escreva no texto seu nome, CPF, telefone ou endereço.";
-export const OMBUDSMAN_NOTICE_HINT = FROZEN_TEXT_NOTICE;
+export const OMBUDSMAN_NOTICE_HINT = "Os detalhes estão em \"Minhas manifestações\", na Ouvidoria.";
 
 // Faixas do api (catalog.rb:42-52), em code points depois do strip.
 export const BODY_MIN = 20;

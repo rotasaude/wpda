@@ -435,6 +435,7 @@ export function Flow() {
       // A caixa não depende do termo (ADR 0024): sem versão guardada, voltar
       // leva ao termo, que segue obrigatório para começar a triagem.
       view = <NoticesStep key={navTick} onRead={refreshBadge}
+        onOmbudsman={hasSessionFeature(OMBUDSMAN_FEATURE) ? () => setState({ at: "ombudsman", consentVersion: state.consentVersion }) : undefined}
         onPreferences={() => setState({ at: "preferences", consentVersion: state.consentVersion })}
         onBack={() => setState(state.consentVersion ? { at: "people", consentVersion: state.consentVersion } : { at: "consent" })} />;
       break;
