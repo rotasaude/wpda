@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   NOT_VERIFIED_INVITE, PARTIAL_NOTICE, citizenKindLabel, citizenStatusLabel, documentFilename, entryPlace, entryStatusText, entryWhen, mergeEntries, sinceText,
-  vitalsLines, URGENCY_KIND
+  vitalsLines, URGENCY_KIND, HOME_VISIT_KIND
 } from "./history";
 import type { CitizenEntry } from "./citizenApi";
 import { ApiError } from "./citizenApi";
@@ -135,5 +135,24 @@ describe("módulo 32a", () => {
     expect(entryPlace(e("u2", { kind: URGENCY_KIND, professional_name: "Dr. Paulo Mendes" }))).toBeNull();
     expect(entryStatusText(u)).toBeNull();
     expect(entryStatusText({ ...u, status: "in_care", status_label: "amarela" })).toBeNull();
+  });
+});
+
+describe("módulo 24b", () => {
+  it("entrada home_visit: rótulo Visita, sem lugar, sem profissional, sem situação", () => {
+    const v = e("home_visit:v1", { kind: HOME_VISIT_KIND, title: "Visita do agente de saúde", unit: { name: "UBS Centro" },
+      professional_name: "Maria Souza", status: "recorded", status_label: "realizada", summary: "Realizada" });
+    expect(HOME_VISIT_KIND).toBe("home_visit");
+    expect(citizenKindLabel("home_visit")).toBe("Visita");
+    expect(entryPlace(v)).toBeNull();
+    expect(entryStatusText(v)).toBeNull();
+  });
+
+  it("home_visit: só o dia, no fuso da cidade", () => {
+    // 23h30 de Brasília = 02h30 UTC do dia seguinte: o dia é o da cidade.
+    expect(entryWhen(e("home_visit:v2", { kind: HOME_VISIT_KIND, occurred_at: "2026-11-11T02:30:00Z" }))).toBe("10/11/2026");
+    expect(entryWhen(e("home_visit:v3", { kind: HOME_VISIT_KIND, occurred_at: "2026-11-10T09:40:00-03:00" }))).not.toMatch(/09:40/);
+    // Forma real do api: meio-dia local.
+    expect(entryWhen(e("home_visit:v4", { kind: HOME_VISIT_KIND, occurred_at: "2026-11-10T12:00:00-03:00" }))).toBe("10/11/2026");
   });
 });
