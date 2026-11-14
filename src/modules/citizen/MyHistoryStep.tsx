@@ -11,7 +11,7 @@ import {
 } from "../../lib/citizenApi";
 import {
   DOCUMENT_GONE, NOT_VERIFIED_INVITE, PARTIAL_NOTICE, SUMMARY_EMPTY, citizenKindLabel, entryFilename,
-  VACCINATION_KIND, TRANSPORT_KIND, entryPlace, entryStatusText, entryWhen, mergeEntries, sinceText, vitalsLines
+  VACCINATION_KIND, TRANSPORT_KIND, HOME_VISIT_KIND, entryPlace, entryStatusText, entryWhen, mergeEntries, sinceText, vitalsLines
 } from "../../lib/history";
 import { EXAM_KIND, EXAM_PDF_GONE } from "../../lib/exams";
 import { fmtDate } from "../../lib/format";
@@ -212,8 +212,9 @@ function EntryList({ entries, downloading, downloadError, onDownload }:
       {entries.map((e) => {
         const place = entryPlace(e);
         const status = entryStatusText(e);
-        // Vacina (módulo 29, RF5) e viagem (módulo 30): só título, data e unidade; resumo e documento do api não se desenham.
-        const noDetail = e.kind === VACCINATION_KIND || e.kind === TRANSPORT_KIND;
+        // Vacina (módulo 29, RF5), viagem (módulo 30) e visita do agente de saúde (módulo 24b): só título e data (a vacina
+        // com a unidade); resumo e documento do api não se desenham.
+        const noDetail = e.kind === VACCINATION_KIND || e.kind === TRANSPORT_KIND || e.kind === HOME_VISIT_KIND;
         return (
           <li key={e.id} style={card}>
             <strong>{citizenKindLabel(e.kind)}</strong>
