@@ -511,6 +511,20 @@ export function isCapsOnlyKind(kind: string): boolean {
   return kind === "psychosocial" || kind.startsWith("psychosocial_");
 }
 
+// Módulo 24b (contrato §12; W2–W5): a visita do agente de saúde chega ao cidadão só realizada e não retirada,
+// com a data e o título. O título é deste canal, nunca o do api: o do profissional ("Visita domiciliar") e o
+// resumo dele (desfecho, motivos, medidas) não passam. Situação não nula ou sem data é a visão do
+// profissional vazando: a entrada some.
+export const HOME_VISIT_KIND = "home_visit";
+export const HOME_VISIT_TITLE = "Visita do agente de saúde";
+
+function normalizeHomeVisitEntry(e: RawEntry): CitizenEntry | null {
+  if (e.status != null) return null;
+  if (typeof e.occurred_at !== "string" || e.occurred_at === "") return null;
+  return { id: e.id, kind: HOME_VISIT_KIND, occurred_at: e.occurred_at, unit: null, professional_name: null,
+    title: HOME_VISIT_TITLE, summary: null, status: null, document: null };
+}
+
 function normalizeEntry(e: RawEntry): CitizenEntry {
   return {
     id: e.id, kind: e.kind ?? "", occurred_at: e.occurred_at ?? "",
@@ -1008,7 +1022,10 @@ export const citizenApi = {
       "GET", `/history?${params.toString()}`);
     return {
       verified: d.verified === true, partial: d.partial === true,
-      entries: (d.entries ?? []).map(normalizeEntry).filter((e) => !isCapsOnlyKind(e.kind)), next_before: d.next_before ?? null
+      entries: (d.entries ?? [])
+        .map((e) => (e.kind === HOME_VISIT_KIND ? normalizeHomeVisitEntry(e) : normalizeEntry(e)))
+        .filter((e): e is CitizenEntry => e !== null && !isCapsOnlyKind(e.kind)),
+      next_before: d.next_before ?? null
     };
   },
   // Só par validado com prontuário (403 not_verified; 404 not_available).
