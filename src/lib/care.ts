@@ -41,7 +41,8 @@ export function careItemView(item: CareItem): { title: string; status: string | 
       return { title, status: item.by_team === true ? `O agente de saúde deve passar até ${day}` : `Faça até ${day}`, tone: "warn" };
     }
     case "overdue":
-      if (item.by_team === true) return { title, status: "A visita está atrasada — fale com a sua unidade de saúde", tone: "warn" };
+      // Q79: logo depois da 1ª de duas visitas o item ainda vem atrasado; a frase serve com nenhuma ou uma.
+      if (item.by_team === true) return { title, status: "Ainda faltam visitas do agente de saúde — se tiver dúvida, fale com a sua unidade de saúde", tone: "warn" };
       return { title, status: "Está na hora — procure a sua unidade de saúde", tone: "warn" };
     // O api nunca manda "untracked" (P5a); fica só como defesa.
     case "untracked": return { title, status: "Confira com a sua equipe de saúde", tone: "neutral" };

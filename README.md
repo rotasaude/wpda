@@ -154,8 +154,9 @@ acompanhamento" mostra a prática "Visitas do agente de saúde" com a situação
 ela conta a visita realizada, com motivo, do agente comunitário de saúde, assim
 que é gravada. O item vem com `by_team: true` (o cliente lê só esse campo,
 `=== true`) e usa frases próprias: "O agente de saúde deve passar até `<dia>`" perto
-do prazo e "A visita está atrasada — fale com a sua unidade de saúde" quando
-atrasada; nos outros estados e itens, as frases de sempre. Não há tela, botão,
+do prazo e "Ainda faltam visitas do agente de saúde — se tiver dúvida, fale com a
+sua unidade de saúde" quando atrasada, com nenhuma ou com uma das visitas feitas
+(Q79); nos outros estados e itens, as frases de sempre. Não há tela, botão,
 aviso nem SMS novo. A atividade coletiva não aparece no canal web.
 
 **Ouvidoria (módulo 33).** Com `ombudsman` ligado na cidade, a tela inicial

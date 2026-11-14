@@ -28,9 +28,14 @@ describe("careItemView — visita do agente (módulo 24b, Q25)", () => {
       .toEqual({ title: "Visitas do agente de saúde", status: "O agente de saúde deve passar até 10/12/2026", tone: "warn" });
   });
 
-  it("item by_team overdue manda falar com a unidade", () => {
+  // Q79: a frase serve com nenhuma ou com uma das visitas feitas, com ou sem data.
+  it("item by_team overdue diz que ainda faltam visitas, sem data", () => {
     expect(careItemView({ ...visit, status: "overdue", due_on: null }))
-      .toEqual({ title: "Visitas do agente de saúde", status: "A visita está atrasada — fale com a sua unidade de saúde", tone: "warn" });
+      .toEqual({ title: "Visitas do agente de saúde", status: "Ainda faltam visitas do agente de saúde — se tiver dúvida, fale com a sua unidade de saúde", tone: "warn" });
+  });
+
+  it("item by_team overdue com data usa a mesma frase", () => {
+    expect(careItemView({ ...visit, status: "overdue", due_on: "2026-10-01" }).status).toBe("Ainda faltam visitas do agente de saúde — se tiver dúvida, fale com a sua unidade de saúde");
   });
 
   it("item by_team due_soon sem data usa o fallback de sempre", () => {

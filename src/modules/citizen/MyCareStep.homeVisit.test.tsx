@@ -48,11 +48,12 @@ describe("MyCareStep — prática de visita (módulo 24b)", () => {
     expect(within(screen.getByRole("listitem", { name: "Medir a pressão" })).getByText("Em dia")).toBeInTheDocument();
   });
 
-  it("atrasada, sem data: manda falar com a unidade de saúde", async () => {
+  it("atrasada, sem data: ainda faltam visitas, com a unidade para dúvidas (Q79)", async () => {
     stubCare("overdue", null);
     renderCare();
     expect(within(await screen.findByRole("listitem", { name: LABEL }))
-      .getByText("A visita está atrasada — fale com a sua unidade de saúde")).toBeInTheDocument();
+      .getByText("Ainda faltam visitas do agente de saúde — se tiver dúvida, fale com a sua unidade de saúde")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/A visita está atrasada/);
   });
 
   it("item sem by_team atrasado: a frase de sempre", async () => {
