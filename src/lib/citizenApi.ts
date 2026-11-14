@@ -511,6 +511,9 @@ export function isCapsOnlyKind(kind: string): boolean {
   return kind === "psychosocial" || kind.startsWith("psychosocial_");
 }
 
+// Módulo 24b: a atividade coletiva é da equipe; o api já filtra, isto é a defesa da borda (mesmo padrão do CAPS).
+export const COLLECTIVE_ACTIVITY_KIND = "collective_activity";
+
 // Módulo 24b (contrato §12; W2–W5): a visita do agente de saúde chega ao cidadão só realizada e não retirada,
 // com a data e o título. O título é deste canal, nunca o do api: o do profissional ("Visita domiciliar") e o
 // resumo dele (desfecho, motivos, medidas) não passam. Situação não nula ou sem data é a visão do
@@ -1028,7 +1031,7 @@ export const citizenApi = {
       verified: d.verified === true, partial: d.partial === true,
       entries: (d.entries ?? [])
         .map((e) => (e.kind === HOME_VISIT_KIND ? normalizeHomeVisitEntry(e) : normalizeEntry(e)))
-        .filter((e): e is CitizenEntry => e !== null && !isCapsOnlyKind(e.kind)),
+        .filter((e): e is CitizenEntry => e !== null && !isCapsOnlyKind(e.kind) && e.kind !== COLLECTIVE_ACTIVITY_KIND),
       next_before: d.next_before ?? null
     };
   },

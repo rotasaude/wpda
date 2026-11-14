@@ -57,6 +57,12 @@ describe("citizenApi.history — visita do agente de saúde (módulo 24b)", () =
       professional_name: "Enf. Carla", title: "Triagem respiratória", summary: null, status: "completed", document: null });
   });
 
+  it("atividade coletiva nunca chega ao cidadão (defesa da borda)", async () => {
+    mockJson(page([ VISIT, { id: "collective_activity:c1", kind: "collective_activity", occurred_at: "2026-11-08T10:00:00-03:00", title: "Atividade coletiva" }, TRIAGE ]));
+    const h = await citizenApi.history("p1");
+    expect(h.entries.map((x) => x.id)).toEqual([ "home_visit:v1", "triage:t1" ]);
+  });
+
   it("a linha do tempo não pede kinds: a visita chega na lista de sempre (W1)", async () => {
     const fn = mockJson(page([ VISIT ]));
     await citizenApi.history("p1");
