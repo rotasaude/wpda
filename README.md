@@ -142,6 +142,22 @@ lugar e da situação (`history.ts`). Quem chegou sem identificação só aparec
 depois de identificado, e aí no histórico da própria pessoa. Não há tela nova
 nem botão novo: a espera de cada UPA está fora (spec, "Fora desta entrega").
 
+**Visita do agente de saúde (módulo 24b).** A visita que o agente de saúde fez
+e registrou como realizada aparece em "Meu histórico" como "Visita", só com o
+dia e "Visita do agente de saúde". Nunca aparecem o nome do agente, a unidade,
+os motivos, as medidas, a observação nem a hora. A visita recusada, a de quem
+não estava em casa e a retirada pela equipe não aparecem; a visita a imóvel sem
+morador também não. O cliente se defende: monta a entrada campo a campo, com o
+título fixo, e descarta a que chegar com situação (`citizenApi.ts`,
+`normalizeHomeVisitEntry`). Com `home_visits` ligado na cidade, "Meu
+acompanhamento" mostra a prática "Visitas do agente de saúde" com a situação;
+ela conta a visita realizada, com motivo, do agente comunitário de saúde, assim
+que é gravada. O item vem com `by_team: true` (o cliente lê só esse campo,
+`=== true`) e usa frases próprias: "O agente de saúde deve passar até <dia>" perto
+do prazo e "A visita está atrasada — fale com a sua unidade de saúde" quando
+atrasada; nos outros estados e itens, as frases de sempre. Não há tela, botão,
+aviso nem SMS novo. A atividade coletiva não aparece no canal web.
+
 **Ouvidoria (módulo 33).** Com `ombudsman` ligado na cidade, a tela inicial
 mostra "Ouvidoria", com "Fazer uma manifestação" (entra com o celular e vai
 direto à Ouvidoria, sem o termo da triagem) e, com `ombudsman_anonymous_web`,

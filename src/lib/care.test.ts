@@ -20,6 +20,35 @@ describe("careItemView", () => {
   });
 });
 
+describe("careItemView — visita do agente (módulo 24b, Q25)", () => {
+  const visit = { label: "Visitas do agente de saúde", due_on: "2026-12-10", by_team: true };
+
+  it("item by_team due_soon mostra a frase do agente", () => {
+    expect(careItemView({ ...visit, status: "due_soon" }))
+      .toEqual({ title: "Visitas do agente de saúde", status: "O agente de saúde deve passar até 10/12/2026", tone: "warn" });
+  });
+
+  it("item by_team overdue manda falar com a unidade", () => {
+    expect(careItemView({ ...visit, status: "overdue", due_on: null }))
+      .toEqual({ title: "Visitas do agente de saúde", status: "A visita está atrasada — fale com a sua unidade de saúde", tone: "warn" });
+  });
+
+  it("item by_team due_soon sem data usa o fallback de sempre", () => {
+    expect(careItemView({ ...visit, status: "due_soon", due_on: null }).status).toBe("Está chegando a hora");
+  });
+
+  it("item by_team ok segue Em dia", () => {
+    expect(careItemView({ ...visit, status: "ok" })).toEqual({ title: "Visitas do agente de saúde", status: "Em dia", tone: "ok" });
+  });
+
+  it("item sem by_team segue Faça até e a frase de sempre no overdue", () => {
+    expect(careItemView({ label: "medir a pressão", status: "due_soon", due_on: "2026-12-10" }).status).toBe("Faça até 10/12/2026");
+    expect(careItemView({ label: "medir a pressão", status: "due_soon", due_on: "2026-12-10", by_team: false }).status).toBe("Faça até 10/12/2026");
+    expect(careItemView({ label: "medir a pressão", status: "overdue", due_on: null }).status)
+      .toBe("Está na hora — procure a sua unidade de saúde");
+  });
+});
+
 describe("triagem periódica vencida", () => {
   it("frase da última vez; sem data, nada", () => {
     expect(lastDoneText({ last_done_at: "2025-10-02" })).toBe("Feita pela última vez em 02/10/2025");

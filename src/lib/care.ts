@@ -36,9 +36,13 @@ export function careItemView(item: CareItem): { title: string; status: string | 
     case "ok": return { title, status: "Em dia", tone: "ok" };
     case "due_soon": {
       const day = fmtCalendarDate(item.due_on);
-      return { title, status: day === "—" ? "Está chegando a hora" : `Faça até ${day}`, tone: "warn" };
+      if (day === "—") return { title, status: "Está chegando a hora", tone: "warn" };
+      // Prática do agente de saúde (módulo 24b, Q25): quem passa é o agente, não o cidadão que vai.
+      return { title, status: item.by_team === true ? `O agente de saúde deve passar até ${day}` : `Faça até ${day}`, tone: "warn" };
     }
-    case "overdue": return { title, status: "Está na hora — procure a sua unidade de saúde", tone: "warn" };
+    case "overdue":
+      if (item.by_team === true) return { title, status: "A visita está atrasada — fale com a sua unidade de saúde", tone: "warn" };
+      return { title, status: "Está na hora — procure a sua unidade de saúde", tone: "warn" };
     // O api nunca manda "untracked" (P5a); fica só como defesa.
     case "untracked": return { title, status: "Confira com a sua equipe de saúde", tone: "neutral" };
     // Marco de vacina com a caderneta ainda não conferida (módulo 29): sem pendência.

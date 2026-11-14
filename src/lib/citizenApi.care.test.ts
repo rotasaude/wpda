@@ -60,6 +60,23 @@ describe("cliente do acompanhamento (contrato §7)", () => {
     expect(urlOf()).toBe("/citizen/care?citizen_id=p1");
   });
 
+  it("care: lê só by_team === true; false, texto e ausente não criam a chave; source e min_gap_days são descartados", async () => {
+    fetchMock.mockResolvedValueOnce(reply(200, { lines: [ { name: "L", items: [
+      { label: "a", status: "overdue", due_on: null, by_team: true, source: "acs_visit", min_gap_days: 30 },
+      { label: "b", status: "ok", due_on: null, by_team: false },
+      { label: "c", status: "ok", due_on: null, by_team: "true" },
+      { label: "d", status: "ok", due_on: null }
+    ] } ] }));
+    const care = await citizenApi.care("p1");
+    expect(care.lines[0].items).toEqual([
+      { label: "a", status: "overdue", due_on: null, by_team: true },
+      { label: "b", status: "ok", due_on: null },
+      { label: "c", status: "ok", due_on: null },
+      { label: "d", status: "ok", due_on: null }
+    ]);
+    expect("by_team" in care.lines[0].items[1]).toBe(false);
+  });
+
   it("care: 403 not_verified vira ApiError com o código", async () => {
     fetchMock.mockResolvedValueOnce(reply(403, { error: "not_verified" }));
     await expect(citizenApi.care("p1")).rejects.toEqual(new ApiError(403, "not_verified"));

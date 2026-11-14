@@ -598,7 +598,8 @@ async function pdf(path: string): Promise<Blob> {
 // motivo, sugestão) é descartado aqui.
 export type DeclaredCondition = "diabetes" | "hypertension" | "pregnancy" | "mental_health" | "none";
 export interface DeclaredConditionEntry { condition: DeclaredCondition | string; declared_at: string }
-export interface CareItem { label: string; status: string; due_on: string | null }
+// by_team (módulo 24b, Q25): a prática é do agente de saúde; só `true` conta, ausente = false.
+export interface CareItem { label: string; status: string; due_on: string | null; by_team?: boolean }
 export interface CareLineView { name: string; items: CareItem[] }
 // L9 do plano do api: as triagens periódicas vencidas vêm junto.
 export interface OverdueTriage { protocol_name: string; title: string; last_done_at: string | null }
@@ -606,7 +607,7 @@ export interface CitizenCare { lines: CareLineView[]; overdue_triages: OverdueTr
 
 type RawConditions = { conditions?: { condition: string; declared_at?: string }[] } | undefined;
 type RawCare = {
-  lines?: { name?: string; items?: { label?: string; status?: string; due_on?: string | null }[] }[];
+  lines?: { name?: string; items?: { label?: string; status?: string; due_on?: string | null; by_team?: unknown }[] }[];
   overdue_triages?: { protocol_name: string; title?: string; last_done_at?: string | null }[];
 };
 
@@ -618,7 +619,10 @@ function normalizeCare(d: RawCare): CitizenCare {
   return {
     lines: (d.lines ?? []).map(l => ({
       name: l.name ?? "",
-      items: (l.items ?? []).map(i => ({ label: i.label ?? "", status: i.status ?? "", due_on: i.due_on ?? null }))
+      items: (l.items ?? []).map(i => ({
+        label: i.label ?? "", status: i.status ?? "", due_on: i.due_on ?? null,
+        ...(i.by_team === true ? { by_team: true } : {})
+      }))
     })),
     overdue_triages: (d.overdue_triages ?? []).map(t => ({
       protocol_name: t.protocol_name, title: t.title ?? "", last_done_at: t.last_done_at ?? null
