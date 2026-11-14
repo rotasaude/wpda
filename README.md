@@ -153,7 +153,7 @@ título fixo, e descarta a que chegar com situação (`citizenApi.ts`,
 acompanhamento" mostra a prática "Visitas do agente de saúde" com a situação;
 ela conta a visita realizada, com motivo, do agente comunitário de saúde, assim
 que é gravada. O item vem com `by_team: true` (o cliente lê só esse campo,
-`=== true`) e usa frases próprias: "O agente de saúde deve passar até o dia combinado" perto
+`=== true`) e usa frases próprias: "O agente de saúde deve passar até `<dia>`" perto
 do prazo e "A visita está atrasada — fale com a sua unidade de saúde" quando
 atrasada; nos outros estados e itens, as frases de sempre. Não há tela, botão,
 aviso nem SMS novo. A atividade coletiva não aparece no canal web.
