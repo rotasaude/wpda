@@ -36,6 +36,7 @@ export function AnonymousReportStep({ onBack, offPhone = false }: { onBack: () =
   const [ addressError, setAddressError ] = useState<string | null>(null);
   const [ subtypeError, setSubtypeError ] = useState<string | null>(null);
   const addressInput = useRef<HTMLInputElement>(null);
+  const subtypeGroup = useRef<HTMLDivElement>(null);
   const inFlight = useRef(false); // o estado só vale no próximo render; o ref fecha a porta no mesmo tick
   const alive = useRef(true);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -85,8 +86,11 @@ export function AnonymousReportStep({ onBack, offPhone = false }: { onBack: () =
     if (inFlight.current) return;
     setError(null); setFieldError(null); setUnitError(null); setAddressError(null); setSubtypeError(null);
     const asking = zoonosesOn && aboutAnimals === "yes";
-    // O endereço nunca vai sozinho; com o assunto, ele é obrigatório (Q15). Sem os dois, a pergunta fica sem resposta.
-    if (asking && !subtype && placeAddress.trim() !== "") return setSubtypeError("Escolha o assunto.");
+    // Sim exige o assunto (como na manifestação); com ele, o endereço é obrigatório (Q15). Sem resposta, vale Não.
+    if (asking && !subtype) {
+      setSubtypeError("Escolha o assunto.");
+      return subtypeGroup.current?.querySelector<HTMLInputElement>("input[type=radio]")?.focus();
+    }
     const withZoonoses = asking && subtype !== undefined;
     const addressBad = withZoonoses ? placeAddressError(placeAddress) : null;
     if (addressBad) { setAddressError(addressBad); return addressInput.current?.focus(); }
@@ -150,8 +154,10 @@ export function AnonymousReportStep({ onBack, offPhone = false }: { onBack: () =
           {aboutAnimals === "yes" && (
             <>
               <div style={{ marginBottom: 12 }}><p style={warnNote}>{ZOONOSES_NOTICE}</p></div>
-              <RadioGroup legend="Assunto" options={ZOONOSES_SUBTYPES} value={subtype} disabled={busy} error={subtypeError ?? undefined}
-                onChange={t => { setSubtype(t as ZoonosesSubtype); setSubtypeError(null); }} />
+              <div ref={subtypeGroup}>
+                <RadioGroup legend="Assunto" options={ZOONOSES_SUBTYPES} value={subtype} disabled={busy} error={subtypeError ?? undefined}
+                  onChange={t => { setSubtype(t as ZoonosesSubtype); setSubtypeError(null); }} />
+              </div>
               <Field ref={addressInput} label={ZOONOSES_ADDRESS_LABEL} autoComplete="off" value={placeAddress} readOnly={busy}
                 error={addressError ?? undefined} onChange={e => { setPlaceAddress(e.target.value); setAddressError(null); }} />
             </>

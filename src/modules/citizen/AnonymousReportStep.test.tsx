@@ -351,15 +351,41 @@ describe("AnonymousReportStep com zoonoses (35b)", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("anônima com Sim e sem subtipo nem endereço: envia sem zoonoses", async () => {
+  it("anônima com Sim e sem assunto: pede o assunto, foca o grupo e não envia", async () => {
     vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG_ZOO);
-    const send = vi.spyOn(citizenApi, "sendAnonymousReport").mockResolvedValue(undefined);
+    const send = vi.spyOn(citizenApi, "sendAnonymousReport");
     const user = userEvent.setup();
     render(<AnonymousReportStep onBack={vi.fn()} />);
     await fill(user, { yes: true });
     await user.click(sendBtn());
+    expect(screen.getByRole("group", { name: "Assunto" })).toHaveAccessibleDescription("Escolha o assunto.");
+    expect(screen.getAllByRole("radio", { name: "Escorpião" })[0]).toHaveFocus();
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("anônima sem responder a pergunta: corpo do 33", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG_ZOO);
+    const send = vi.spyOn(citizenApi, "sendAnonymousReport").mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    await fill(user, {});
+    await user.click(sendBtn());
     await screen.findByRole("heading", { level: 1, name: "Denúncia enviada" });
     expect(send).toHaveBeenCalledWith({ body: TEXT, healthUnitId: null });
+  });
+
+  it("422 place_address: foca o endereço e mantém o texto", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG_ZOO);
+    vi.spyOn(citizenApi, "sendAnonymousReport").mockRejectedValue(new ApiError(422, "invalid_request", "place_address"));
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    await fill(user, { yes: true, subtype: "Morcego", address: ADDRESS });
+    await user.click(sendBtn());
+    const input = screen.getByLabelText(ZOONOSES_ADDRESS_LABEL);
+    await vi.waitFor(() => expect(input).toHaveFocus());
+    expect(input).toHaveAccessibleDescription(ombudsmanMessage(new ApiError(422, "invalid_request", "place_address")));
+    expect(input).toHaveValue(ADDRESS);
+    expect(screen.getByRole("textbox", { name: BODY_LABEL })).toHaveValue(TEXT);
   });
 
   it("endereço sem subtipo: pede o assunto e não envia", async () => {
