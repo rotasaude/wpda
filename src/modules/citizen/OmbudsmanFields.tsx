@@ -98,12 +98,12 @@ export function AttachmentPicker({ items, onChange, disabled, onBusy }: {
   }
 
   return (
-    <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 6, marginBottom: 12 }}>
       {items.length < MAX_ATTACHMENTS && (
         <>
           <label htmlFor={id} style={{ fontWeight: 600 }}>Anexar arquivo (opcional)</label>
           <input id={id} type="file" accept={Object.keys(ATTACHMENT_TYPES).join(",")} disabled={disabled || busy}
-            aria-describedby={hintId} style={{ minHeight: 48, fontSize: 18 }}
+            aria-describedby={hintId} style={{ minHeight: 48, fontSize: 18, maxWidth: "100%", minWidth: 0, boxSizing: "border-box" }}
             onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; void pick(f); }} />
           <p id={hintId} style={hintStyle}>Até 3 arquivos, PDF, JPEG ou PNG, de até 10 MB cada.</p>
         </>
