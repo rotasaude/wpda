@@ -91,22 +91,7 @@ test("Solicitação de escorpião: pergunta, assunto, endereço e aviso; corpo e
   await expect(page.getByText(ZOONOSES_NOTICE, { exact: true })).toBeVisible();
   await page.getByLabel(ZOONOSES_ADDRESS_LABEL).fill(SCORPION_ADDRESS);
   await page.getByRole("textbox", { name: "Conte o que aconteceu" }).fill(SCORPION_TEXT);
-  // A tela do texto do 33 rola de lado por causa do seletor de anexo (módulo 33, OmbudsmanFields; fora do 35b): o input file de 18 px
-  // passa ~23 px da tela e alarga o que o contém (a barra "Emergência? Ligar 192" vai junto: sem o seletor ela cabe, ver abaixo).
-  // Prova: (1) o input file, seu rótulo e sua dica estão entre os que passam; (2) tirando só esses três, nada mais passa, nem o aviso
-  // nem o endereço do 35b.
-  const overflowing = () => page.evaluate(() => {
-    const width = document.documentElement.clientWidth;
-    return [ ...document.querySelectorAll("*") ].filter(e => e.getBoundingClientRect().right > width)
-      .map(e => `${e.tagName.toLowerCase()}${e.matches('input[type="file"]') ? '[file]' : ""}:${(e.textContent ?? "").slice(0, 30)}`);
-  });
-  expect(await overflowing()).toContain("input[file]:");
-  await page.evaluate(() => {
-    const file = document.querySelector<HTMLInputElement>('input[type="file"]')!;
-    const hint = document.getElementById(file.getAttribute("aria-describedby") ?? "");
-    for (const el of [ file, file.labels?.[0], hint ]) if (el) el.style.display = "none";
-  });
-  expect(await overflowing(), "sem o seletor de anexo do 33, nada passa da largura").toEqual([]);
+  expect(await noOverflow(page)).toBeLessThanOrEqual(0);
   await page.getByRole("button", { name: "Enviar manifestação" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: "Manifestação registrada" })).toBeVisible();
