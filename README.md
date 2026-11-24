@@ -177,6 +177,18 @@ endereço `<base>ouvidoria` abre a Ouvidoria depois do login; o id da
 manifestação nunca vai à URL (um F5 no detalhe volta à lista). Tudo, menos a
 denúncia anônima, segue o bloqueio por dispositivo da decisão 9.
 
+**Zoonoses na ouvidoria (módulo 35b).** Com o centro de zoonoses ligado na
+cidade (`public_config.zoonoses`, Q10), Solicitação e Denúncia perguntam "É
+sobre animais, insetos ou bichos?". Com "Sim", vêm o assunto (os oito do §4) e o
+campo obrigatório "Onde fica o problema? (endereço do local)", com o aviso "Seu
+pedido vai direto ao centro de zoonoses. Não escreva seu nome nem telefone no
+texto." Na denúncia anônima, as mesmas perguntas: a pergunta é opcional, mas com
+o assunto escolhido o endereço é obrigatório, como na manifestação. O api
+encaminha sozinho ao centro; "Minhas manifestações" mostra só o que o 33
+mostra, nunca a demanda nem a vistoria. Desligado, nada muda; contra um api sem
+o 35b, a pergunta só não aparece. Ordem de deploy: contracts, api, dashboard,
+wpda e maintenance, campo.
+
 ### Relatório público (`src/modules/Report.tsx`)
 
 `/wpda/?token=<token>` busca o JSON congelado de `GET /r/:token`, sem login.

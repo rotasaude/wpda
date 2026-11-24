@@ -5,10 +5,13 @@ import userEvent from "@testing-library/user-event";
 import { AnonymousReportStep } from "./AnonymousReportStep";
 import { OmbudsmanEntry } from "./OmbudsmanEntry";
 import { citizenApi, ApiError } from "../../lib/citizenApi";
+import { ZOONOSES_ADDRESS_LABEL, ZOONOSES_NOTICE, ZOONOSES_QUESTION, ombudsmanMessage } from "../../lib/ombudsman";
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 const CONFIG = { anonymous_web: true, zoonoses: false, units: [ { id: "u1", name: "UBS Centro" } ] };
+const CONFIG_ZOO = { ...CONFIG, zoonoses: true };
+const ADDRESS = "Praça Central, perto do coreto";
 const TEXT = "Na UBS Centro cobraram consulta, o que é proibido no SUS.";
 const WARNING = "Sem identificação, você não recebe protocolo nem acompanha a resposta.";
 const PHONE_LINE = "Reclamações, denúncias, elogios, sugestões e pedidos à Secretaria de Saúde.";
@@ -296,5 +299,143 @@ describe("AnonymousReportStep", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Carregando…");
     await user.click(screen.getByRole("button", { name: "Voltar" }));
     expect(onBack).toHaveBeenCalledOnce();
+  });
+});
+
+describe("AnonymousReportStep com zoonoses (35b)", () => {
+  const BODY_LABEL = "O que você quer denunciar?";
+  async function fill(user: ReturnType<typeof userEvent.setup>, opts: { yes?: boolean; subtype?: string; address?: string; text?: string }) {
+    const box = await screen.findByRole("textbox", { name: BODY_LABEL });
+    if (opts.yes) await user.click(screen.getByRole("radio", { name: "Sim" }));
+    if (opts.subtype) await user.click(screen.getByRole("radio", { name: opts.subtype }));
+    if (opts.address) { await user.click(screen.getByLabelText(ZOONOSES_ADDRESS_LABEL)); await user.paste(opts.address); }
+    await user.click(box);
+    await user.paste(opts.text ?? TEXT);
+  }
+  const sendBtn = () => screen.getByRole("button", { name: "Enviar denúncia" });
+
+  it("anônima com Sim: aviso antes do envio; corpo com subtipo e endereço; sem cookie", async () => {
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/citizen/ombudsman/public_config") return new Response(JSON.stringify(CONFIG_ZOO), { status: 200 });
+      if (url === "/citizen/ombudsman/anonymous_reports" && init?.method === "POST") return new Response(JSON.stringify({ ok: true }), { status: 201 });
+      return new Response(null, { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchFn);
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    await fill(user, { yes: true, subtype: "Morcego", address: ADDRESS });
+    const notice = screen.getByText(ZOONOSES_NOTICE);
+    expect(notice.compareDocumentPosition(sendBtn()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(sendBtn());
+    await screen.findByRole("heading", { level: 1, name: "Denúncia enviada" });
+    const posts = fetchFn.mock.calls.filter(([ , init ]) => init?.method === "POST");
+    expect(posts).toHaveLength(1);
+    const [ url, init ] = posts[0] as [string, RequestInit];
+    expect(url).toBe("/citizen/ombudsman/anonymous_reports");
+    expect(init.credentials).toBe("omit");
+    expect(init.body).toBe(JSON.stringify({ body: TEXT, zoonoses_subtype: "bat", place_address: ADDRESS }));
+    expect(document.body.textContent).not.toMatch(/[Pp]rotocolo \d/);
+  });
+
+  it("anônima com subtipo e sem endereço: erro no campo com foco e nada enviado (Q15)", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG_ZOO);
+    const send = vi.spyOn(citizenApi, "sendAnonymousReport");
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    await fill(user, { yes: true, subtype: "Carrapato" });
+    await user.click(sendBtn());
+    const input = screen.getByLabelText(ZOONOSES_ADDRESS_LABEL);
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveFocus();
+    expect(input).toHaveAccessibleDescription("Escreva pelo menos 10 caracteres.");
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("anônima com Sim e sem subtipo nem endereço: envia sem zoonoses", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG_ZOO);
+    const send = vi.spyOn(citizenApi, "sendAnonymousReport").mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    await fill(user, { yes: true });
+    await user.click(sendBtn());
+    await screen.findByRole("heading", { level: 1, name: "Denúncia enviada" });
+    expect(send).toHaveBeenCalledWith({ body: TEXT, healthUnitId: null });
+  });
+
+  it("endereço sem subtipo: pede o assunto e não envia", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG_ZOO);
+    const send = vi.spyOn(citizenApi, "sendAnonymousReport");
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    await fill(user, { yes: true, address: ADDRESS });
+    await user.click(sendBtn());
+    expect(screen.getByRole("group", { name: "Assunto" })).toHaveAccessibleDescription("Escolha o assunto.");
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("endereço curto: erro no campo com foco", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG_ZOO);
+    const send = vi.spyOn(citizenApi, "sendAnonymousReport");
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    await fill(user, { yes: true, subtype: "Morcego", address: "Rua A" });
+    await user.click(sendBtn());
+    const input = screen.getByLabelText(ZOONOSES_ADDRESS_LABEL);
+    expect(input).toHaveAccessibleDescription("Escreva pelo menos 10 caracteres.");
+    expect(input).toHaveFocus();
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("Sim e depois Não: nada de zoonoses no corpo", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG_ZOO);
+    const send = vi.spyOn(citizenApi, "sendAnonymousReport").mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    await fill(user, { yes: true, subtype: "Morcego", address: ADDRESS });
+    await user.click(screen.getByRole("radio", { name: "Não" }));
+    expect(screen.queryByLabelText(ZOONOSES_ADDRESS_LABEL)).toBeNull();
+    await user.click(sendBtn());
+    await screen.findByRole("heading", { level: 1, name: "Denúncia enviada" });
+    expect(send).toHaveBeenCalledWith({ body: TEXT, healthUnitId: null });
+  });
+
+  it("zoonoses desligado: o formulário e o corpo do 33", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG);
+    const send = vi.spyOn(citizenApi, "sendAnonymousReport").mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    await screen.findByRole("button", { name: "Enviar denúncia" });
+    expect(screen.queryByText(ZOONOSES_QUESTION)).toBeNull();
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    await user.click(screen.getByRole("textbox"));
+    await user.paste(TEXT);
+    await user.click(sendBtn());
+    await screen.findByRole("heading", { level: 1, name: "Denúncia enviada" });
+    expect(send).toHaveBeenCalledWith({ body: TEXT, healthUnitId: null });
+  });
+
+  it("com Sim, nenhum campo de contato", async () => {
+    vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG_ZOO);
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    await screen.findByRole("button", { name: "Enviar denúncia" });
+    await user.click(screen.getByRole("radio", { name: "Sim" }));
+    expect(screen.queryByLabelText(/telefone|celular|e-mail|nome|cpf/i)).toBeNull();
+    expect(screen.getAllByRole("textbox")).toHaveLength(2);
+  });
+
+  it("422 zoonoses_subtype: relê, tira a escolha e mantém o texto", async () => {
+    const config = vi.spyOn(citizenApi, "ombudsmanPublicConfig")
+      .mockResolvedValueOnce(CONFIG_ZOO)
+      .mockResolvedValueOnce({ ...CONFIG_ZOO, zoonoses: false });
+    vi.spyOn(citizenApi, "sendAnonymousReport").mockRejectedValue(new ApiError(422, "invalid_request", "zoonoses_subtype"));
+    const user = userEvent.setup();
+    render(<AnonymousReportStep onBack={vi.fn()} />);
+    await fill(user, { yes: true, subtype: "Morcego", address: ADDRESS });
+    await user.click(sendBtn());
+    expect(await screen.findByRole("alert")).toHaveTextContent(ombudsmanMessage(new ApiError(422, "invalid_request", "zoonoses_subtype")));
+    await vi.waitFor(() => expect(screen.queryByText(ZOONOSES_QUESTION)).toBeNull());
+    expect(config).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("textbox", { name: BODY_LABEL })).toHaveValue(TEXT);
   });
 });
