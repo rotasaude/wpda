@@ -91,14 +91,22 @@ test("Solicitação de escorpião: pergunta, assunto, endereço e aviso; corpo e
   await expect(page.getByText(ZOONOSES_NOTICE, { exact: true })).toBeVisible();
   await page.getByLabel(ZOONOSES_ADDRESS_LABEL).fill(SCORPION_ADDRESS);
   await page.getByRole("textbox", { name: "Conte o que aconteceu" }).fill(SCORPION_TEXT);
-  // A tela do texto do 33 rola de lado por causa do seletor de anexo (input file de 18 px, ~23 px além da tela; OmbudsmanFields, fora do 35b).
-  // Aqui vale o que o 35b põe nela: o aviso e o campo do endereço cabem na largura da tela.
-  const width = await page.evaluate(() => document.documentElement.clientWidth);
-  for (const el of [ page.getByText(ZOONOSES_NOTICE, { exact: true }), page.getByLabel(ZOONOSES_ADDRESS_LABEL) ]) {
-    const box = (await el.boundingBox())!;
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(width);
-  }
+  // A tela do texto do 33 rola de lado por causa do seletor de anexo (módulo 33, OmbudsmanFields; fora do 35b): o input file de 18 px
+  // passa ~23 px da tela e alarga o que o contém (a barra "Emergência? Ligar 192" vai junto: sem o seletor ela cabe, ver abaixo).
+  // Prova: (1) o input file, seu rótulo e sua dica estão entre os que passam; (2) tirando só esses três, nada mais passa, nem o aviso
+  // nem o endereço do 35b.
+  const overflowing = () => page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    return [ ...document.querySelectorAll("*") ].filter(e => e.getBoundingClientRect().right > width)
+      .map(e => `${e.tagName.toLowerCase()}${e.matches('input[type="file"]') ? '[file]' : ""}:${(e.textContent ?? "").slice(0, 30)}`);
+  });
+  expect(await overflowing()).toContain("input[file]:");
+  await page.evaluate(() => {
+    const file = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const hint = document.getElementById(file.getAttribute("aria-describedby") ?? "");
+    for (const el of [ file, file.labels?.[0], hint ]) if (el) el.style.display = "none";
+  });
+  expect(await overflowing(), "sem o seletor de anexo do 33, nada passa da largura").toEqual([]);
   await page.getByRole("button", { name: "Enviar manifestação" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: "Manifestação registrada" })).toBeVisible();
@@ -148,6 +156,8 @@ test("Zoonoses desligado: nenhuma pergunta nos dois caminhos", async ({ page }) 
   await page.goto("/wpda/");
   await page.getByRole("button", { name: "Denúncia anônima", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Denúncia anônima" })).toBeVisible();
+  // Controle positivo: a configuração já chegou (a unidade só aparece com ela), então a ausência da pergunta é do interruptor.
+  await expect(page.getByRole("combobox", { name: "Unidade de saúde (opcional)" }).locator("option", { hasText: "UBS Centro" })).toHaveCount(1);
   await expect(page.getByText(ZOONOSES_QUESTION)).toHaveCount(0);
   await page.getByRole("textbox", { name: "O que você quer denunciar?" }).fill(BAT_TEXT);
   await page.getByRole("button", { name: "Enviar denúncia" }).click();
@@ -157,8 +167,10 @@ test("Zoonoses desligado: nenhuma pergunta nos dois caminhos", async ({ page }) 
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
   const { manifestations } = await mockApi(page, { signedIn: true, zoonoses: false });
+  const config = page.waitForResponse(r => new URL(r.url()).pathname === "/citizen/ombudsman/public_config");
   await page.goto("/wpda/ouvidoria");
   await page.getByRole("button", { name: "Nova manifestação" }).click();
+  expect((await config).status()).toBe(200); // controle positivo: a configuração (zoonoses: false) chegou antes da pergunta que não vem
   await pick(page, /^Solicitação/);
   await next(page);
   await expect(page.getByText(ZOONOSES_QUESTION)).toHaveCount(0);
