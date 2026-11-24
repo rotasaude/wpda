@@ -8,7 +8,7 @@ import { citizenApi, ApiError } from "../../lib/citizenApi";
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-const CONFIG = { anonymous_web: true, units: [ { id: "u1", name: "UBS Centro" } ] };
+const CONFIG = { anonymous_web: true, zoonoses: false, units: [ { id: "u1", name: "UBS Centro" } ] };
 const TEXT = "Na UBS Centro cobraram consulta, o que é proibido no SUS.";
 const WARNING = "Sem identificação, você não recebe protocolo nem acompanha a resposta.";
 const PHONE_LINE = "Reclamações, denúncias, elogios, sugestões e pedidos à Secretaria de Saúde.";
@@ -221,7 +221,7 @@ describe("AnonymousReportStep", () => {
   it("422 health_unit_id: erro na unidade, relê a lista e volta a 'Nenhuma unidade específica'", async () => {
     const config = vi.spyOn(citizenApi, "ombudsmanPublicConfig")
       .mockResolvedValueOnce(CONFIG)
-      .mockResolvedValueOnce({ anonymous_web: true, units: [ { id: "u2", name: "UBS Norte" } ] });
+      .mockResolvedValueOnce({ anonymous_web: true, zoonoses: false, units: [ { id: "u2", name: "UBS Norte" } ] });
     vi.spyOn(citizenApi, "sendAnonymousReport").mockRejectedValue(new ApiError(422, "invalid_request", "health_unit_id"));
     const user = userEvent.setup();
     render(<AnonymousReportStep onBack={vi.fn()} />);

@@ -26,13 +26,13 @@ const headerNames = (init: RequestInit) => Object.keys((init.headers ?? {}) as R
 describe("citizenApi — ouvidoria pública (módulo 33, §4)", () => {
   it("publicConfig: sem cookie; unidades válidas; anonymous_web só com true", async () => {
     const m = stubFetch(200, { anonymous_web: "yes", units: [ { id: "u1", name: "UBS Centro" }, { id: 7 }, { name: "sem id" } ] });
-    expect(await citizenApi.ombudsmanPublicConfig()).toEqual({ anonymous_web: false, units: [ { id: "u1", name: "UBS Centro" } ] });
+    expect(await citizenApi.ombudsmanPublicConfig()).toEqual({ anonymous_web: false, zoonoses: false, units: [ { id: "u1", name: "UBS Centro" } ] });
     expect(sent(m).url).toBe("/citizen/ombudsman/public_config");
     expect(sent(m).init.credentials).toBe("omit");
     expect(headerNames(sent(m).init)).not.toContain("cookie");
 
     stubFetch(200, { anonymous_web: true, units: [ { id: "u2", name: "CAPS II", kind: "caps" } ], extra: 1 });
-    expect(await citizenApi.ombudsmanPublicConfig()).toEqual({ anonymous_web: true, units: [ { id: "u2", name: "CAPS II" } ] });
+    expect(await citizenApi.ombudsmanPublicConfig()).toEqual({ anonymous_web: true, zoonoses: false, units: [ { id: "u2", name: "CAPS II" } ] });
   });
 
   it("anonymousReport: corpo exato, sem cookie e sem citizen:unauthenticated", async () => {
@@ -284,5 +284,68 @@ describe("citizenApi — minhas manifestações (módulo 33, §3)", () => {
         cpf_masked: "***.982.247-**" }
     ]);
     expect(r.unread_count).toBe(2);
+  });
+});
+
+describe("citizenApi — zoonoses na ouvidoria (módulo 35b, §4)", () => {
+  const TEXT = "Apareceu um escorpião no quintal da escola.";
+
+  it("publicConfig: zoonoses só com true", async () => {
+    stubFetch(200, { zoonoses: "yes" });
+    expect((await citizenApi.ombudsmanPublicConfig()).zoonoses).toBe(false);
+    stubFetch(200, { zoonoses: true });
+    expect((await citizenApi.ombudsmanPublicConfig()).zoonoses).toBe(true);
+    stubFetch(200, {});
+    expect((await citizenApi.ombudsmanPublicConfig()).zoonoses).toBe(false);
+  });
+
+  it("createManifestation: com zoonoses, subtipo e endereço aparado no corpo, nada na URL", async () => {
+    const m = stubFetch(201, { id: "m11", protocol: "2026-000126", due_on: null });
+    await citizenApi.createManifestation({ who: { citizenId: "p1" }, kind: "request", mode: "identified", body: TEXT, healthUnitId: null,
+      attachmentIds: [], zoonoses: { subtype: "scorpion", placeAddress: "  Rua das Flores, 120, fundos  " } });
+    expect(sent(m).body).toEqual({ citizen_id: "p1", kind: "request", identification_mode: "identified", body: TEXT,
+      zoonoses_subtype: "scorpion", place_address: "Rua das Flores, 120, fundos" });
+    expect(sent(m).url).toBe("/citizen/ombudsman/manifestations");
+  });
+
+  it("createManifestation: sem zoonoses (ou null), o corpo do 33", async () => {
+    const m = stubFetch(201, { id: "m12", protocol: "2026-000127", due_on: null });
+    const base = { who: { citizenId: "p1" }, kind: "request" as const, mode: "identified" as const, body: TEXT, healthUnitId: null, attachmentIds: [] };
+    await citizenApi.createManifestation(base);
+    await citizenApi.createManifestation({ ...base, zoonoses: null });
+    for (const i of [ 0, 1 ]) {
+      expect(sent(m, i).body).not.toHaveProperty("zoonoses_subtype");
+      expect(sent(m, i).body).not.toHaveProperty("place_address");
+    }
+  });
+
+  it("anonymousReport: com zoonoses, corpo exato e sem cookie", async () => {
+    const m = stubFetch(201, { ok: true });
+    await citizenApi.sendAnonymousReport({ body: TEXT, healthUnitId: null, zoonoses: { subtype: "bat", placeAddress: "Praça Central, perto do coreto" } });
+    expect(sent(m).init.body).toBe(JSON.stringify({ body: TEXT, zoonoses_subtype: "bat", place_address: "Praça Central, perto do coreto" }));
+    expect(sent(m).init.credentials).toBe("omit");
+    expect(headerNames(sent(m).init)).not.toContain("cookie");
+    expect(sent(m).url).not.toMatch(/\?|bat|Pra/);
+  });
+
+  it("anonymousReport: sem zoonoses (ou null), o corpo do 33", async () => {
+    const m = stubFetch(201, { ok: true });
+    await citizenApi.sendAnonymousReport({ body: TEXT, healthUnitId: null });
+    await citizenApi.sendAnonymousReport({ body: TEXT, healthUnitId: null, zoonoses: null });
+    expect(sent(m, 0).init.body).toBe(JSON.stringify({ body: TEXT }));
+    expect(sent(m, 1).init.body).toBe(JSON.stringify({ body: TEXT }));
+  });
+
+  it("manifestation: nada da demanda nem da vistoria", async () => {
+    const base = { id: "m1", protocol: "2026-000123", kind: "request", identification_mode: "identified", state: "received",
+      received_at: "2026-11-10T09:00:00-03:00", due_on: "2026-12-10", color: "green", body: "Escorpião.", health_unit: null,
+      attachments: [], timeline: [], can_complement: false, can_request_reopen: false, can_answer_satisfaction: false };
+    stubFetch(200, base);
+    const expected = Object.keys(await citizenApi.manifestation("m1")).sort();
+    stubFetch(200, { ...base, zoonoses_subtype: "scorpion", place_address: "Rua das Flores, 120", zoonoses_demand: { state: "scheduled" },
+      inspection: { note: "x" }, subject: { name: "Zoonoses" } });
+    const r = await citizenApi.manifestation("m1");
+    expect(Object.keys(r).sort()).toEqual(expected);
+    expect(JSON.stringify(r)).not.toMatch(/scheduled|inspection|Zoonoses|place_address/);
   });
 });

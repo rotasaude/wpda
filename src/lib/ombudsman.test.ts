@@ -4,7 +4,8 @@ import {
   ANONYMOUS_DISABLED, ANONYMOUS_WARNING, ANONYMOUS_WEB_FEATURE, ATTACHMENT_TYPES, KIND_OPTIONS, MAX_ATTACHMENTS, MODE_OPTIONS,
   OMBUDSMAN_FEATURE, PRESERVED_HINT, REPORT_HINT, SATISFACTION,
   attachmentError, attachmentFilename, bodyError, complementError, deadlineText, kindLabel, nameError, noticeTitle, ombudsmanMessage,
-  readAsBase64, reasonError, stateLabel, textLength, timelineTitle
+  readAsBase64, reasonError, stateLabel, textLength, timelineTitle,
+  YES_NO_OPTIONS, ZOONOSES_ADDRESS_LABEL, ZOONOSES_NOTICE, ZOONOSES_QUESTION, ZOONOSES_SUBTYPES, placeAddressError, zoonosesAllowed
 } from "./ombudsman";
 
 afterEach(() => vi.useRealTimers());
@@ -230,5 +231,42 @@ describe("ombudsmanMessage", () => {
 
   it("sem rede cai em messageFor", () => {
     expect(ombudsmanMessage(new TypeError("offline"))).toBe("Sem conexão. Verifique a internet e tente de novo.");
+  });
+});
+
+describe("zoonoses (módulo 35b)", () => {
+  it("frases fixas do contrato §14", () => {
+    expect(ZOONOSES_QUESTION).toBe("É sobre animais, insetos ou bichos?");
+    expect(ZOONOSES_ADDRESS_LABEL).toBe("Onde fica o problema? (endereço do local)");
+    expect(ZOONOSES_NOTICE).toBe("Seu pedido vai direto ao centro de zoonoses. Não escreva seu nome nem telefone no texto.");
+    expect(YES_NO_OPTIONS).toEqual([ { value: "yes", label: "Sim" }, { value: "no", label: "Não" } ]);
+  });
+
+  it("subtipos na ordem e com os rótulos do §4", () => {
+    expect(ZOONOSES_SUBTYPES.map(s => s.value)).toEqual([ "scorpion", "bat", "rodent", "tick", "aggressive_animal",
+      "neurological_animal", "sporotrichosis", "other" ]);
+    expect(ZOONOSES_SUBTYPES.map(s => s.label)).toEqual([ "Escorpião", "Morcego", "Rato ou outro roedor", "Carrapato",
+      "Animal que mordeu ou atacou", "Animal com comportamento estranho ou paralisia", "Gato com feridas (esporotricose)",
+      "Outro problema com animal" ]);
+  });
+
+  it("placeAddressError: 10 a 300 code points depois do trim", () => {
+    expect(placeAddressError("Rua A, 1")).toBe("Escreva pelo menos 10 caracteres.");
+    expect(placeAddressError("  Rua A, 123  ")).toBeNull();
+    expect(placeAddressError("a".repeat(301))).toBe("Escreva no máximo 300 caracteres.");
+    expect(placeAddressError("🦂".repeat(300))).toBeNull();
+  });
+
+  it("zoonosesAllowed: só solicitação e denúncia", () => {
+    expect(zoonosesAllowed("request")).toBe(true);
+    expect(zoonosesAllowed("report")).toBe(true);
+    for (const k of [ "complaint", "praise", "suggestion", undefined ]) expect(zoonosesAllowed(k)).toBe(false);
+  });
+
+  it("frases de path novas", () => {
+    expect(ombudsmanMessage(new ApiError(422, "invalid_request", "zoonoses_subtype")))
+      .toBe("O envio direto ao centro de zoonoses não está disponível agora. Sua manifestação pode seguir sem essa escolha.");
+    expect(ombudsmanMessage(new ApiError(422, "invalid_request", "place_address")))
+      .toBe("Escreva o endereço do local com 10 a 300 caracteres.");
   });
 });

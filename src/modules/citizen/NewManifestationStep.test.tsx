@@ -10,7 +10,7 @@ afterEach(() => { vi.restoreAllMocks(); });
 const P1: Person = { id: "p1", cpf_masked: "***.982.247-**", verification_level: "declared", neighborhood: null, profile: null };
 const P2: Person = { id: "p2", cpf_masked: "***.111.444-**", verification_level: "verified", neighborhood: null, profile: null };
 const TEXT = "Esperei quatro horas na recepção e ninguém me chamou.";
-const CONFIG = { anonymous_web: true, units: [ { id: "u1", name: "UBS Centro" } ] };
+const CONFIG = { anonymous_web: true, zoonoses: false, units: [ { id: "u1", name: "UBS Centro" } ] };
 const PRESERVED = /não escreva no texto seu nome, CPF, telefone ou endereço/;
 const FROZEN = /Depois de enviado, este texto não pode ser alterado/;
 

@@ -794,7 +794,11 @@ export type IdentificationMode = "identified" | "preserved";
 export type ManifestationState = "received" | "in_analysis" | "forwarded" | "awaiting_complement" | "answered" | "archived";
 export type DeadlineColor = "green" | "yellow" | "red" | "paused";
 
-export interface OmbudsmanPublicConfig { anonymous_web: boolean; units: { id: string; name: string }[] }
+// Módulo 35b (contrato §4, §14): os oito subtipos que o cidadão escolhe; vão só no corpo, com o endereço do local.
+export type ZoonosesSubtype = "scorpion" | "bat" | "rodent" | "tick" | "aggressive_animal" | "neurological_animal" | "sporotrichosis" | "other";
+export type ZoonosesAnswer = { subtype: ZoonosesSubtype; placeAddress: string };
+
+export interface OmbudsmanPublicConfig { anonymous_web: boolean; zoonoses: boolean; units: { id: string; name: string }[] }
 
 export interface CitizenManifestationSummary {
   id: string;
@@ -859,7 +863,7 @@ function normalizePublicConfig(raw: unknown): OmbudsmanPublicConfig {
     const unit = rec(u);
     if (typeof unit.id === "string" && typeof unit.name === "string") units.push({ id: unit.id, name: unit.name });
   }
-  return { anonymous_web: d.anonymous_web === true, units };
+  return { anonymous_web: d.anonymous_web === true, zoonoses: d.zoonoses === true, units };
 }
 
 // Campos comuns à lista e ao detalhe.
@@ -1084,10 +1088,12 @@ export const citizenApi = {
   // Ouvidoria (módulo 33). Públicas: sem cookie (publicCall); 403 feature_disabled com o interruptor desligado (Q1).
   ombudsmanPublicConfig: async (): Promise<OmbudsmanPublicConfig> =>
     normalizePublicConfig(await publicCall<unknown>("GET", "/ombudsman/public_config")),
-  // Corpo exatamente { body } ou { body, health_unit_id }; a resposta é descartada (nunca há protocolo).
-  sendAnonymousReport: async (r: { body: string; healthUnitId: string | null }): Promise<void> => {
+  // Corpo { body }, mais `health_unit_id` opcional e, com subtipo, `zoonoses_subtype` e `place_address` juntos (Q15, módulo 35b);
+  // a resposta é descartada (nunca há protocolo).
+  sendAnonymousReport: async (r: { body: string; healthUnitId: string | null; zoonoses?: ZoonosesAnswer | null }): Promise<void> => {
     await publicCall<unknown>("POST", "/ombudsman/anonymous_reports",
-      { body: r.body, ...(r.healthUnitId ? { health_unit_id: r.healthUnitId } : {}) });
+      { body: r.body, ...(r.healthUnitId ? { health_unit_id: r.healthUnitId } : {}),
+        ...(r.zoonoses ? { zoonoses_subtype: r.zoonoses.subtype, place_address: r.zoonoses.placeAddress.trim() } : {}) });
   },
   manifestations: async (): Promise<CitizenManifestationSummary[]> => {
     const d = rec(await call<unknown>("GET", "/ombudsman/manifestations"));
@@ -1100,7 +1106,7 @@ export const citizenApi = {
   // U1: `citizen_id` ou `{ cpf, full_name }`, nunca os dois; tudo só no corpo.
   createManifestation: async (m: {
     who: ManifestationAuthor; kind: ManifestationKind; mode: IdentificationMode; body: string;
-    healthUnitId: string | null; attachmentIds: string[];
+    healthUnitId: string | null; attachmentIds: string[]; zoonoses?: ZoonosesAnswer | null;
   }): Promise<{ id: string; protocol: string; due_on: string | null }> => {
     const who = "citizenId" in m.who
       ? { citizen_id: m.who.citizenId }
@@ -1110,6 +1116,7 @@ export const citizenApi = {
       kind: m.kind,
       identification_mode: m.mode,
       body: m.body,
+      ...(m.zoonoses ? { zoonoses_subtype: m.zoonoses.subtype, place_address: m.zoonoses.placeAddress.trim() } : {}),
       ...(m.healthUnitId ? { health_unit_id: m.healthUnitId } : {}),
       ...(m.attachmentIds.length > 0 ? { attachment_ids: m.attachmentIds } : {})
     }));

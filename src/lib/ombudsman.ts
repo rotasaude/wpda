@@ -1,6 +1,6 @@
 // Ouvidoria no canal do cidadão (módulo 33, ADR 0051; contrato §3, §4, §10, §14). Regras de tela puras; nada aqui grava, loga ou monta URL.
 import { ApiError } from "./citizenApi";
-import type { DeadlineColor, ManifestationState } from "./citizenApi";
+import type { DeadlineColor, ManifestationState, ZoonosesSubtype } from "./citizenApi";
 import { cityToday, fmtCalendarDate } from "./format";
 import { messageFor } from "../modules/citizen/ui";
 
@@ -22,6 +22,24 @@ export const TEXT_MIN = 10; // complemento
 export const TEXT_MAX = 4000;
 export const NAME_MIN = 2; // full_name
 export const NAME_MAX = 120;
+
+// Módulo 35b (contrato §4, §14): frases fixas, os oito subtipos e a faixa do endereço do local.
+export const ZOONOSES_QUESTION = "É sobre animais, insetos ou bichos?";
+export const ZOONOSES_ADDRESS_LABEL = "Onde fica o problema? (endereço do local)";
+export const ZOONOSES_NOTICE = "Seu pedido vai direto ao centro de zoonoses. Não escreva seu nome nem telefone no texto.";
+export const ZOONOSES_SUBTYPES: readonly { value: ZoonosesSubtype; label: string }[] = [
+  { value: "scorpion", label: "Escorpião" },
+  { value: "bat", label: "Morcego" },
+  { value: "rodent", label: "Rato ou outro roedor" },
+  { value: "tick", label: "Carrapato" },
+  { value: "aggressive_animal", label: "Animal que mordeu ou atacou" },
+  { value: "neurological_animal", label: "Animal com comportamento estranho ou paralisia" },
+  { value: "sporotrichosis", label: "Gato com feridas (esporotricose)" },
+  { value: "other", label: "Outro problema com animal" }
+];
+export const YES_NO_OPTIONS = [ { value: "yes", label: "Sim" }, { value: "no", label: "Não" } ];
+export const PLACE_ADDRESS_MIN = 10;
+export const PLACE_ADDRESS_MAX = 300;
 
 export const MAX_ATTACHMENTS = 3;
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -126,6 +144,10 @@ function rangeError(s: string, min: number, max: number): string | null {
   return null;
 }
 
+export const placeAddressError = (s: string) => rangeError(s, PLACE_ADDRESS_MIN, PLACE_ADDRESS_MAX);
+// Módulo 35b: a pergunta só existe em Solicitação e Denúncia (a anônima é sempre denúncia, Q6).
+export const zoonosesAllowed = (kind: string | undefined): boolean => kind === "request" || kind === "report";
+
 export const bodyError = (s: string) => rangeError(s, BODY_MIN, BODY_MAX);
 export const reasonError = (s: string) => rangeError(s, REASON_MIN, REASON_MAX);
 export const complementError = (s: string) => rangeError(s, TEXT_MIN, TEXT_MAX);
@@ -196,7 +218,9 @@ const PATH_MESSAGE: Record<string, string> = {
   cpf: BAD_CPF,
   citizen_id: ONE_OF_PEOPLE,
   health_unit_id: "Essa unidade não está mais na lista. Escolha de novo.",
-  attachment_ids: "Um dos anexos não vale mais. Remova e anexe de novo."
+  attachment_ids: "Um dos anexos não vale mais. Remova e anexe de novo.",
+  zoonoses_subtype: "O envio direto ao centro de zoonoses não está disponível agora. Sua manifestação pode seguir sem essa escolha.",
+  place_address: "Escreva o endereço do local com 10 a 300 caracteres."
 };
 
 export const GENERIC_MESSAGE = "Algo deu errado. Tente de novo.";

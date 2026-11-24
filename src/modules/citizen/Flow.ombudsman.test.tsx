@@ -35,7 +35,7 @@ function api({ session, features = [ "ombudsman", "ombudsman_anonymous_web" ], a
   const notices = vi.spyOn(citizenApi, "notices").mockResolvedValue({ notices: [], unread_count: 0 });
   // Q1: interruptor desligado = 403 feature_disabled.
   const config = publicConfig
-    ? vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue({ anonymous_web: anonymous, units: [] })
+    ? vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue({ anonymous_web: anonymous, zoonoses: false, units: [] })
     : vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockRejectedValue(new ApiError(403, "feature_disabled"));
   const list = vi.spyOn(citizenApi, "manifestations").mockResolvedValue([]);
   return { notices, list, config };

@@ -45,7 +45,7 @@ describe("bloqueio fora do celular", () => {
 
 // U2: a denúncia anônima abre também no desktop de produção, sem sessão; o resto segue só no celular.
 describe("denúncia anônima fora do celular (U2)", () => {
-  const CONFIG = { anonymous_web: true, units: [ { id: "u1", name: "UBS Centro" } ] };
+  const CONFIG = { anonymous_web: true, zoonoses: false, units: [ { id: "u1", name: "UBS Centro" } ] };
 
   it("desktop de produção com anonymous_web: 'Abra no celular' e 'Denúncia anônima', que abre o formulário", async () => {
     vi.spyOn(citizenApi, "ombudsmanPublicConfig").mockResolvedValue(CONFIG);
