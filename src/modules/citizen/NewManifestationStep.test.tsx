@@ -4,6 +4,9 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NewManifestationStep } from "./NewManifestationStep";
 import { citizenApi, ApiError, type Person } from "../../lib/citizenApi";
+import { ZOONOSES_ADDRESS_LABEL, ZOONOSES_NOTICE, ZOONOSES_QUESTION, ombudsmanMessage } from "../../lib/ombudsman";
+
+const pathMessage = (path: string) => ombudsmanMessage(new ApiError(422, "invalid_request", path));
 
 afterEach(() => { vi.restoreAllMocks(); });
 
@@ -11,6 +14,8 @@ const P1: Person = { id: "p1", cpf_masked: "***.982.247-**", verification_level:
 const P2: Person = { id: "p2", cpf_masked: "***.111.444-**", verification_level: "verified", neighborhood: null, profile: null };
 const TEXT = "Esperei quatro horas na recepção e ninguém me chamou.";
 const CONFIG = { anonymous_web: true, zoonoses: false, units: [ { id: "u1", name: "UBS Centro" } ] };
+const CONFIG_ZOO = { ...CONFIG, zoonoses: true };
+const ADDRESS = "Rua das Flores, 120, fundos";
 const PRESERVED = /não escreva no texto seu nome, CPF, telefone ou endereço/;
 const FROZEN = /Depois de enviado, este texto não pode ser alterado/;
 
@@ -33,6 +38,24 @@ async function fillAndSend(user: User, kind = "Reclamação", mode = "Identifica
   await next(user);
   await user.click(await screen.findByRole("textbox", { name: "Conte o que aconteceu" }));
   await user.paste(text);
+}
+
+const kindRadio = (user: User, kind: string) => screen.findByRole("radio", { name: new RegExp(`^${kind}`) }).then(r => user.click(r));
+const addressBox = () => screen.getByRole("textbox", { name: ZOONOSES_ADDRESS_LABEL });
+
+// Na tela da pergunta: responde, continua e, com Sim, escolhe o subtipo pelo rótulo exato e continua.
+async function answerAnimal(user: User, answer: "Sim" | "Não", subtype?: string) {
+  await user.click(await screen.findByRole("radio", { name: answer }));
+  await next(user);
+  if (subtype) {
+    await user.click(await screen.findByRole("radio", { name: subtype }));
+    await next(user);
+  }
+}
+
+async function pickMode(user: User, mode = "Identificada") {
+  await user.click(await screen.findByRole("radio", { name: new RegExp(`^${mode}`) }));
+  await next(user);
 }
 
 async function identify(user: User, cpf: string, name: string) {
@@ -460,5 +483,214 @@ describe("NewManifestationStep", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(message);
     expect(textbox()).toHaveValue(TEXT);
     expect(screen.getByRole("button", { name: "Enviar manifestação" })).toBeEnabled();
+  });
+  describe("módulo 35b: zoonoses", () => {
+    it("zoonoses ligado, Solicitação: pergunta, subtipo, aviso e endereço vão no corpo", async () => {
+      const { create } = stub([ P1 ], CONFIG_ZOO);
+      const user = userEvent.setup();
+      renderStep();
+      await kindRadio(user, "Solicitação");
+      await next(user);
+      expect(await screen.findByRole("heading", { level: 1, name: ZOONOSES_QUESTION })).toBeInTheDocument();
+      await answerAnimal(user, "Sim", "Escorpião");
+      await pickMode(user);
+      const notice = screen.getByText(ZOONOSES_NOTICE);
+      const button = screen.getByRole("button", { name: "Enviar manifestação" });
+      expect(notice.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(notice.compareDocumentPosition(addressBox()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      await user.type(addressBox(), `  ${ADDRESS}  `);
+      await user.click(textbox());
+      await user.paste(TEXT);
+      await send(user);
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({
+        kind: "request", zoonoses: { subtype: "scorpion", placeAddress: ADDRESS }
+      }));
+      expect(await screen.findByRole("heading", { level: 1, name: "Manifestação registrada" })).toBeInTheDocument();
+    });
+
+    it("Denúncia também pergunta; Reclamação, Elogio e Sugestão não", async () => {
+      stub([ P1 ], CONFIG_ZOO);
+      for (const [ kind, asks ] of [ [ "Denúncia", true ], [ "Reclamação", false ], [ "Elogio", false ], [ "Sugestão", false ] ] as const) {
+        const user = userEvent.setup();
+        const view = renderStep();
+        await kindRadio(user, kind);
+        await next(user);
+        const title = asks ? ZOONOSES_QUESTION : "Como você quer se identificar?";
+        expect(await screen.findByRole("heading", { level: 1, name: title })).toBeInTheDocument();
+        view.unmount();
+      }
+    });
+
+    it("zoonoses desligado: a tela e o corpo do 33", async () => {
+      const { create } = stub([ P1 ], CONFIG);
+      const user = userEvent.setup();
+      renderStep();
+      await kindRadio(user, "Solicitação");
+      await next(user);
+      expect(await screen.findByRole("heading", { level: 1, name: "Como você quer se identificar?" })).toBeInTheDocument();
+      expect(screen.queryByText(ZOONOSES_QUESTION)).toBeNull();
+      await pickMode(user);
+      await user.click(textbox());
+      await user.paste(TEXT);
+      await send(user);
+      expect(create.mock.calls[0][0].zoonoses ?? null).toBeNull();
+    });
+
+    it("Não: segue sem subtipo e sem endereço", async () => {
+      const { create } = stub([ P1 ], CONFIG_ZOO);
+      const user = userEvent.setup();
+      renderStep();
+      await kindRadio(user, "Solicitação");
+      await next(user);
+      await answerAnimal(user, "Não");
+      expect(screen.queryByRole("radio", { name: "Escorpião" })).toBeNull();
+      await pickMode(user);
+      expect(screen.queryByRole("textbox", { name: ZOONOSES_ADDRESS_LABEL })).toBeNull();
+      expect(screen.queryByText(ZOONOSES_NOTICE)).toBeNull();
+      await user.click(textbox());
+      await user.paste(TEXT);
+      await send(user);
+      expect(create.mock.calls[0][0].zoonoses ?? null).toBeNull();
+    });
+
+    it("trocar o tipo ou responder Não apaga o subtipo e o endereço", async () => {
+      const { create } = stub([ P1 ], CONFIG_ZOO);
+      const user = userEvent.setup();
+      const view = renderStep();
+      await kindRadio(user, "Solicitação");
+      await next(user);
+      await answerAnimal(user, "Sim", "Morcego");
+      await pickMode(user);
+      await user.type(addressBox(), ADDRESS);
+      const back = () => user.click(screen.getByRole("button", { name: "Voltar" }));
+      await back(); await back(); await back(); await back(); // mode → subtype → animal → kind
+      expect(await screen.findByRole("heading", { level: 1, name: "Que tipo de manifestação?" })).toBeInTheDocument();
+      await kindRadio(user, "Reclamação");
+      await next(user);
+      await next(user); // a forma de identificação continua escolhida
+      expect(screen.queryByRole("textbox", { name: ZOONOSES_ADDRESS_LABEL })).toBeNull();
+      await user.click(textbox());
+      await user.paste(TEXT);
+      await send(user);
+      expect(create.mock.calls[0][0].zoonoses ?? null).toBeNull();
+      view.unmount();
+
+      renderStep();
+      await kindRadio(user, "Solicitação");
+      await next(user);
+      await answerAnimal(user, "Sim", "Morcego");
+      await back(); await back(); // mode → subtype → animal
+      await answerAnimal(user, "Não");
+      await pickMode(user);
+      await user.click(textbox());
+      await user.paste(TEXT);
+      await send(user);
+      expect(create.mock.calls[1][0].zoonoses ?? null).toBeNull();
+    });
+
+    it("endereço obrigatório: curto ou vazio, erro no campo com foco e nada enviado", async () => {
+      const { create } = stub([ P1 ], CONFIG_ZOO);
+      const user = userEvent.setup();
+      renderStep();
+      await kindRadio(user, "Solicitação");
+      await next(user);
+      await answerAnimal(user, "Sim", "Rato ou outro roedor");
+      await pickMode(user);
+      await user.type(addressBox(), "Rua A");
+      await user.click(textbox());
+      await user.paste(TEXT);
+      await send(user);
+      expect(addressBox()).toHaveAttribute("aria-invalid", "true");
+      expect(addressBox()).toHaveFocus();
+      expect(addressBox()).toHaveAccessibleDescription(/Escreva pelo menos 10 caracteres\./);
+      expect(create).not.toHaveBeenCalled();
+      await user.clear(addressBox());
+      await send(user);
+      expect(addressBox()).toHaveFocus();
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("sem escolha na pergunta e no subtipo: erro no grupo", async () => {
+      stub([ P1 ], CONFIG_ZOO);
+      const user = userEvent.setup();
+      renderStep();
+      await kindRadio(user, "Solicitação");
+      await next(user);
+      await next(user);
+      expect(await screen.findByRole("alert")).toHaveTextContent("Escolha uma opção.");
+      await user.click(screen.getByRole("radio", { name: "Sim" }));
+      await next(user);
+      await next(user);
+      expect(await screen.findByRole("alert")).toHaveTextContent("Escolha o assunto.");
+    });
+
+    it("public_config lento: a pergunta não é pulada", async () => {
+      const { configSpy } = stub([ P1 ], CONFIG_ZOO);
+      let resolve!: (c: typeof CONFIG_ZOO) => void;
+      configSpy.mockReturnValueOnce(new Promise(r => { resolve = r; }));
+      const user = userEvent.setup();
+      renderStep();
+      expect(await screen.findByRole("status")).toHaveTextContent("Carregando…");
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      expect(screen.getByRole("status")).toHaveTextContent("Carregando…");
+      expect(screen.queryByRole("radio")).toBeNull();
+      await act(async () => { resolve(CONFIG_ZOO); });
+      await kindRadio(user, "Solicitação");
+      await next(user);
+      expect(await screen.findByRole("heading", { level: 1, name: ZOONOSES_QUESTION })).toBeInTheDocument();
+    });
+
+    it("public_config recusado: sem a pergunta", async () => {
+      const { configSpy } = stub([ P1 ], CONFIG_ZOO);
+      configSpy.mockRejectedValue(new ApiError(403, "feature_disabled"));
+      const user = userEvent.setup();
+      renderStep();
+      await kindRadio(user, "Solicitação");
+      await next(user);
+      expect(await screen.findByRole("heading", { level: 1, name: "Como você quer se identificar?" })).toBeInTheDocument();
+      expect(screen.queryByText(ZOONOSES_QUESTION)).toBeNull();
+    });
+
+    async function toText(user: User) {
+      await kindRadio(user, "Solicitação");
+      await next(user);
+      await answerAnimal(user, "Sim", "Carrapato");
+      await pickMode(user);
+      await user.type(addressBox(), ADDRESS);
+      await user.click(textbox());
+      await user.paste(TEXT);
+    }
+
+    it("422 place_address: erro no campo do endereço, com foco", async () => {
+      const { create } = stub([ P1 ], CONFIG_ZOO);
+      create.mockRejectedValueOnce(new ApiError(422, "invalid_request", "place_address"));
+      const user = userEvent.setup();
+      renderStep();
+      await toText(user);
+      await send(user);
+      await screen.findByText(pathMessage("place_address"));
+      expect(addressBox()).toHaveAccessibleDescription(pathMessage("place_address"));
+      expect(addressBox()).toHaveFocus();
+      expect(addressBox()).toHaveValue(ADDRESS);
+      expect(textbox()).toHaveValue(TEXT);
+    });
+
+    it("422 zoonoses_subtype: relê, tira a escolha e mantém o texto", async () => {
+      const { create, configSpy } = stub([ P1 ], CONFIG_ZOO);
+      configSpy.mockResolvedValueOnce(CONFIG_ZOO).mockResolvedValueOnce(CONFIG);
+      create.mockRejectedValueOnce(new ApiError(422, "invalid_request", "zoonoses_subtype"));
+      const user = userEvent.setup();
+      renderStep();
+      await toText(user);
+      await send(user);
+      expect(await screen.findByRole("alert")).toHaveTextContent(pathMessage("zoonoses_subtype"));
+      expect(configSpy).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole("textbox", { name: ZOONOSES_ADDRESS_LABEL })).toBeNull();
+      expect(screen.queryByText(ZOONOSES_NOTICE)).toBeNull();
+      expect(textbox()).toHaveValue(TEXT);
+      await send(user);
+      expect(create).toHaveBeenCalledTimes(2);
+      expect(create.mock.calls[1][0].zoonoses ?? null).toBeNull();
+    });
   });
 });

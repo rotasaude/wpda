@@ -1,25 +1,28 @@
 // Nova manifestação (módulo 33; contrato §3, §14): uma pergunta por tela. O texto mora só no estado (nunca em storage, URL ou console).
 // Quem manifesta (Q62): sem pessoa na sessão, CPF e nome (U1, sem o termo da triagem); com uma, ela mesma, sem tela de escolha;
 // com várias, a escolha é obrigatória. Nunca "Outra pessoa".
+// Módulo 35b (contrato §4, §14): com zoonoses, Solicitação e Denúncia perguntam se é sobre animais; subtipo e endereço do local vão ao registro do 33.
 import { useEffect, useId, useRef, useState } from "react";
 import {
-  ApiError, citizenApi, type IdentificationMode, type ManifestationAuthor, type ManifestationKind, type Person
+  ApiError, citizenApi, type IdentificationMode, type ManifestationAuthor, type ManifestationKind, type Person, type ZoonosesSubtype
 } from "../../lib/citizenApi";
 import { fmtCalendarDate } from "../../lib/format";
 import { isValidCpf, maskCpf, onlyDigits } from "../../lib/masks";
 import {
-  BAD_CPF, BODY_MAX, GENERIC_MESSAGE, KIND_OPTIONS, MODE_OPTIONS, PRESERVED_HINT, bodyError, nameError, ombudsmanMessage
+  BAD_CPF, BODY_MAX, GENERIC_MESSAGE, KIND_OPTIONS, MODE_OPTIONS, PRESERVED_HINT, YES_NO_OPTIONS, ZOONOSES_ADDRESS_LABEL,
+  ZOONOSES_NOTICE, ZOONOSES_QUESTION, ZOONOSES_SUBTYPES, bodyError, nameError, ombudsmanMessage, placeAddressError, zoonosesAllowed
 } from "../../lib/ombudsman";
 import { AttachmentPicker, TextArea, UnitSelect, type PickedAttachment } from "./OmbudsmanFields";
 import { personLine } from "./PeopleStep";
 import { BigButton, ErrorText, FROZEN_TEXT_NOTICE, Field, RadioGroup, Screen } from "./ui";
 
 type Unit = { id: string; name: string };
-type Mode = "loading" | "failed" | "identity" | "who" | "kind" | "mode" | "text" | "sent";
+type Mode = "loading" | "failed" | "identity" | "who" | "kind" | "animal" | "subtype" | "mode" | "text" | "sent";
 type Result = { id: string; protocol: string; due_on: string | null };
 
 const WHO_TITLE = "Quem está fazendo a manifestação?";
 const UPLOAD_WAIT = "Aguarde o anexo terminar de subir.";
+const warnNote = { background: "var(--warn-bg)", padding: 12, borderRadius: 12, margin: 0 } as const;
 const linkStyle = { minHeight: 48, background: "none", border: "none", textDecoration: "underline", fontSize: 18, padding: 0,
   textAlign: "left", color: "var(--ink)" } as const;
 
@@ -40,10 +43,14 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
   const [ people, setPeople ] = useState<Person[]>([]);
   const [ units, setUnits ] = useState<Unit[]>([]);
   const [ anonymousWeb, setAnonymousWeb ] = useState(false);
+  const [ zoonosesOn, setZoonosesOn ] = useState(false);
   const [ citizenId, setCitizenId ] = useState<string | undefined>(undefined);
   const [ cpf, setCpf ] = useState("");
   const [ fullName, setFullName ] = useState("");
   const [ kind, setKind ] = useState<string | undefined>(undefined);
+  const [ aboutAnimals, setAboutAnimals ] = useState<string | undefined>(undefined);
+  const [ subtype, setSubtype ] = useState<ZoonosesSubtype | undefined>(undefined);
+  const [ placeAddress, setPlaceAddress ] = useState("");
   const [ idMode, setIdMode ] = useState<string | undefined>(undefined);
   const [ healthUnitId, setHealthUnitId ] = useState<string | null>(null);
   const [ text, setText ] = useState("");
@@ -54,6 +61,9 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
   const [ cpfError, setCpfError ] = useState<string | null>(null);
   const [ nameErr, setNameErr ] = useState<string | null>(null);
   const [ kindError, setKindError ] = useState<string | null>(null);
+  const [ animalError, setAnimalError ] = useState<string | null>(null);
+  const [ subtypeError, setSubtypeError ] = useState<string | null>(null);
+  const [ addressError, setAddressError ] = useState<string | null>(null);
   const [ modeError, setModeError ] = useState<string | null>(null);
   const [ fieldError, setFieldError ] = useState<string | null>(null);
   const [ unitError, setUnitError ] = useState<string | null>(null);
@@ -65,24 +75,28 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
   const inFlight = useRef(false); // o estado só vale no próximo render; o ref fecha a porta no mesmo tick
   const alive = useRef(true);
   const field = useRef<HTMLTextAreaElement>(null);
+  const addressInput = useRef<HTMLInputElement>(null);
   const cpfInput = useRef<HTMLInputElement>(null);
   const nameInput = useRef<HTMLInputElement>(null);
   const waitId = useId();
 
   useEffect(() => {
     alive.current = true;
+    // A tela só sai de "loading" com as duas leituras: com o public_config atrasado, o tipo pularia a pergunta (35b).
+    const config = citizenApi.ombudsmanPublicConfig().then(
+      c => c,
+      () => null // sem configuração: sem unidade, sem o caminho anônimo e sem a pergunta de zoonoses
+    );
     citizenApi.people().then(
-      ({ people: list }) => {
+      async ({ people: list }) => {
+        const c = await config;
         if (!alive.current) return;
+        if (c) { setUnits(c.units); setAnonymousWeb(c.anonymous_web); setZoonosesOn(c.zoonoses === true); }
         setPeople(list);
         if (list.length === 1) setCitizenId(list[0].id);
         setMode(firstMode(list));
       },
       e => { if (alive.current) { setError(ombudsmanMessage(e)); setMode("failed"); } }
-    );
-    citizenApi.ombudsmanPublicConfig().then(
-      c => { if (alive.current) { setUnits(c.units); setAnonymousWeb(c.anonymous_web); } },
-      () => { /* sem configuração: sem unidade e sem o caminho anônimo */ }
     );
     return () => { alive.current = false; };
   }, []);
@@ -109,9 +123,34 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
     go("kind");
   }
 
+  function clearZoonoses() {
+    setAboutAnimals(undefined);
+    setSubtype(undefined);
+    setPlaceAddress("");
+    setAddressError(null);
+  }
+
+  // Só Solicitação e Denúncia, e só com o interruptor ligado, fazem a pergunta; qualquer outro caminho apaga o que sobrou.
   function continueKind() {
     if (!kind) return setKindError("Escolha o tipo.");
+    if (zoonosesOn && zoonosesAllowed(kind)) return go("animal");
+    clearZoonoses();
     go("mode");
+  }
+
+  function continueAnimal() {
+    if (!aboutAnimals) return setAnimalError("Escolha uma opção.");
+    if (aboutAnimals === "no") { clearZoonoses(); setAboutAnimals("no"); return go("mode"); }
+    go("subtype");
+  }
+
+  function continueSubtype() {
+    if (!subtype) return setSubtypeError("Escolha o assunto.");
+    go("mode");
+  }
+
+  function modeBack() {
+    go(aboutAnimals === "yes" ? "subtype" : aboutAnimals === "no" ? "animal" : "kind");
   }
 
   function continueMode() {
@@ -147,6 +186,14 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
     citizenApi.ombudsmanPublicConfig().then(c => { if (alive.current) setUnits(c.units); }, () => { /* fica a lista que havia */ });
   }
 
+  // O interruptor mudou entre a leitura e o envio: relê, tira a pergunta e mantém o texto.
+  function refreshZoonoses() {
+    citizenApi.ombudsmanPublicConfig().then(
+      c => { if (alive.current) { setUnits(c.units); setZoonosesOn(c.zoonoses === true); } },
+      () => { if (alive.current) setZoonosesOn(false); }
+    );
+  }
+
   function failIdentity(set: (m: string) => void, message: string) {
     set(message);
     setMode("identity");
@@ -154,7 +201,10 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
 
   async function submit() {
     if (inFlight.current || uploading) return;
-    setError(null); setFieldError(null); setUnitError(null); setAttachError(null);
+    setError(null); setFieldError(null); setUnitError(null); setAttachError(null); setAddressError(null);
+    const withZoonoses = zoonosesOn && zoonosesAllowed(kind) && aboutAnimals === "yes" && subtype !== undefined;
+    const addressBad = withZoonoses ? placeAddressError(placeAddress) : null;
+    if (addressBad) { setAddressError(addressBad); return addressInput.current?.focus(); }
     const local = bodyError(text);
     if (local) return failField(local);
     // Com pessoa na sessão, só vai uma delas: sem escolha, nada sai (nunca um citizen_id vazio).
@@ -167,7 +217,8 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
     try {
       const r = await citizenApi.createManifestation({
         who, kind: kind as ManifestationKind, mode: idMode as IdentificationMode, body: text.trim(),
-        healthUnitId, attachmentIds: attachments.map(a => a.id)
+        healthUnitId, attachmentIds: attachments.map(a => a.id),
+        ...(withZoonoses && subtype ? { zoonoses: { subtype, placeAddress: placeAddress.trim() } } : {})
       });
       if (!alive.current) return;
       setResult(r);
@@ -179,6 +230,8 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
       else if (isCode(e, "invalid_cpf") || invalidPath(e, "cpf")) failIdentity(setCpfError, message);
       else if (invalidPath(e, "full_name")) failIdentity(setNameErr, message);
       else if (isCode(e, "too_many_people")) failIdentity(setError, message);
+      else if (invalidPath(e, "place_address")) { setAddressError(message); addressInput.current?.focus(); }
+      else if (invalidPath(e, "zoonoses_subtype")) { refreshZoonoses(); clearZoonoses(); setError(message); }
       else if (invalidPath(e, "body")) failField(bodyError(text) ?? message);
       else if (invalidPath(e, "health_unit_id")) { setUnitError(message); refreshUnits(); }
       else if (invalidPath(e, "attachment_ids") || isCode(e, "too_many_attachments")) setAttachError(message);
@@ -252,9 +305,27 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
     );
   }
 
+  if (mode === "animal") {
+    return (
+      <Screen title={ZOONOSES_QUESTION} footer={nav(continueAnimal, () => go("kind"))}>
+        <RadioGroup legend={ZOONOSES_QUESTION} options={YES_NO_OPTIONS} value={aboutAnimals} error={animalError ?? undefined}
+          onChange={a => { setAboutAnimals(a); setAnimalError(null); }} />
+      </Screen>
+    );
+  }
+
+  if (mode === "subtype") {
+    return (
+      <Screen title="O que está acontecendo?" footer={nav(continueSubtype, () => go("animal"))}>
+        <RadioGroup legend="Assunto" options={ZOONOSES_SUBTYPES} value={subtype} error={subtypeError ?? undefined}
+          onChange={t => { setSubtype(t as ZoonosesSubtype); setSubtypeError(null); }} />
+      </Screen>
+    );
+  }
+
   if (mode === "mode") {
     return (
-      <Screen title="Como você quer se identificar?" footer={nav(continueMode, () => go("kind"))}>
+      <Screen title="Como você quer se identificar?" footer={nav(continueMode, modeBack)}>
         <RadioGroup legend="Forma de identificação" options={MODES} value={idMode} error={modeError ?? undefined}
           onChange={m => { setIdMode(m); setModeError(null); }} />
       </Screen>
@@ -270,6 +341,13 @@ export function NewManifestationStep({ onBack, onDone, onAnonymous }: {
         </BigButton>
         <BigButton variant="secondary" disabled={busy} onClick={() => go("mode")}>Voltar</BigButton>
       </>}>
+      {subtype && (
+        <>
+          <div style={{ marginBottom: 12 }}><p style={warnNote}>{ZOONOSES_NOTICE}</p></div>
+          <Field ref={addressInput} label={ZOONOSES_ADDRESS_LABEL} autoComplete="off" value={placeAddress} readOnly={busy}
+            error={addressError ?? undefined} onChange={e => { setPlaceAddress(e.target.value); setAddressError(null); }} />
+        </>
+      )}
       <UnitSelect units={units} value={healthUnitId} disabled={busy} onChange={id => { setHealthUnitId(id); setUnitError(null); }} />
       {unitError && <div style={{ marginBottom: 12 }}><ErrorText>{unitError}</ErrorText></div>}
       <TextArea ref={field} label="Conte o que aconteceu" hint={idMode === "preserved" ? PRESERVED_HINT : FROZEN_TEXT_NOTICE}
